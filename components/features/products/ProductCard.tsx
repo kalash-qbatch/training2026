@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Product, ProductVariant } from "@/types";
 import { formatCurrency } from "@/lib/utils";
@@ -83,10 +82,7 @@ export function ProductCard({ product }: { product: Product }) {
 
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-[4px] border border-[#d0d5dd] bg-white">
-      <Link
-        href={`/products/${product.id}`}
-        className="relative block aspect-[5/4] w-full bg-[#f3f4f6]"
-      >
+      <div className="relative aspect-[5/4] w-full bg-[#f3f4f6]">
         <Image
           src={product.imageUrl}
           alt={product.name}
@@ -99,13 +95,11 @@ export function ProductCard({ product }: { product: Product }) {
             Out Of Stock
           </span>
         ) : null}
-      </Link>
+      </div>
 
       <div className="flex flex-1 flex-col px-3 pb-3 pt-2.5">
         <h3 className="line-clamp-2 min-h-[40px] text-[14px] font-semibold leading-[20px] text-[#111827]">
-          <Link href={`/products/${product.id}`} className="hover:text-brand-500">
-            {product.name}
-          </Link>
+          {product.name}
         </h3>
 
         <div className="mt-2 flex items-center justify-between gap-2">
@@ -132,7 +126,7 @@ export function ProductCard({ product }: { product: Product }) {
           <select
             value={size}
             onChange={(e) => setSize(e.target.value)}
-            className="h-9 rounded-[3px] border border-[#d0d5dd] bg-white px-2 text-[12px] text-[#333] outline-none focus:border-brand-500 disabled:opacity-50"
+            className="h-9 rounded-[3px] cursor-pointer border border-[#d0d5dd] bg-white px-2 text-[12px] text-[#333] outline-none focus:border-brand-500 disabled:opacity-50"
             aria-label="Select size"
           >
             <option value="" disabled>
@@ -171,7 +165,7 @@ export function ProductCard({ product }: { product: Product }) {
           <button
             type="button"
             disabled={outOfStock || !color || !size}
-            className="h-[34px] flex-1 rounded-[3px] bg-brand-500 px-3 text-[13px] font-semibold text-white transition hover:bg-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="h-[34px] flex-1 rounded-[3px] cursor-pointer bg-brand-500 px-3 text-[13px] font-semibold text-white transition hover:bg-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
             onClick={() => {
               if (!isAuthenticated) {
                 router.push("/login");

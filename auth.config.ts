@@ -65,7 +65,6 @@ export default {
       const isStorefrontRoute =
         pathname === "/" ||
         pathname === "/products" ||
-        pathname.startsWith("/products/") ||
         pathname.startsWith("/cart");
 
       if (isLoggedIn && isAdmin && isStorefrontRoute) {
@@ -73,9 +72,7 @@ export default {
       }
 
       const isPublicRoute =
-        pathname === "/" ||
-        pathname === "/products" ||
-        pathname.startsWith("/products/");
+        pathname === "/" || pathname === "/products";
 
       if (isPublicRoute) {
         return true;
