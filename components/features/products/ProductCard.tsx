@@ -114,11 +114,9 @@ export function ProductCard({ product }: { product: Product }) {
               outOfStock ? "text-[#e53935]" : "text-[#22c55e]"
             }`}
           >
-            {invalidCombo
-              ? "Unavailable"
-              : outOfStock
-                ? "Out of stock"
-                : `${stock} Items Left`}
+            {outOfStock || invalidCombo
+              ? "Out of stock"
+              : `${stock} Items Left`}
           </p>
         </div>
 
@@ -172,7 +170,7 @@ export function ProductCard({ product }: { product: Product }) {
                 return;
               }
               if (invalidCombo) {
-                toast.error("That color and size combination is unavailable");
+                toast.error("That color and size combination is out of stock");
                 return;
               }
               const result = addItem(product, qty, { size, color });

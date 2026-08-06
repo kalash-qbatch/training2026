@@ -174,7 +174,7 @@ export function CartPageClient() {
         })}
       </ul>
 
-      <div className="mt-10 flex justify-end">
+      <div className="mt-10 flex justify-center md:justify-end">
         <CartSummary
           subtotal={subtotal}
           tax={tax}
