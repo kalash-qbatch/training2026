@@ -4,8 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import type { Order } from "@/types";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import {
+  formatCurrency,
+  formatDate,
+  orderStatusClass,
+  orderStatusLabel,
+} from "@/lib/utils";
 import { fetchAdminOrder } from "@/lib/api/admin";
+import { OrderStatusSelect } from "@/components/admin/OrderStatusSelect";
 
 export function OrderDetailClient({ orderId }: { orderId: string }) {
   const [order, setOrder] = useState<Order | null>(null);
@@ -62,14 +68,25 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
         Order Detail
       </Link>
 
-      <div className="mb-6 grid gap-4 border-b border-[#e5e7eb] pb-5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-        <Meta label="Date" value={formatDate(order.date)} />
-        <Meta label="Order #" value={order.id} />
-        <Meta label="User" value={order.userName} />
-        <Meta label="Products" value={String(units).padStart(2, "0")} />
-        <Meta label="Sub Total" value={formatCurrency(subTotal)} />
-        <Meta label="Tax" value={formatCurrency(tax)} />
-        <Meta label="Total" value={formatCurrency(order.amount)} />
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-[#e5e7eb] pb-5">
+        <div className="grid flex-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+          <Meta label="Date" value={formatDate(order.date)} />
+          <Meta label="Order #" value={order.id} />
+          <Meta label="User" value={order.userName} />
+          <Meta label="Products" value={String(units).padStart(2, "0")} />
+          <Meta label="Sub Total" value={formatCurrency(subTotal)} />
+          <Meta label="Tax" value={formatCurrency(tax)} />
+          <Meta label="Total" value={formatCurrency(order.amount)} />
+        </div>
+        <div className="flex flex-col gap-2">
+          <p className="text-[12px] text-[#8a94a6]">Status</p>
+          <span
+            className={`inline-flex w-fit rounded px-2.5 py-1 text-[11px] font-semibold ${orderStatusClass(order.status)}`}
+          >
+            {orderStatusLabel(order.status)}
+          </span>
+          <OrderStatusSelect order={order} onUpdated={setOrder} />
+        </div>
       </div>
 
       <h2 className="mb-4 text-[15px] font-semibold text-[#2563EB]">

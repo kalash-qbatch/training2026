@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { getProducts } from "@/lib/api/products";
 import { placeOrder as placeOrderApi } from "@/lib/api/orders";
 import { useCartStore } from "@/lib/store/useCartStore";
 import { useAuthStore } from "@/lib/store/useAuthStore";
@@ -26,18 +25,11 @@ export function CartPageClient() {
   const items = useCartStore((s) => s.items);
   const updateQty = useCartStore((s) => s.updateQty);
   const removeItem = useCartStore((s) => s.removeItem);
-  const removeMissingProducts = useCartStore((s) => s.removeMissingProducts);
-  const addLocalOrder = useCartStore((s) => s.addLocalOrder);
+  const removeItems = useCartStore((s) => s.removeItems);
 
   const [pendingRemove, setPendingRemove] = useState<CartItem | null>(null);
   const [placing, setPlacing] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    getProducts({ pageSize: 100 })
-      .then((data) => removeMissingProducts(data.products.map((p) => p.id)))
-      .catch(() => {});
-  }, [removeMissingProducts]);
 
   useEffect(() => {
     const keys = new Set(items.map(itemKey));
@@ -137,9 +129,14 @@ export function CartPageClient() {
                       return next;
                     });
                   }}
-                  onQtyChange={(qty) =>
-                    updateQty(item.productId, qty, item.size, item.color)
-                  }
+                  onQtyChange={(qty) => {
+                    void updateQty(item.productId, qty, item.size, item.color).catch(
+                      (err: unknown) =>
+                        toast.error(
+                          err instanceof Error ? err.message : "Failed to update qty"
+                        )
+                    );
+                  }}
                   onRemove={() => setPendingRemove(item)}
                 />
               );
@@ -165,9 +162,14 @@ export function CartPageClient() {
                   return next;
                 });
               }}
-              onQtyChange={(qty) =>
-                updateQty(item.productId, qty, item.size, item.color)
-              }
+              onQtyChange={(qty) => {
+                void updateQty(item.productId, qty, item.size, item.color).catch(
+                  (err: unknown) =>
+                    toast.error(
+                      err instanceof Error ? err.message : "Failed to update qty"
+                    )
+                );
+              }}
               onRemove={() => setPendingRemove(item)}
             />
           );
@@ -192,7 +194,7 @@ export function CartPageClient() {
             }
             setPlacing(true);
             try {
-              const order = await placeOrderApi(
+              await placeOrderApi(
                 selectedItems.map((i) => ({
                   productId: i.productId,
                   quantity: i.qty,
@@ -200,10 +202,13 @@ export function CartPageClient() {
                   size: i.size,
                 }))
               );
-              addLocalOrder(order);
-              for (const i of selectedItems) {
-                removeItem(i.productId, i.size, i.color);
-              }
+              await removeItems(
+                selectedItems.map((i) => ({
+                  productId: i.productId,
+                  size: i.size,
+                  color: i.color,
+                }))
+              );
               toast.success("Awesome, Your order has been placed successfully.");
               const remaining = items.length - selectedItems.length;
               if (remaining <= 0) {
@@ -226,12 +231,17 @@ export function CartPageClient() {
         onClose={() => setPendingRemove(null)}
         onConfirm={() => {
           if (pendingRemove) {
-            removeItem(
+            void removeItem(
               pendingRemove.productId,
               pendingRemove.size,
               pendingRemove.color
-            );
-            toast.success("Item removed from bag");
+            )
+              .then(() => toast.success("Item removed from bag"))
+              .catch((err: unknown) =>
+                toast.error(
+                  err instanceof Error ? err.message : "Failed to remove item"
+                )
+              );
           }
           setPendingRemove(null);
         }}

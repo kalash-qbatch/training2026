@@ -1,19 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin";
-import {
-  createProduct,
-  findAdminProducts,
-  type StockFilter,
-} from "@/lib/services/products";
+import { createProduct, findAdminProducts } from "@/lib/services/products";
 import { getProductError, productErrorStatus } from "@/lib/errors/products";
 import { adminProductSchema } from "@/lib/validations/admin";
-
-function parsePriceParam(raw: string | null): number | undefined {
-  if (!raw?.trim()) return undefined;
-  const value = Number(raw);
-  if (!Number.isFinite(value) || value < 0) return undefined;
-  return value;
-}
 
 export async function GET(request: Request) {
   const { error } = await requireAdmin();
@@ -23,9 +12,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const result = await findAdminProducts({
       search: searchParams.get("search") ?? undefined,
-      stock: (searchParams.get("stock") as StockFilter | null) ?? "all",
-      minPrice: parsePriceParam(searchParams.get("minPrice")),
-      maxPrice: parsePriceParam(searchParams.get("maxPrice")),
+      categoryId: searchParams.get("categoryId") ?? undefined,
       page: Number(searchParams.get("page") || 1),
       pageSize: Number(searchParams.get("pageSize") || 8),
     });
@@ -65,6 +52,8 @@ export async function POST(request: Request) {
       color: parsed.data.color,
       size: parsed.data.size,
       variants: parsed.data.variants,
+      categoryId: parsed.data.categoryId,
+      categoryName: parsed.data.categoryName,
     });
 
     return NextResponse.json({

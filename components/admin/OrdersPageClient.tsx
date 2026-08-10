@@ -16,7 +16,7 @@ import {
   orderStatusClass,
   orderStatusLabel,
 } from "@/lib/utils";
-import { fetchAdminOrders, fetchAdminUsers } from "@/lib/api/admin";
+import { fetchAdminOrders } from "@/lib/api/admin";
 import { useToast } from "@/components/ui/Toast";
 import { AdminPagination } from "@/components/admin/AdminPagination";
 
@@ -59,19 +59,10 @@ export function OrdersPageClient() {
     totalUnits: 0,
     totalAmount: 0,
   });
-  const [users, setUsers] = useState<
-    Array<{ id: string; fullName: string; email: string }>
-  >([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
-  const [userId, setUserId] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [minAmount, setMinAmount] = useState("");
-  const [maxAmount, setMaxAmount] = useState("");
-  const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -79,23 +70,11 @@ export function OrdersPageClient() {
     return () => window.clearTimeout(t);
   }, [search]);
 
-  useEffect(() => {
-    fetchAdminUsers()
-      .then(setUsers)
-      .catch(() => undefined);
-  }, []);
-
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const data = await fetchAdminOrders({
         search: debounced,
-        userId,
-        dateFrom,
-        dateTo,
-        minAmount,
-        maxAmount,
-        status,
         page,
       });
       setOrders(data.orders);
@@ -106,17 +85,7 @@ export function OrdersPageClient() {
     } finally {
       setLoading(false);
     }
-  }, [
-    debounced,
-    userId,
-    dateFrom,
-    dateTo,
-    minAmount,
-    maxAmount,
-    status,
-    page,
-    toast,
-  ]);
+  }, [debounced, page, toast]);
 
   useEffect(() => {
     void load();
@@ -124,7 +93,7 @@ export function OrdersPageClient() {
 
   useEffect(() => {
     setPage(1);
-  }, [debounced, userId, dateFrom, dateTo, minAmount, maxAmount, status]);
+  }, [debounced]);
 
   return (
     <div>
@@ -158,59 +127,6 @@ export function OrdersPageClient() {
           />
           <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a94a6]" />
         </div>
-      </div>
-
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <select
-          value={userId}
-          onChange={(e) => setUserId(e.target.value)}
-          className={inputClass}
-        >
-          <option value="">All users</option>
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.fullName} ({u.email})
-            </option>
-          ))}
-        </select>
-        <input
-          type="date"
-          value={dateFrom}
-          onChange={(e) => setDateFrom(e.target.value)}
-          className={inputClass}
-        />
-        <input
-          type="date"
-          value={dateTo}
-          onChange={(e) => setDateTo(e.target.value)}
-          className={inputClass}
-        />
-        <input
-          type="number"
-          value={minAmount}
-          onChange={(e) => setMinAmount(e.target.value)}
-          placeholder="Min amount"
-          className={inputClass}
-        />
-        <input
-          type="number"
-          value={maxAmount}
-          onChange={(e) => setMaxAmount(e.target.value)}
-          placeholder="Max amount"
-          className={inputClass}
-        />
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className={inputClass}
-        >
-          <option value="">All statuses</option>
-          <option value="PENDING">Pending</option>
-          <option value="PROCESSING">Processing</option>
-          <option value="SHIPPED">Shipped</option>
-          <option value="DELIVERED">Delivered</option>
-          <option value="CANCELLED">Cancelled</option>
-        </select>
       </div>
 
       <div className="overflow-x-auto">

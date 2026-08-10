@@ -21,6 +21,30 @@ export function formatDate(iso: string) {
   }).format(new Date(iso));
 }
 
+export function formatRelativeTime(iso: string) {
+  const date = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHour = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHour / 24);
+
+  if (diffSec < 60) {
+    return "Just now";
+  }
+  if (diffMin < 60) {
+    return `${diffMin}m ago`;
+  }
+  if (diffHour < 24) {
+    return `${diffHour}h ago`;
+  }
+  if (diffDay < 7) {
+    return `${diffDay}d ago`;
+  }
+  return formatDate(iso);
+}
+
 const COLOR_SWATCHES: Record<string, string> = {
   black: "#111827",
   blue: "#2563EB",
@@ -45,16 +69,53 @@ export function colorSwatch(color?: string) {
   return COLOR_SWATCHES[color.toLowerCase()] ?? "#94A3B8";
 }
 
+/** True when a hex background is light enough that white text is hard to read. */
+export function isLightSwatch(hex: string) {
+  const raw = hex.replace("#", "");
+  const full =
+    raw.length === 3
+      ? raw
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      : raw;
+  if (full.length !== 6) return false;
+  const r = parseInt(full.slice(0, 2), 16) / 255;
+  const g = parseInt(full.slice(2, 4), 16) / 255;
+  const b = parseInt(full.slice(4, 6), 16) / 255;
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return luminance > 0.55;
+}
+
 export function orderStatusLabel(status: string) {
   switch (status) {
     case "delivered":
       return "Delivered";
     case "shipped":
-      return "Dispatched";
+      return "Approved";
     case "cancelled":
-      return "Rejected";
+      return "Cancelled";
     default:
       return "In Progress";
+  }
+}
+
+/** Map UI/API order status → Prisma enum for admin select. */
+export function toAdminOrderStatus(
+  status: string
+): "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED" {
+  switch (status) {
+    case "delivered":
+    case "DELIVERED":
+      return "DELIVERED";
+    case "shipped":
+    case "SHIPPED":
+      return "SHIPPED";
+    case "cancelled":
+    case "CANCELLED":
+      return "CANCELLED";
+    default:
+      return "PROCESSING";
   }
 }
 

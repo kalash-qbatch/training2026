@@ -15,6 +15,12 @@ export type ProductVariant = {
   qty: number;
 };
 
+export type Category = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
 export type Product = {
   id: string;
   name: string;
@@ -26,6 +32,8 @@ export type Product = {
   colors?: string[];
   sizes?: string[];
   variants?: ProductVariant[];
+  categoryId?: string;
+  category?: Category;
 };
 
 export type AdminOrderStats = {

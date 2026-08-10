@@ -20,6 +20,7 @@ export function QtyStepper({
 }: QtyStepperProps) {
   const cell =
     "flex h-[34px] w-[34px] shrink-0 items-center justify-center border border-[#d0d5dd] bg-white text-[13px]";
+  const atMin = value <= min;
   const atMax = max != null && value >= max;
 
   return (
@@ -27,8 +28,11 @@ export function QtyStepper({
       <button
         type="button"
         aria-label="Decrease quantity"
-        className={cn(cell, "text-brand-500 hover:bg-[#f0f6ff] disabled:opacity-40")}
-        disabled={value <= min}
+        className={cn(
+          cell,
+          "text-brand-500 hover:bg-[#f0f6ff] disabled:cursor-not-allowed disabled:opacity-40"
+        )}
+        disabled={atMin}
         onClick={() => onChange(Math.max(min, value - 1))}
       >
         <Minus className="h-3.5 w-3.5" strokeWidth={2.5} />
@@ -37,12 +41,15 @@ export function QtyStepper({
         className={cn(cell, "-mx-px font-medium tabular-nums text-[#333333]")}
         aria-live="polite"
       >
-        {String(value).padStart(2, "0")}
+        {value}
       </span>
       <button
         type="button"
         aria-label="Increase quantity"
-        className={cn(cell, "text-brand-500 hover:bg-[#f0f6ff] disabled:opacity-40")}
+        className={cn(
+          cell,
+          "text-brand-500 hover:bg-[#f0f6ff] disabled:cursor-not-allowed disabled:opacity-40"
+        )}
         disabled={atMax}
         onClick={() => {
           const next = value + 1;

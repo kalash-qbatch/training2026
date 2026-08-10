@@ -36,6 +36,8 @@ export async function PUT(request: Request, context: Ctx) {
       color: parsed.data.color,
       size: parsed.data.size,
       variants: parsed.data.variants,
+      categoryId: parsed.data.categoryId,
+      categoryName: parsed.data.categoryName,
     });
 
     return NextResponse.json({

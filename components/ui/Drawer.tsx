@@ -79,7 +79,7 @@ export function Drawer({
             type="button"
             id={titleId}
             onClick={handleBack}
-            className="inline-flex items-center gap-2 text-[15px] font-semibold text-[#2563EB] transition hover:text-[#1e6aef]"
+            className="inline-flex cursor-pointer items-center gap-2 text-[15px] font-semibold text-[#2563EB] transition hover:text-[#1e6aef]"
             aria-label={`Back from ${title}`}
           >
             <ArrowLeft className="h-4 w-4 shrink-0" strokeWidth={2.25} />

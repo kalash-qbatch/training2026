@@ -2,8 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Camera, Pencil, Plus, Trash2 } from "lucide-react";
-import type { Product, ProductVariant } from "@/types";
-import { uploadAdminImage } from "@/lib/api/admin";
+import type { Category, Product, ProductVariant } from "@/types";
+import {
+  createAdminCategory,
+  fetchAdminCategories,
+  uploadAdminImage,
+} from "@/lib/api/admin";
 import { Drawer } from "@/components/ui/Drawer";
 
 const COLOR_OPTIONS = [
@@ -17,12 +21,14 @@ const COLOR_OPTIONS = [
   "Yellow",
 ];
 const SIZE_OPTIONS = ["Small", "Medium", "Large", "XL", "XXL"];
+const NEW_CATEGORY = "__new__";
 
 type FormState = {
   title: string;
   price: string;
   stock: string;
   image: string;
+  categoryId: string;
 };
 
 type DraftVariant = {
@@ -32,7 +38,7 @@ type DraftVariant = {
 };
 
 function emptyForm(): FormState {
-  return { title: "", price: "", stock: "", image: "" };
+  return { title: "", price: "", stock: "", image: "", categoryId: "" };
 }
 
 function emptyDraft(): DraftVariant {
@@ -67,6 +73,10 @@ function ProductFormFields({
   setDraft,
   variants,
   setVariants,
+  categories,
+  setCategories,
+  newCategoryName,
+  setNewCategoryName,
   error,
   setError,
   loading,
@@ -81,6 +91,10 @@ function ProductFormFields({
   setDraft: React.Dispatch<React.SetStateAction<DraftVariant>>;
   variants: ProductVariant[];
   setVariants: React.Dispatch<React.SetStateAction<ProductVariant[]>>;
+  categories: Category[];
+  setCategories: React.Dispatch<React.SetStateAction<Category[]>>;
+  newCategoryName: string;
+  setNewCategoryName: React.Dispatch<React.SetStateAction<string>>;
   error: string;
   setError: React.Dispatch<React.SetStateAction<string>>;
   loading: boolean;
@@ -90,6 +104,30 @@ function ProductFormFields({
   onUpload: (file: File) => Promise<void>;
 }) {
   const hasVariants = variants.length > 0;
+  const [creatingCategory, setCreatingCategory] = useState(false);
+
+  async function saveNewCategory() {
+    const name = newCategoryName.trim();
+    if (!name) {
+      setError("Enter a category name");
+      return;
+    }
+    setCreatingCategory(true);
+    setError("");
+    try {
+      const category = await createAdminCategory(name);
+      setCategories((prev) => {
+        if (prev.some((c) => c.id === category.id)) return prev;
+        return [...prev, category].sort((a, b) => a.name.localeCompare(b.name));
+      });
+      setForm((f) => ({ ...f, categoryId: category.id }));
+      setNewCategoryName("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create category");
+    } finally {
+      setCreatingCategory(false);
+    }
+  }
 
   function addVariant() {
     if (!draft.color || !draft.size || draft.qty === "") {
@@ -123,6 +161,19 @@ function ProductFormFields({
     setForm((f) => ({
       ...f,
       stock: totalStock(next, f.stock),
+    }));
+  }
+
+  function updateVariantQty(index: number, raw: string) {
+    const qty = Number(raw);
+    if (!Number.isFinite(qty) || qty < 0) return;
+    const next = variants.map((v, i) =>
+      i === index ? { ...v, qty: Math.floor(qty) } : v
+    );
+    setVariants(next);
+    setForm((f) => ({
+      ...f,
+      stock: String(next.reduce((sum, v) => sum + v.qty, 0)),
     }));
   }
 
@@ -189,7 +240,7 @@ function ProductFormFields({
               />
             </label>
             <label className="block text-[12px] font-medium text-[#6b7280]">
-              Quantity
+              Quantity (total)
               <input
                 required
                 type="number"
@@ -200,12 +251,54 @@ function ProductFormFields({
                 className="mt-1.5 h-10 w-full rounded-md border border-[#d0d5dd] px-3 text-[13px] text-[#333] outline-none focus:border-[#2563EB] read-only:bg-[#f8fafc]"
                 title={
                   hasVariants
-                    ? "Total stock is the sum of all color/size quantities"
+                    ? "Auto total from color/size rows — edit qty on each row below"
                     : undefined
                 }
               />
             </label>
           </div>
+          <label className="block text-[12px] font-medium text-[#6b7280]">
+            Category
+            <select
+              required
+              value={form.categoryId}
+              onChange={(e) => {
+                const value = e.target.value;
+                setForm((f) => ({
+                  ...f,
+                  categoryId: value === NEW_CATEGORY ? NEW_CATEGORY : value,
+                }));
+                if (value !== NEW_CATEGORY) setNewCategoryName("");
+              }}
+              className="mt-1.5 h-10 w-full rounded-md border border-[#d0d5dd] bg-white px-3 text-[13px] text-[#333] outline-none focus:border-[#2563EB]"
+            >
+              <option value="">Select category</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+              <option value={NEW_CATEGORY}>+ Create new category</option>
+            </select>
+          </label>
+          {form.categoryId === NEW_CATEGORY ? (
+            <div className="flex gap-2">
+              <input
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="New category name"
+                className="h-10 min-w-0 flex-1 rounded-md border border-[#d0d5dd] px-3 text-[13px] text-[#333] outline-none focus:border-[#2563EB]"
+              />
+              <button
+                type="button"
+                disabled={creatingCategory}
+                onClick={() => void saveNewCategory()}
+                className="shrink-0 rounded-md bg-[#2563EB] px-3 text-[13px] font-medium text-white hover:bg-[#1e6aef] disabled:opacity-60"
+              >
+                {creatingCategory ? "Saving…" : "Add"}
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -262,6 +355,9 @@ function ProductFormFields({
           </button>
         </div>
 
+        <p className="text-[12px] text-[#8a94a6]">
+          Color / size stock — edit <strong>Qty</strong> on each row (this is what the storefront uses)
+        </p>
         <div className="space-y-2">
           {variants.map((v, index) => (
             <div
@@ -274,9 +370,14 @@ function ProductFormFields({
               <div className="flex h-10 items-center rounded-md border border-[#d0d5dd] px-3 text-[13px] text-[#333]">
                 {v.size}
               </div>
-              <div className="flex h-10 items-center rounded-md border border-[#d0d5dd] px-3 text-[13px] tabular-nums text-[#333]">
-                {v.qty}
-              </div>
+              <input
+                type="number"
+                min={0}
+                value={v.qty}
+                onChange={(e) => updateVariantQty(index, e.target.value)}
+                className="h-10 w-full rounded-md border border-[#d0d5dd] px-3 text-[13px] tabular-nums text-[#333] outline-none focus:border-[#2563EB]"
+                aria-label={`Quantity for ${v.color} ${v.size}`}
+              />
               <button
                 type="button"
                 onClick={() => removeVariant(index)}
@@ -313,7 +414,22 @@ export type ProductSavePayload = {
   color?: string;
   size?: string;
   variants: ProductVariant[];
+  categoryId?: string | null;
 };
+
+function useCategoryLoader(open: boolean) {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [newCategoryName, setNewCategoryName] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    void fetchAdminCategories()
+      .then(setCategories)
+      .catch(() => setCategories([]));
+  }, [open]);
+
+  return { categories, setCategories, newCategoryName, setNewCategoryName };
+}
 
 export function AddProductDrawer({
   open,
@@ -330,14 +446,17 @@ export function AddProductDrawer({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const { categories, setCategories, newCategoryName, setNewCategoryName } =
+    useCategoryLoader(open);
 
   useEffect(() => {
     if (!open) return;
     setForm(emptyForm());
     setDraft(emptyDraft());
     setVariants([]);
+    setNewCategoryName("");
     setError("");
-  }, [open]);
+  }, [open, setNewCategoryName]);
 
   async function onUpload(file: File) {
     try {
@@ -357,6 +476,10 @@ export function AddProductDrawer({
         setDraft={setDraft}
         variants={variants}
         setVariants={setVariants}
+        categories={categories}
+        setCategories={setCategories}
+        newCategoryName={newCategoryName}
+        setNewCategoryName={setNewCategoryName}
         error={error}
         setError={setError}
         loading={loading}
@@ -364,6 +487,10 @@ export function AddProductDrawer({
         fileRef={fileRef}
         onUpload={onUpload}
         onSubmit={async () => {
+          if (!form.categoryId || form.categoryId === NEW_CATEGORY) {
+            setError("Select or create a category first");
+            return;
+          }
           setLoading(true);
           setError("");
           try {
@@ -379,6 +506,7 @@ export function AddProductDrawer({
               color: variants[0]?.color,
               size: variants[0]?.size,
               variants,
+              categoryId: form.categoryId,
             });
             onClose();
           } catch (err) {
@@ -409,6 +537,8 @@ export function EditProductDrawer({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const { categories, setCategories, newCategoryName, setNewCategoryName } =
+    useCategoryLoader(open);
 
   useEffect(() => {
     if (!product || !open) return;
@@ -418,11 +548,13 @@ export function EditProductDrawer({
       price: String(product.price),
       stock: totalStock(nextVariants, String(product.stock ?? 0)),
       image: product.imageUrl,
+      categoryId: product.categoryId ?? product.category?.id ?? "",
     });
     setVariants(nextVariants);
     setDraft(emptyDraft());
+    setNewCategoryName("");
     setError("");
-  }, [product, open]);
+  }, [product, open, setNewCategoryName]);
 
   async function onUpload(file: File) {
     try {
@@ -442,6 +574,10 @@ export function EditProductDrawer({
         setDraft={setDraft}
         variants={variants}
         setVariants={setVariants}
+        categories={categories}
+        setCategories={setCategories}
+        newCategoryName={newCategoryName}
+        setNewCategoryName={setNewCategoryName}
         error={error}
         setError={setError}
         loading={loading}
@@ -449,6 +585,10 @@ export function EditProductDrawer({
         fileRef={fileRef}
         onUpload={onUpload}
         onSubmit={async () => {
+          if (!form.categoryId || form.categoryId === NEW_CATEGORY) {
+            setError("Select or create a category first");
+            return;
+          }
           setLoading(true);
           setError("");
           try {
@@ -464,6 +604,7 @@ export function EditProductDrawer({
               color: variants[0]?.color,
               size: variants[0]?.size,
               variants,
+              categoryId: form.categoryId,
             });
             onClose();
           } catch (err) {

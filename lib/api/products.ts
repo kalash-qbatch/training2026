@@ -9,8 +9,10 @@ export async function getProducts(opts?: {
   sort?: ProductSort;
   page?: number;
   pageSize?: number;
+  categoryId?: string;
+  categorySlug?: string;
   sizeFilters?: SizeFilter[];
-  colorFilters?: ColorFilter[]; 
+  colorFilters?: ColorFilter[];
 }): Promise<{
   products: Product[];
   total: number;
@@ -23,6 +25,8 @@ export async function getProducts(opts?: {
   if (opts?.sort) params.set("sort", opts.sort);
   if (opts?.page) params.set("page", String(opts.page));
   if (opts?.pageSize) params.set("pageSize", String(opts.pageSize));
+  if (opts?.categoryId) params.set("categoryId", opts.categoryId);
+  if (opts?.categorySlug) params.set("category", opts.categorySlug);
 
   const res = await fetch(`/api/products?${params.toString()}`, {
     cache: "no-store",
@@ -61,4 +65,17 @@ export async function getProductById(id: string): Promise<Product | null> {
     throw new Error(data.error || "Failed to load product");
   }
   return data.product ?? null;
+}
+
+export async function getCategories() {
+  const res = await fetch("/api/categories", { cache: "no-store" });
+  const data = (await res.json()) as {
+    success?: boolean;
+    categories?: Array<{ id: string; name: string; slug: string }>;
+    error?: string;
+  };
+  if (!res.ok || !data.success || !data.categories) {
+    throw new Error(data.error || "Failed to load categories");
+  }
+  return data.categories;
 }

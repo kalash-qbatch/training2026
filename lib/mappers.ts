@@ -1,10 +1,18 @@
 import type {
   Product as DbProduct,
+  Category as DbCategory,
   Order as DbOrder,
   OrderItem as DbOrderItem,
   OrderStatus as DbOrderStatus,
 } from "@prisma/client";
-import type { Order, OrderItem, OrderStatus, Product, ProductVariant } from "@/types";
+import type {
+  Category,
+  Order,
+  OrderItem,
+  OrderStatus,
+  Product,
+  ProductVariant,
+} from "@/types";
 
 type DbSpecification = {
   color: string;
@@ -12,7 +20,10 @@ type DbSpecification = {
   qty: number;
 };
 
-type DbProductRow = DbProduct & { specifications?: DbSpecification[] };
+type DbProductRow = DbProduct & {
+  specifications?: DbSpecification[];
+  category?: Pick<DbCategory, "id" | "name" | "slug"> | null;
+};
 type DbOrderWithRelations = DbOrder & {
   user: { fullName: string; name?: string | null; email?: string | null };
   items: (DbOrderItem & { product: DbProduct })[];
@@ -28,24 +39,30 @@ function mapVariants(row: DbProductRow): ProductVariant[] {
   }));
 }
 
+export function mapCategory(
+  row: Pick<DbCategory, "id" | "name" | "slug">
+): Category {
+  return { id: row.id, name: row.name, slug: row.slug };
+}
+
 export function mapProduct(row: DbProductRow): Product {
   const variants = mapVariants(row);
-  const colors = [
-    ...new Set(
-      [
-        ...variants.map((v) => v.color),
-        row.color ?? undefined,
-      ].filter(Boolean) as string[]
-    ),
-  ];
-  const sizes = [
-    ...new Set(
-      [
-        ...variants.map((v) => v.size),
-        ...(row.size ? [row.size] : []),
-      ].filter(Boolean)
-    ),
-  ];
+  // When variants exist, only expose those color/size combos (avoid ghost
+  // options like product.size "M" mixed with variant size "Medium").
+  const colors = variants.length
+    ? [...new Set(variants.map((v) => v.color).filter(Boolean))]
+    : row.color
+      ? [row.color]
+      : [];
+  const sizes = variants.length
+    ? [...new Set(variants.map((v) => v.size).filter(Boolean))]
+    : row.size
+      ? [row.size]
+      : [];
+
+  const stock = variants.length
+    ? variants.reduce((sum, v) => sum + v.qty, 0)
+    : row.stock;
 
   return {
     id: row.id,
@@ -53,11 +70,13 @@ export function mapProduct(row: DbProductRow): Product {
     description: row.description,
     price: Number(row.price),
     imageUrl: row.image,
-    stock: row.stock,
+    stock,
     color: colors[0] ?? row.color ?? undefined,
     colors: colors.length ? colors : undefined,
     sizes: sizes.length ? sizes : undefined,
     variants: variants.length ? variants : undefined,
+    categoryId: row.categoryId ?? undefined,
+    category: row.category ? mapCategory(row.category) : undefined,
   };
 }
 

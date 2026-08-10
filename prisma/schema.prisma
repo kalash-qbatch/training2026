@@ -23,6 +23,7 @@ model User {
   accounts      Account[]
   cartItems     CartItem[]
   orders        Order[]
+  notifications Notification[]
 }
 
 model Account {
@@ -43,6 +44,15 @@ model Account {
   @@unique([provider, providerAccountId])
 }
 
+model Category {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  slug      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
+}
+
 model Product {
   id          String      @id @default(uuid())
   title       String
@@ -52,8 +62,10 @@ model Product {
   color       String?
   size        String?
   stock       Int         @default(100)
+  categoryId  String?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+  category    Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   cartItems   CartItem[]
   orderItems  OrderItem[]
   specifications Specification[]
@@ -73,6 +85,8 @@ model Specification {
 model CartItem {
   id        String   @id @default(uuid())
   quantity  Int      @default(1)
+  color     String   @default("")
+  size      String   @default("")
   userId    String
   productId String
   createdAt DateTime @default(now())
@@ -80,7 +94,7 @@ model CartItem {
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, productId])
+  @@unique([userId, productId, color, size])
 }
 
 model Order {
@@ -105,7 +119,21 @@ model OrderItem {
   orderId   String
   productId String
   order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  message   String
+  orderId   String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, read])
 }
 
 enum OrderStatus {

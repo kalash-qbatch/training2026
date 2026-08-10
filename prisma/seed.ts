@@ -13,6 +13,7 @@ async function main() {
   await prisma.order.deleteMany();
   await prisma.cartItem.deleteMany();
   await prisma.product.deleteMany();
+  await prisma.category.deleteMany();
   await prisma.user.deleteMany();
 
   const passwordHash = await bcrypt.hash("Password1!", 12);
@@ -35,8 +36,29 @@ async function main() {
   };
 
   const user = await prisma.user.create({ data: kalashUserData });
-  await prisma.user.create({ data: kalashUserData });
+  await prisma.user.create({
+    data: {
+      ...kalashUserData,
+      fullName: "Alex Example",
+      email: "alex@example.com",
+    },
+  });
   await prisma.user.create({ data: adminUserData });
+
+  const categoryDefs = [
+    { name: "T-Shirts", slug: "t-shirts" },
+    { name: "Jackets", slug: "jackets" },
+    { name: "Beanies", slug: "beanies" },
+    { name: "Sneakers", slug: "sneakers" },
+    { name: "Watches", slug: "watches" },
+    { name: "Sunglasses", slug: "sunglasses" },
+    { name: "Crossbody Bags", slug: "crossbody-bags" },
+    { name: "Tote Bags", slug: "tote-bags" },
+  ];
+  const categoryRows = await Promise.all(
+    categoryDefs.map((c) => prisma.category.create({ data: c }))
+  );
+  const bySlug = Object.fromEntries(categoryRows.map((c) => [c.slug, c.id]));
 
   const catalog = [
     {
@@ -47,6 +69,7 @@ async function main() {
       color: "White",
       size: "M",
       stock: 50,
+      categoryId: bySlug["t-shirts"],
     },
     {
       title: "Denim Jacket Slim Fit Urban Style",
@@ -56,6 +79,7 @@ async function main() {
       color: "Blue",
       size: "L",
       stock: 30,
+      categoryId: bySlug.jackets,
     },
     {
       title: "Leather Crossbody Bag Compact Travel",
@@ -65,6 +89,7 @@ async function main() {
       color: "Brown",
       size: "One Size",
       stock: 20,
+      categoryId: bySlug["crossbody-bags"],
     },
     {
       title: "Running Sneakers Lightweight Breathable",
@@ -74,6 +99,7 @@ async function main() {
       color: "Red",
       size: "10",
       stock: 40,
+      categoryId: bySlug.sneakers,
     },
     {
       title: "Wool Beanie Winter Warm Soft Knit",
@@ -83,6 +109,7 @@ async function main() {
       color: "Gray",
       size: "One Size",
       stock: 80,
+      categoryId: bySlug.beanies,
     },
     {
       title: "Sunglasses UV400 Polarized Classic",
@@ -92,6 +119,7 @@ async function main() {
       color: "Black",
       size: "One Size",
       stock: 60,
+      categoryId: bySlug.sunglasses,
     },
     {
       title: "Canvas Tote Everyday Carry All",
@@ -101,6 +129,7 @@ async function main() {
       color: "Natural",
       size: "One Size",
       stock: 70,
+      categoryId: bySlug["tote-bags"],
     },
     {
       title: "Minimalist Watch Stainless Steel",
@@ -110,6 +139,7 @@ async function main() {
       color: "Silver",
       size: "One Size",
       stock: 25,
+      categoryId: bySlug.watches,
     },
   ];
 
@@ -150,6 +180,8 @@ async function main() {
       userId: user.id,
       productId: products[0].id,
       quantity: 2,
+      color: "White",
+      size: "Medium",
     },
   });
 
@@ -162,8 +194,20 @@ async function main() {
       total: 192.24,
       items: {
         create: [
-          { productId: products[1].id, quantity: 1, price: 89 },
-          { productId: products[0].id, quantity: 2, price: 28 },
+          {
+            productId: products[1].id,
+            quantity: 1,
+            price: 89,
+            color: "Blue",
+            size: "Large",
+          },
+          {
+            productId: products[0].id,
+            quantity: 2,
+            price: 28,
+            color: "White",
+            size: "Medium",
+          },
         ],
       },
     },
@@ -173,6 +217,7 @@ async function main() {
   console.log("  USER:  alex@example.com / Password1!");
   console.log("  USER:  kalash@qbatch.com / Password1!");
   console.log("  ADMIN: admin@gmail.com / Admin/123  → /admin/products");
+  console.log(`  Categories: ${categoryRows.length}`);
   console.log(`  Products: ${products.length}`);
   console.log("  Orders: 1");
 }

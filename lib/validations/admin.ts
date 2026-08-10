@@ -15,6 +15,12 @@ export const adminProductSchema = z.object({
   color: z.string().optional(),
   size: z.string().optional(),
   variants: z.array(productVariantSchema).optional(),
+  categoryId: z.string().uuid().optional().nullable(),
+  categoryName: z.string().min(1).optional().nullable(),
+});
+
+export const adminCategorySchema = z.object({
+  name: z.string().min(2, "Category name is required").max(60),
 });
 
 export type AdminProductInput = z.infer<typeof adminProductSchema>;

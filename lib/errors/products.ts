@@ -27,19 +27,22 @@ export function getProductError(err: unknown): ProductServiceError | null {
   const code = (err as ProductServiceError).code;
   if (
     code === PRODUCT_ERROR.DUPLICATE ||
-    code === PRODUCT_ERROR.NOT_FOUND
+    code === PRODUCT_ERROR.NOT_FOUND ||
+    code === "PRODUCT_IN_ORDERS"
   ) {
     return err as ProductServiceError;
   }
   return null;
 }
 
-export function productErrorStatus(code: ProductErrorCode): number {
+export function productErrorStatus(code: ProductErrorCode | string): number {
   switch (code) {
     case PRODUCT_ERROR.DUPLICATE:
       return 409;
     case PRODUCT_ERROR.NOT_FOUND:
       return 404;
+    case "PRODUCT_IN_ORDERS":
+      return 409;
     default:
       return 500;
   }

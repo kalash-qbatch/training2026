@@ -8,7 +8,7 @@ export default function MainLayout({
   return (
     <div className="flex min-h-screen flex-col bg-white">
       <Navbar />
-      <main className="mx-auto w-full flex-1 px-8 py-8 lg:px-14">
+      <main className="mx-auto w-full flex-1 p-4 sm:p-8 lg:px-14 xl:px-15">
         {children}
       </main>
     </div>

@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Pencil, Trash2, Search } from "lucide-react";
-import type { Product } from "@/types";
-import type { StockFilter } from "@/lib/services/products";
-import { formatCurrency } from "@/lib/utils";
+import { colorSwatch, formatCurrency, isLightSwatch } from "@/lib/utils";
+import type { Category, Product, ProductVariant } from "@/types";
 import {
   createAdminProduct,
   deleteAdminProduct,
+  fetchAdminCategories,
   fetchAdminProducts,
   updateAdminProduct,
 } from "@/lib/api/admin";
@@ -23,16 +23,57 @@ import { AddMultipleProductsModal } from "@/components/admin/AddMultipleProducts
 const inputClass =
   "h-10 w-full rounded-md border border-[#d0d5dd] bg-white px-3 text-[13px] text-[#333333] outline-none placeholder:text-[#8a94a6] focus:border-[#2563EB]";
 
+function stockByColor(product: Product): Array<{ color: string; qty: number }> {
+  if (product.variants?.length) {
+    const map = new Map<string, number>();
+    for (const v of product.variants as ProductVariant[]) {
+      const key = v.color.trim();
+      if (!key) continue;
+      map.set(key, (map.get(key) ?? 0) + v.qty);
+    }
+    return [...map.entries()].map(([color, qty]) => ({ color, qty }));
+  }
+  if (product.color) {
+    return [{ color: product.color, qty: product.stock ?? 0 }];
+  }
+  return [{ color: "", qty: product.stock ?? 0 }];
+}
+
+function StockColorCircles({ product }: { product: Product }) {
+  const rows = stockByColor(product);
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {rows.map(({ color, qty }) => {
+        const isWhite = color.trim().toLowerCase() === "white";
+        const bg = isWhite ? "#FFFFFF" : color ? colorSwatch(color) : "#94A3B8";
+        const light = isLightSwatch(bg);
+        return (
+          <span
+            key={color || "stock"}
+            title={color ? `${color}: ${qty}` : `Stock: ${qty}`}
+            className="inline-flex h-7 min-w-7 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums"
+            style={{
+              backgroundColor: bg,
+              color: light ? "#111827" : "#FFFFFF",
+              border: light ? "1px solid #111827" : "1px solid transparent",
+            }}
+          >
+            {qty}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
 export function ProductsPageClient() {
   const { toast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
-  const [stock, setStock] = useState<StockFilter>("all");
-  const [minPrice, setMinPrice] = useState("");
-  const [maxPrice, setMaxPrice] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [loading, setLoading] = useState(true);
 
   const [addOpen, setAddOpen] = useState(false);
@@ -46,14 +87,18 @@ export function ProductsPageClient() {
     return () => window.clearTimeout(t);
   }, [search]);
 
+  useEffect(() => {
+    void fetchAdminCategories()
+      .then(setCategories)
+      .catch(() => setCategories([]));
+  }, [addOpen, editProduct]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const data = await fetchAdminProducts({
         search: debounced,
-        stock,
-        minPrice,
-        maxPrice,
+        categoryId: categoryId || undefined,
         page,
       });
       setProducts(data.products);
@@ -63,7 +108,7 @@ export function ProductsPageClient() {
     } finally {
       setLoading(false);
     }
-  }, [debounced, stock, minPrice, maxPrice, page, toast]);
+  }, [debounced, categoryId, page, toast]);
 
   useEffect(() => {
     void load();
@@ -93,7 +138,7 @@ export function ProductsPageClient() {
         </div>
       </div>
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-5 grid gap-3 sm:grid-cols-2">
         <div className="relative">
           <input
             value={search}
@@ -107,40 +152,20 @@ export function ProductsPageClient() {
           <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a94a6]" />
         </div>
         <select
-          value={stock}
+          value={categoryId}
           onChange={(e) => {
-            setStock(e.target.value as StockFilter);
+            setCategoryId(e.target.value);
             resetPage();
           }}
           className={inputClass}
         >
-          <option value="all">All stock</option>
-          <option value="in_stock">In stock</option>
-          <option value="low_stock">Low stock (≤10)</option>
-          <option value="out_of_stock">Out of stock</option>
+          <option value="">All categories</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
         </select>
-        <input
-          type="number"
-          min={0}
-          value={minPrice}
-          onChange={(e) => {
-            setMinPrice(e.target.value);
-            resetPage();
-          }}
-          placeholder="Min price"
-          className={inputClass}
-        />
-        <input
-          type="number"
-          min={0}
-          value={maxPrice}
-          onChange={(e) => {
-            setMaxPrice(e.target.value);
-            resetPage();
-          }}
-          placeholder="Max price"
-          className={inputClass}
-        />
       </div>
 
       <div className="overflow-x-auto">
@@ -148,6 +173,7 @@ export function ProductsPageClient() {
           <thead>
             <tr className="border-b border-[#e5e7eb] text-[12px] font-medium text-[#8a94a6]">
               <th className="pb-3 pr-4 font-medium">Title</th>
+              <th className="pb-3 pr-4 font-medium">Category</th>
               <th className="pb-3 pr-4 font-medium">Price</th>
               <th className="pb-3 pr-4 font-medium">Stock</th>
               <th className="pb-3 font-medium">Actions</th>
@@ -156,13 +182,13 @@ export function ProductsPageClient() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={4} className="py-10 text-center text-[#8a94a6]">
+                <td colSpan={5} className="py-10 text-center text-[#8a94a6]">
                   Loading…
                 </td>
               </tr>
             ) : !products.length ? (
               <tr>
-                <td colSpan={4} className="py-10 text-center text-[#8a94a6]">
+                <td colSpan={5} className="py-10 text-center text-[#8a94a6]">
                   No products found
                 </td>
               </tr>
@@ -183,10 +209,15 @@ export function ProductsPageClient() {
                       <p className="font-medium text-[#333333]">{p.name}</p>
                     </div>
                   </td>
+                  <td className="py-3.5 pr-4 text-[#333333]">
+                    {p.category?.name ?? "—"}
+                  </td>
                   <td className="py-3.5 pr-4 tabular-nums text-[#333333]">
                     {formatCurrency(p.price)}
                   </td>
-                  <td className="py-3.5 pr-4 text-[#333333]">{p.stock ?? 0}</td>
+                  <td className="py-3.5 pr-4">
+                    <StockColorCircles product={p} />
+                  </td>
                   <td className="py-3.5">
                     <div className="flex items-center gap-1">
                       <button
@@ -258,9 +289,7 @@ export function ProductsPageClient() {
             setDeleteId(null);
             const data = await fetchAdminProducts({
               search: debounced,
-              stock,
-              minPrice,
-              maxPrice,
+              categoryId: categoryId || undefined,
               page,
             });
             if (data.page > data.totalPages) {

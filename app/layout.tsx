@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { AuthProvider } from "@/components/features/auth/AuthProvider";
 import { AuthSessionSync } from "@/components/features/auth/AuthSessionSync";
+import { CartSync } from "@/components/features/cart/CartSync";
 import { ToastProvider } from "@/components/ui/Toast";
 import "./globals.css";
 
@@ -11,8 +12,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "E-Commerce User Module",
-  description: "Responsive e-commerce user module with auth, cart, and orders",
+  title: "Bhai ka Store",
+  description: "Bhai ka Store is a platform for buying and selling products",
 };
 
 export default function RootLayout({
@@ -22,9 +23,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} h-full`}>
-      <body className="min-h-full font-sans antialiased">
+      <body className="min-h-full font-sans antialiased" suppressHydrationWarning>
         <AuthProvider>
           <AuthSessionSync />
+          <CartSync />
           <ToastProvider>{children}</ToastProvider>
         </AuthProvider>
       </body>

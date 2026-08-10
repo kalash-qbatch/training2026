@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { getOrderById, getOrders } from "@/lib/api/orders";
-import { useCartStore } from "@/lib/store/useCartStore";
 import type { Order } from "@/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Drawer } from "@/components/ui/Drawer";
@@ -19,7 +18,6 @@ export function OrdersDrawer({
   onClose: () => void;
   initialOrderId?: string | null;
 }) {
-  const placedOrders = useCartStore((s) => s.orders);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,22 +58,9 @@ export function OrdersDrawer({
     };
   }, [open]);
 
-  const allOrders = useMemo(() => {
-    const map = new Map<string, Order>();
-    [...placedOrders, ...orders].forEach((o) => map.set(o.id, o));
-    return Array.from(map.values()).sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-  }, [placedOrders, orders]);
-
   useEffect(() => {
     if (!selectedOrderId) {
       setDetail(undefined);
-      return;
-    }
-    const local = placedOrders.find((o) => o.id === selectedOrderId);
-    if (local) {
-      setDetail(local);
       return;
     }
     let cancelled = false;
@@ -90,7 +75,7 @@ export function OrdersDrawer({
     return () => {
       cancelled = true;
     };
-  }, [selectedOrderId, placedOrders]);
+  }, [selectedOrderId]);
 
   const showingDetail = Boolean(selectedOrderId);
 
@@ -115,7 +100,7 @@ export function OrdersDrawer({
         </div>
       ) : error ? (
         <EmptyState title="Could not load orders" description={error} />
-      ) : allOrders.length === 0 ? (
+      ) : orders.length === 0 ? (
         <EmptyState
           title="You haven't placed any orders yet"
           description="When you place an order, it will show up here."
@@ -125,11 +110,11 @@ export function OrdersDrawer({
       ) : (
         <div className="space-y-4">
           <OrdersTable
-            orders={allOrders}
+            orders={orders}
             onViewOrder={(id) => setSelectedOrderId(id)}
           />
           <p className="text-sm text-neutral-muted">
-            {allOrders.length} Total Count
+            {orders.length} Total Count
           </p>
         </div>
       )}
@@ -186,7 +171,7 @@ function OrderDetailsContent({
           Product Information
         </h2>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] border-collapse">
+          <table className="w-full min-w-[560px] border-collapse">
             <thead>
               <tr className="border-b border-neutral-border text-left text-[12px] font-medium text-neutral-muted">
                 <th className="pb-3 font-medium">Title</th>
@@ -194,7 +179,6 @@ function OrderDetailsContent({
                 <th className="pb-3 font-medium">Size</th>
                 <th className="pb-3 font-medium">Price</th>
                 <th className="pb-3 font-medium">Quantity</th>
-                <th className="pb-3 font-medium">Stock</th>
               </tr>
             </thead>
             <tbody>
@@ -229,9 +213,6 @@ function OrderDetailsContent({
                     {formatCurrency(item.price)}
                   </td>
                   <td className="py-4 text-sm text-neutral-text">{item.qty}</td>
-                  <td className="py-4 text-sm text-neutral-text">
-                    {item.stock ?? "—"}
-                  </td>
                 </tr>
               ))}
             </tbody>

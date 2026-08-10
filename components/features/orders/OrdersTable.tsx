@@ -56,7 +56,7 @@ export function OrdersTable({
                     <button
                       type="button"
                       onClick={() => onViewOrder?.(order.id)}
-                      className="inline-flex rounded-md p-2 text-neutral-muted hover:bg-brand-50 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                      className="inline-flex cursor-pointer rounded-md p-2 text-neutral-muted hover:bg-brand-50 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
                       aria-label={`View order ${order.id}`}
                     >
                       <ArrowUpRight className="h-4 w-4" strokeWidth={2} />

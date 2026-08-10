@@ -12,8 +12,17 @@ export async function GET(request: Request) {
     const pageSize = Number(
       searchParams.get("pageSize") || searchParams.get("limit") || 8
     );
+    const categoryId = searchParams.get("categoryId") ?? undefined;
+    const categorySlug = searchParams.get("category") ?? undefined;
 
-    const result = await findProducts({ search, sort, page, pageSize });
+    const result = await findProducts({
+      search,
+      sort,
+      page,
+      pageSize,
+      categoryId,
+      categorySlug,
+    });
     return NextResponse.json({ success: true, ...result });
   } catch (error) {
     console.error("products GET error:", error);

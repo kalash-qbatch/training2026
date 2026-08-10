@@ -1,5 +1,4 @@
-import type { AdminOrderStats, Product, Order } from "@/types";
-import type { ColorFilter, SizeFilter, StockFilter } from "@/lib/services/products";
+import type { AdminOrderStats, Category, Product, Order } from "@/types";
 
 async function parseJson<T>(res: Response): Promise<T & { error?: string }> {
   return (await res.json()) as T & { error?: string };
@@ -7,20 +6,12 @@ async function parseJson<T>(res: Response): Promise<T & { error?: string }> {
 
 export async function fetchAdminProducts(params: {
   search?: string;
-  stock?: StockFilter;
-  minPrice?: string;
-  maxPrice?: string;
-  size?: SizeFilter;
-  color?: ColorFilter;
+  categoryId?: string;
   page?: number;
 }) {
   const q = new URLSearchParams();
   if (params.search) q.set("search", params.search);
-  if (params.stock && params.stock !== "all") q.set("stock", params.stock);
-  if (params.minPrice) q.set("minPrice", params.minPrice);
-  if (params.maxPrice) q.set("maxPrice", params.maxPrice);
-  if (params.size && params.size !== "all") q.set("size", params.size);
-  if (params.color && params.color !== "all") q.set("color", params.color);
+  if (params.categoryId) q.set("categoryId", params.categoryId);
   q.set("page", String(params.page ?? 1));
 
   const res = await fetch(`/api/admin/products?${q}`);
@@ -35,6 +26,28 @@ export async function fetchAdminProducts(params: {
   return data;
 }
 
+export async function fetchAdminCategories() {
+  const res = await fetch("/api/admin/categories");
+  const data = await parseJson<{ success: boolean; categories: Category[] }>(res);
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || "Failed to load categories");
+  }
+  return data.categories;
+}
+
+export async function createAdminCategory(name: string) {
+  const res = await fetch("/api/admin/categories", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  const data = await parseJson<{ success: boolean; category: Category }>(res);
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || "Failed to create category");
+  }
+  return data.category;
+}
+
 export async function createAdminProduct(body: {
   title: string;
   description?: string;
@@ -44,6 +57,8 @@ export async function createAdminProduct(body: {
   size?: string;
   color?: string;
   variants?: Array<{ color: string; size: string; qty: number }>;
+  categoryId?: string | null;
+  categoryName?: string | null;
 }) {
   const res = await fetch("/api/admin/products", {
     method: "POST",
@@ -66,6 +81,8 @@ export async function updateAdminProduct(
     size?: string;
     color?: string;
     variants?: Array<{ color: string; size: string; qty: number }>;
+    categoryId?: string | null;
+    categoryName?: string | null;
   }
 ) {
   const res = await fetch(`/api/admin/products/${id}`, {
@@ -132,12 +149,24 @@ export async function fetchAdminOrder(id: string) {
   return data.order;
 }
 
-export async function fetchAdminUsers() {
-  const res = await fetch("/api/admin/users");
-  const data = await parseJson<{
-    success: boolean;
-    users: Array<{ id: string; fullName: string; email: string }>;
-  }>(res);
-  if (!res.ok || !data.success) throw new Error(data.error || "Failed to load users");
-  return data.users;
+export type AdminOrderStatusUpdate =
+  | "PROCESSING"
+  | "SHIPPED"
+  | "DELIVERED"
+  | "CANCELLED";
+
+export async function updateAdminOrderStatus(
+  id: string,
+  status: AdminOrderStatusUpdate
+) {
+  const res = await fetch(`/api/admin/orders/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  const data = await parseJson<{ success: boolean; order: Order }>(res);
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || "Failed to update order status");
+  }
+  return data.order;
 }
