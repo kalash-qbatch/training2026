@@ -12,7 +12,7 @@ export function sessionMaxAgeSeconds(remember?: boolean): number {
 }
 
 /** Change this one value to control reset-link lifetime (minutes). */
-export const RESET_TOKEN_EXPIRY_MINUTES: number = 1;
+export const RESET_TOKEN_EXPIRY_MINUTES: number = 10;
 
 export const RESET_TOKEN_EXPIRY_MS = RESET_TOKEN_EXPIRY_MINUTES * 60 * 1000;
 
