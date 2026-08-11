@@ -2,6 +2,10 @@ import type { OrderStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { mapOrder } from "@/lib/mappers";
 import type { Order } from "@/types";
+import {
+  notifyOrderPlaced,
+  notifyOrderStatusChange,
+} from "@/lib/services/notifications";
 
 const TAX_RATE = 0.08;
 
@@ -145,6 +149,8 @@ export async function createOrder(userId: string, items: PlaceOrderItemInput[]) 
         items: { include: { product: true } },
       },
     });
+
+    await notifyOrderPlaced(tx, userId, order.id);
 
     return mapOrder(order);
   });
@@ -373,6 +379,8 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
         items: { include: { product: true } },
       },
     });
+
+    await notifyOrderStatusChange(tx, existing.userId, id, status);
 
     return mapOrder(row);
   });

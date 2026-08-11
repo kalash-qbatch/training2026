@@ -74,7 +74,7 @@ export async function notifyOrderPlaced(
   orderId: string
 ) {
   const ref = shortOrderId(orderId);
-  return createNotification(tx, {
+  return await createNotification(tx, {
     userId,
     title: "Order placed",
     message: `Your order #${ref} has been placed successfully.`,

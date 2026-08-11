@@ -213,13 +213,13 @@ async function main() {
     },
   });
 
-  console.log("Seed complete:");
-  console.log("  USER:  alex@example.com / Password1!");
-  console.log("  USER:  kalash@qbatch.com / Password1!");
-  console.log("  ADMIN: admin@gmail.com / Admin/123  → /admin/products");
-  console.log(`  Categories: ${categoryRows.length}`);
-  console.log(`  Products: ${products.length}`);
-  console.log("  Orders: 1");
+  // console.log("Seed complete:");
+  // console.log("  USER:  alex@example.com / Password1!");
+  // console.log("  USER:  kalash@qbatch.com / Password1!");
+  // console.log("  ADMIN: admin@gmail.com / Admin/123  → /admin/products");
+  // console.log(`  Categories: ${categoryRows.length}`);
+  // console.log(`  Products: ${products.length}`);
+  // console.log("  Orders: 1");
 }
 
 main()

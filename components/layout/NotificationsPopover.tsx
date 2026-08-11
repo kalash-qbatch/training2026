@@ -81,11 +81,14 @@ export function NotificationsPopover() {
 
   const load = useCallback(async () => {
     setLoading(true);
+
     try {
       const data = await fetchNotifications();
-      setNotifications(data.notifications);
-      setUnreadCount(data.unreadCount);
-    } catch {
+      setNotifications(data.notifications ?? []);
+      setUnreadCount(data.unreadCount ?? 0);
+    } catch (err) {
+      console.error("Notification Error:", err);
+
       setNotifications([]);
       setUnreadCount(0);
     } finally {
