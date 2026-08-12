@@ -3,6 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import type { Adapter } from "next-auth/adapters";
 import bcrypt from "bcryptjs";
+
 import { prisma } from "@/lib/db";
 import { loginSchema } from "@/lib/validations/auth";
 import {
@@ -12,45 +13,71 @@ import {
 import authConfig from "./auth.config";
 
 function parseRemember(value: unknown): boolean {
-  return value === true || value === "true" || value === "on" || value === "1";
+  return (
+    value === true ||
+    value === "true" ||
+    value === "on" ||
+    value === "1"
+  );
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
+
   adapter: PrismaAdapter(prisma) as Adapter,
+
   session: {
     strategy: "jwt",
+    // Keep this at the largest possible value.
+    // Actual expiration is controlled per-user below.
     maxAge: REMEMBER_ME_MAX_AGE_SECONDS,
   },
+
   jwt: {
     maxAge: REMEMBER_ME_MAX_AGE_SECONDS,
   },
+
   providers: [
     ...authConfig.providers,
+
     Credentials({
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
         remember: { label: "Remember me", type: "text" },
       },
+
       async authorize(credentials) {
         const remember = parseRemember(credentials?.remember);
+
         const parsed = loginSchema.safeParse({
           email: credentials?.email,
           password: credentials?.password,
           remember,
         });
-        if (!parsed.success) return null;
+
+        if (!parsed.success) {
+          return null;
+        }
 
         const email = parsed.data.email.toLowerCase();
-        const user = await prisma.user.findUnique({ where: { email } });
-        if (!user?.passwordHash) return null;
+
+        const user = await prisma.user.findUnique({
+          where: { email },
+        });
+
+        if (!user?.passwordHash) {
+          return null;
+        }
 
         const valid = await bcrypt.compare(
           parsed.data.password,
           user.passwordHash
         );
-        if (!valid) return null;
+
+        if (!valid) {
+          return null;
+        }
 
         return {
           id: user.id,
@@ -63,9 +90,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
+
   callbacks: {
     ...authConfig.callbacks,
+
     async jwt({ token, user }) {
+      // Initial login
       if (user) {
         token.id = user.id;
         token.name = user.name ?? token.name;
@@ -76,14 +106,27 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const remember = parseRemember(
           (user as { remember?: boolean }).remember
         );
+
         const maxAge = sessionMaxAgeSeconds(remember);
-        token.exp = Math.floor(Date.now() / 1000) + maxAge;
+
+        token.remember = remember;
+        token.expiresAt = Date.now() + maxAge * 1000;
       }
 
-      // Keep role/profile in sync with DB (covers role changes after login)
+      // Force logout when custom expiry is reached
+      if (
+        typeof token.expiresAt === "number" &&
+        Date.now() > token.expiresAt
+      ) {
+        return {};
+      }
+
+      // Keep role/profile synchronized
       if (token.email) {
         const dbUser = await prisma.user.findUnique({
-          where: { email: String(token.email).toLowerCase() },
+          where: {
+            email: String(token.email).toLowerCase(),
+          },
           select: {
             id: true,
             role: true,
@@ -92,32 +135,64 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             image: true,
           },
         });
+
         if (dbUser) {
           token.id = dbUser.id;
           token.role = dbUser.role;
-          token.name = dbUser.fullName || dbUser.name || token.name;
-          if (dbUser.image) token.picture = dbUser.image;
+          token.name =
+            dbUser.fullName || dbUser.name || token.name;
+
+          if (dbUser.image) {
+            token.picture = dbUser.image;
+          }
         }
       }
 
       return token;
     },
+
     async session({ session, token }) {
-      if (session.user) {
-        session.user.id = (token.id as string) ?? "";
-        session.user.role = (token.role as string) ?? "USER";
-        if (token.name) session.user.name = token.name as string;
-        if (token.email) session.user.email = token.email as string;
-        if (token.picture) session.user.image = token.picture as string;
+      // Session already expired
+      if (!token?.id) {
+        return null as never;
       }
+
+      if (session.user) {
+        session.user.id = String(token.id);
+        session.user.role = String(token.role ?? "USER");
+
+        if (token.name) {
+          session.user.name = String(token.name);
+        }
+
+        if (token.email) {
+          session.user.email = String(token.email);
+        }
+
+        if (token.picture) {
+          session.user.image = String(token.picture);
+        }
+      }
+
+      if (typeof token.expiresAt === "number") {
+        session.expires = new Date(
+          token.expiresAt
+        ).toISOString();
+      }
+
       return session;
     },
   },
+
   events: {
     async createUser({ user }) {
       if (!user.id) return;
+
       const fullName =
-        user.name?.trim() || user.email?.split("@")[0] || "User";
+        user.name?.trim() ||
+        user.email?.split("@")[0] ||
+        "User";
+
       await prisma.user.update({
         where: { id: user.id },
         data: {
