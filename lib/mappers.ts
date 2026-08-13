@@ -87,6 +87,7 @@ function mapStatus(status: DbOrderStatus): OrderStatus {
     SHIPPED: "shipped",
     DELIVERED: "delivered",
     CANCELLED: "cancelled",
+    REJECTED: "cancelled",
   };
   return map[status];
 }

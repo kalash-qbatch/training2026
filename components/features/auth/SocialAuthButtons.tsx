@@ -31,13 +31,16 @@ const providers: {
 
 type SocialAuthButtonsProps = {
   context?: "login" | "signup";
+  getRememberMe?: () => boolean;
 };
 
-export function SocialAuthButtons({ context = "login" }: SocialAuthButtonsProps) {
+export function SocialAuthButtons({ context = "login", getRememberMe }: SocialAuthButtonsProps) {
   const { toast } = useToast();
 
   async function handleProvider(id: Provider, label: string) {
     try {
+      const isRemember = getRememberMe ? getRememberMe() : true;
+      document.cookie = `auth_remember_me=${isRemember}; path=/; max-age=300; SameSite=Lax`;
       await signIn(id, { callbackUrl: "/products" });
     } catch {
       toast.error(

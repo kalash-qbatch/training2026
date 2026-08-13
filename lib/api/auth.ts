@@ -3,7 +3,7 @@ export async function signUpRequest(data: {
   email: string;
   mobile: string;
   password: string;
-  confirmPassword?: string;
+  confirmPassword: string;
 }): Promise<void> {
   const res = await fetch("/api/auth/register", {
     method: "POST",

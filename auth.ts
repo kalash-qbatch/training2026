@@ -1,207 +1,170 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { PrismaAdapter } from "@auth/prisma-adapter";
-import type { Adapter } from "next-auth/adapters";
+import Google from "next-auth/providers/google";
+import GitHub from "next-auth/providers/github";
+import { decode as jwtDecode, encode as jwtEncode } from "next-auth/jwt";
 import bcrypt from "bcryptjs";
-
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
-import { loginSchema } from "@/lib/validations/auth";
-import {
-  REMEMBER_ME_MAX_AGE_SECONDS,
-  sessionMaxAgeSeconds,
-} from "@/lib/constants/auth";
 import authConfig from "./auth.config";
-
-function parseRemember(value: unknown): boolean {
-  return (
-    value === true ||
-    value === "true" ||
-    value === "on" ||
-    value === "1"
-  );
-}
+import { SESSION_EXPIRY_REMEMBER_ME, SESSION_EXPIRY_DEFAULT } from "@/lib/constants";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
-
-  adapter: PrismaAdapter(prisma) as Adapter,
-
-  session: {
-    strategy: "jwt",
-    // Keep this at the largest possible value.
-    // Actual expiration is controlled per-user below.
-    maxAge: REMEMBER_ME_MAX_AGE_SECONDS,
-  },
-
+  session: { strategy: "jwt", maxAge: SESSION_EXPIRY_REMEMBER_ME, updateAge: SESSION_EXPIRY_REMEMBER_ME },
   jwt: {
-    maxAge: REMEMBER_ME_MAX_AGE_SECONDS,
+    maxAge: SESSION_EXPIRY_REMEMBER_ME,
+    async encode({ token, secret, salt, maxAge }) {
+      if (!token) return "";
+
+      const expiry = typeof token.exp === "number" ? token.exp : undefined;
+      const effectiveMaxAge =
+        expiry !== undefined
+          ? Math.max(expiry - Math.floor(Date.now() / 1000), 0)
+          : maxAge ?? SESSION_EXPIRY_DEFAULT;
+
+      return jwtEncode({ token, secret, salt, maxAge: effectiveMaxAge });
+    },
+    async decode({ token, secret, salt }) {
+      return jwtDecode({ token, secret, salt });
+    },
   },
-
   providers: [
-    ...authConfig.providers,
-
+    GitHub({
+      clientId: process.env.GITHUB_ID ?? process.env.GITHUB_CLIENT_ID,
+      clientSecret: process.env.GITHUB_SECRET ?? process.env.GITHUB_CLIENT_SECRET
+    }),
+    Google({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET
+    }),
     Credentials({
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
-        remember: { label: "Remember me", type: "text" },
+        remember: { label: "Remember me", type: "checkbox" },
+        rememberMe: { label: "Remember me", type: "checkbox" },
       },
-
       async authorize(credentials) {
-        const remember = parseRemember(credentials?.remember);
-
-        const parsed = loginSchema.safeParse({
-          email: credentials?.email,
-          password: credentials?.password,
-          remember,
-        });
-
-        if (!parsed.success) {
+        if (!credentials?.email || typeof credentials.password !== "string") {
           return null;
         }
-
-        const email = parsed.data.email.toLowerCase();
 
         const user = await prisma.user.findUnique({
-          where: { email },
+          where: { email: credentials.email as string },
         });
 
-        if (!user?.passwordHash) {
-          return null;
-        }
+        if (!user || !user.passwordHash) return null;
 
-        const valid = await bcrypt.compare(
-          parsed.data.password,
-          user.passwordHash
-        );
-
-        if (!valid) {
-          return null;
-        }
-
+        const valid = await bcrypt.compare(credentials.password, user.passwordHash);
+        if (!valid) return null;
+        const rememberMeRaw = credentials.rememberMe ?? credentials.remember;
+        const isRememberMe =
+          rememberMeRaw === true ||
+          rememberMeRaw === "true" ||
+          rememberMeRaw === "on" ||
+          rememberMeRaw === "1";
         return {
           id: user.id,
-          name: user.fullName || user.name || "User",
-          email: user.email!,
-          image: user.image,
+          name: user.fullName,
+          email: user.email,
           role: user.role,
-          remember,
+          rememberMe: isRememberMe
         };
       },
     }),
   ],
-
   callbacks: {
-    ...authConfig.callbacks,
-
-    async jwt({ token, user }) {
-      // Initial login
-      if (user) {
-        token.id = user.id;
-        token.name = user.name ?? token.name;
-        token.email = user.email ?? token.email;
-        token.picture = user.image ?? token.picture;
-        token.role = user.role ?? "USER";
-
-        const remember = parseRemember(
-          (user as { remember?: boolean }).remember
-        );
-
-        const maxAge = sessionMaxAgeSeconds(remember);
-
-        token.remember = remember;
-        token.expiresAt = Date.now() + maxAge * 1000;
-      }
-
-      // Force logout when custom expiry is reached
-      if (
-        typeof token.expiresAt === "number" &&
-        Date.now() > token.expiresAt
-      ) {
-        return {};
-      }
-
-      // Keep role/profile synchronized
-      if (token.email) {
-        const dbUser = await prisma.user.findUnique({
-          where: {
-            email: String(token.email).toLowerCase(),
-          },
-          select: {
-            id: true,
-            role: true,
-            fullName: true,
-            name: true,
-            image: true,
+    async signIn({ user, account }) {
+      if (account?.provider === "google" || account?.provider === "github") {
+        const email = user.email || (account.provider === "github" ? `${user.id || account.providerAccountId}@github.user` : null);
+        if (!email) return false;
+        await prisma.user.upsert({
+          where: { email },
+          update: {},
+          create: {
+            email,
+            fullName: user.name || (account.provider === "github" ? "GitHub User" : "Google User"),
+            phone: "",
+            passwordHash: "",
           },
         });
+      }
+      return true;
+    },
+    async jwt({ token, user, account, trigger, session }) {
+      if (account) {
+        token.provider = account.provider;
+      }
 
+      if (typeof token.rememberMe !== "boolean") {
+        token.rememberMe = false;
+      }
+
+      if (trigger === "update" && typeof session?.rememberMe === "boolean") {
+        token.rememberMe = session.rememberMe;
+        token.exp = Math.floor(Date.now() / 1000) +
+          (token.rememberMe ? SESSION_EXPIRY_REMEMBER_ME : SESSION_EXPIRY_DEFAULT);
+      }
+
+      if (user) {
+        token.id = user.id;
+        token.role = user.role;
+
+        let rememberMe = (user as { rememberMe?: boolean }).rememberMe;
+
+        if (rememberMe === undefined && (account?.provider === "google" || account?.provider === "github")) {
+          try {
+            const cookieStore = await cookies();
+            const rememberCookie = cookieStore.get("auth_remember_me")?.value;
+            if (rememberCookie !== undefined) {
+              rememberMe = rememberCookie === "true";
+            } else {
+              rememberMe = true;
+            }
+          } catch {
+            rememberMe = true;
+          }
+        }
+
+        token.rememberMe = rememberMe ?? false;
+
+        token.exp = Math.floor(Date.now() / 1000) +
+          (token.rememberMe
+            ? SESSION_EXPIRY_REMEMBER_ME
+            : SESSION_EXPIRY_DEFAULT);
+      } else if ((account?.provider === "google" || account?.provider === "github") && token.email) {
+        const dbUser = await prisma.user.findUnique({
+          where: { email: token.email },
+        });
         if (dbUser) {
           token.id = dbUser.id;
           token.role = dbUser.role;
-          token.name =
-            dbUser.fullName || dbUser.name || token.name;
-
-          if (dbUser.image) {
-            token.picture = dbUser.image;
-          }
         }
       }
 
+      if (token.email && (!token.id || !token.role)) {
+        const dbUser = await prisma.user.findUnique({
+          where: { email: token.email },
+        });
+        if (dbUser) {
+          token.id = dbUser.id;
+          token.role = dbUser.role;
+        }
+      }
       return token;
     },
-
     async session({ session, token }) {
-      // Session already expired
-      if (!token?.id) {
-        return null as never;
+      if (token.id) {
+        session.user.id = token.id as string;
+        (session.user as { role?: string; provider?: string }).role = token.role as string;
+        (session.user as { role?: string; provider?: string }).provider = token.provider as string;
+        (session.user as { rememberMe?: boolean }).rememberMe = token.rememberMe as boolean;
       }
-
-      if (session.user) {
-        session.user.id = String(token.id);
-        session.user.role = String(token.role ?? "USER");
-
-        if (token.name) {
-          session.user.name = String(token.name);
-        }
-
-        if (token.email) {
-          session.user.email = String(token.email);
-        }
-
-        if (token.picture) {
-          session.user.image = String(token.picture);
-        }
+      if (token.exp) {
+        (session as { expires?: string }).expires = new Date((token.exp as number) * 1000).toISOString();
       }
-
-      if (typeof token.expiresAt === "number") {
-        session.expires = new Date(
-          token.expiresAt
-        ).toISOString();
-      }
-
       return session;
-    },
-  },
-
-  events: {
-    async createUser({ user }) {
-      if (!user.id) return;
-
-      const fullName =
-        user.name?.trim() ||
-        user.email?.split("@")[0] ||
-        "User";
-
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          fullName,
-          name: user.name ?? fullName,
-          email: user.email?.toLowerCase() ?? undefined,
-          image: user.image ?? undefined,
-        },
-      });
     },
   },
 });

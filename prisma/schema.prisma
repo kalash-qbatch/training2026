@@ -9,9 +9,9 @@ datasource db {
 model User {
   id            String     @id @default(uuid())
   fullName      String     @default("")
-  email         String?    @unique
+  email         String     @unique
   phone         String?
-  passwordHash  String?
+  passwordHash  String
   role          String     @default("USER")
   resetToken    String?
   resetTokenExp DateTime?
@@ -142,4 +142,5 @@ enum OrderStatus {
   SHIPPED
   DELIVERED
   CANCELLED
+  REJECTED
 }

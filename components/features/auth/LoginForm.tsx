@@ -21,6 +21,7 @@ export function LoginForm() {
   const {
     register,
     handleSubmit,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -49,6 +50,7 @@ export function LoginForm() {
         email: values.email,
         password: values.password,
         remember: values.remember ? "true" : "false",
+        rememberMe: values.remember ? "true" : "false",
         redirect: false,
       });
 
@@ -121,7 +123,7 @@ export function LoginForm() {
             Login
           </Button>
         </form>
-        <SocialAuthButtons context="login" />
+        <SocialAuthButtons context="login" getRememberMe={() => !!getValues("remember")} />
         <div className="mt-5 space-y-2.5 text-center text-sm text-neutral-muted">
           <p>
             Forgot Password!{" "}

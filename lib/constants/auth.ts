@@ -7,6 +7,9 @@ export const REMEMBER_ME_DURATION_HOURS: number = 48; // 2 days
 export const SESSION_MAX_AGE_SECONDS = SESSION_DURATION_HOURS * 60 * 60;
 export const REMEMBER_ME_MAX_AGE_SECONDS = REMEMBER_ME_DURATION_HOURS * 60 * 60;
 
+export const SESSION_EXPIRY_DEFAULT = SESSION_MAX_AGE_SECONDS;
+export const SESSION_EXPIRY_REMEMBER_ME = REMEMBER_ME_MAX_AGE_SECONDS;
+
 export function sessionMaxAgeSeconds(remember?: boolean): number {
   return remember ? REMEMBER_ME_MAX_AGE_SECONDS : SESSION_MAX_AGE_SECONDS;
 }
