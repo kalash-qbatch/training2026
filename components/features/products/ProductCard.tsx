@@ -60,13 +60,32 @@ export function ProductCard({ product }: { product: Product }) {
   const hasVariants = Boolean(product.variants?.length);
   const freeSize = isFreeSizeProduct(product);
 
-  const initial = useMemo(
-    () => defaultInStockVariant(product),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [product.id]
-  );
-  const [color, setColor] = useState(initial.color);
-  const [size, setSize] = useState(initial.size);
+  function getDefaultInStockVariant(product: Product) {
+    const inStock = product.variants?.find((v) => v.qty > 0);
+  
+    if (inStock) {
+      return {
+        color: inStock.color,
+        size: inStock.size,
+      };
+    }
+  
+    const first = product.variants?.[0];
+  
+    if (first) {
+      return {
+        color: first.color,
+        size: first.size,
+      };
+    }
+  
+    return {
+      color: "",
+      size: "",
+    };
+  }
+  const [color, setColor] = useState(getDefaultInStockVariant(product).color);
+  const [size, setSize] = useState(getDefaultInStockVariant(product).size);
 
   const selectedVariant = findVariant(product.variants, color, size);
   const totalStock = hasVariants
@@ -123,7 +142,7 @@ export function ProductCard({ product }: { product: Product }) {
         ) : null}
       </div>
 
-      <div className="flex flex-1 flex-col px-3 pb-3 pt-2.5">
+      <div className="flex flex-1 flex-col px-2 pb-2 pt-2">
         <h3 className="line-clamp-2 text-[14px] font-medium leading-5 text-neutral-900">
           {product.name}
         </h3>
@@ -159,7 +178,7 @@ export function ProductCard({ product }: { product: Product }) {
                 />
               ))}
             </div>
-            <div className="mt-2 flex items-center gap-1.5 justify-between">
+            <div className="mt-2 flex items-center flex-wrap gap-1.5 justify-between">
               <div className="mt-2 flex min-h-6 flex-wrap items-center gap-1.5">
                 {sizes.length ? (
                   sizes.map((s) => (
@@ -169,7 +188,7 @@ export function ProductCard({ product }: { product: Product }) {
                       aria-pressed={size === s}
                       onClick={() => setSize(s)}
                       className={cn(
-                        "h-6 min-w-7 rounded-[3px] border border-[#e1e5eb] px-2 text-[11px] font-medium uppercase text-neutral-900",
+                        "h-6 min-w-5 sm:min-w-7 rounded-[3px] border border-[#e1e5eb] px-2 text-[11px] font-medium uppercase text-neutral-900",
                         size === s && "border-neutral-900 bg-neutral-900 text-white"
                       )}
                     >
@@ -177,7 +196,7 @@ export function ProductCard({ product }: { product: Product }) {
                     </button>
                   ))
                 ) : (
-                  <span className="inline-flex h-6 items-center rounded-[3px] border border-neutral-900 bg-neutral-900 px-2 text-[11px] font-medium uppercase text-white">
+                  <span className="inline-flex h-6 items-center rounded-[3px] border border-neutral-900 bg-neutral-900 px-1 sm:px-2 text-[11px] font-medium uppercase text-white">
                     {FREE_SIZE_LABEL}
                   </span>
                 )}
@@ -190,7 +209,7 @@ export function ProductCard({ product }: { product: Product }) {
         )}
 
 
-        <div className="mt-3 flex items-center justify-between gap-2">
+        <div className="mt-3 flex items-center flex-wrap justify-center sm:justify-between gap-2">
           <QtyStepper
             value={selectedQty}
             min={outOfStock ? 0 : 1}

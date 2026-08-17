@@ -1,4 +1,4 @@
-export const FREE_SIZE_LABEL = "Free Size";
+export const FREE_SIZE_LABEL = "No Size";
 
 export function isFreeSizeProduct(product: { variants?: unknown[] }) {
   return !product.variants?.length;

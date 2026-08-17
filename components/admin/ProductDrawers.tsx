@@ -16,6 +16,16 @@ const COLOR_OPTIONS = [
   "Brown",
   "Beige",
   "Gray",
+  "Pink",
+  "Purple",
+  "Orange",
+  "Gold",
+  "Silver",
+  "Bronze",
+  "Copper",
+  "Brass",
+  "Steel",
+  "Iron",
   "Yellow",
 ];
 const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL"];
