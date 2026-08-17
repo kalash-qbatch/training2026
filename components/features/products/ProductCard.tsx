@@ -199,11 +199,15 @@ export function ProductCard({ product }: { product: Product }) {
           />
           <button
             type="button"
-            disabled={outOfStock || invalidCombo || needsSelection}
-            className="h-8.5 rounded-[3px] bg-brand-500 px-3 text-[13px] font-semibold text-white transition hover:bg-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={outOfStock || invalidCombo || needsSelection || selectedQty < 1}
+            className=" rounded-[3px] bg-brand-500 w-full px-3 text-[13px] py-2 font-semibold text-white transition hover:bg-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
             onClick={async () => {
               if (!isAuthenticated) {
                 router.push("/login");
+                return;
+              }
+              if (selectedQty < 1) {
+                toast.error("Quantity must be at least 1");
                 return;
               }
               if (invalidCombo) {
