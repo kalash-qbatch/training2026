@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Plus, Trash2, Upload, X } from "lucide-react";
+import { Loader2, Plus, Trash2, Upload, X } from "lucide-react";
 import type { Category, Product, ProductVariant } from "@/types";
 import {
   createAdminCategory,
@@ -9,6 +9,7 @@ import {
   uploadAdminImage,
 } from "@/lib/api/admin";
 import { Drawer } from "@/components/ui/Drawer";
+import { Select } from "@/components/ui/Select";
 
 const COLOR_OPTIONS = [
   "Black",
@@ -45,7 +46,7 @@ type DraftVariant = {
 };
 
 const fieldClass =
-  "mt-1.5 h-10 w-full rounded-md border border-[#d0d5dd] bg-white px-3 text-[13px] text-[#333] outline-none placeholder:text-[#8a94a6] focus:border-[#2563EB]";
+  "mt-1.5 h-10 w-full rounded-md border border-neutral-border bg-white px-3 text-[13px] text-neutral-text outline-none placeholder:text-neutral-muted focus:border-[#2563EB]";
 
 function emptyForm(): FormState {
   return {
@@ -93,6 +94,7 @@ function ProductFormFields({
   onSubmit,
   fileRef,
   onUpload,
+  uploadingCount,
 }: {
   form: FormState;
   setForm: React.Dispatch<React.SetStateAction<FormState>>;
@@ -113,6 +115,7 @@ function ProductFormFields({
   onSubmit: () => Promise<void>;
   fileRef: React.RefObject<HTMLInputElement | null>;
   onUpload: (file: File) => Promise<void>;
+  uploadingCount: number;
 }) {
   const hasVariants = variants.length > 0;
   const [creatingCategory, setCreatingCategory] = useState(false);
@@ -141,8 +144,12 @@ function ProductFormFields({
   }
 
   function addVariant() {
-    if (!draft.color || !draft.size || draft.qty === "") {
-      setError("Select color, size, and quantity before adding");
+    if (!draft.color && !draft.size) {
+      setError("Select at least a color or a size");
+      return;
+    }
+    if (draft.qty === "") {
+      setError("Enter a quantity before adding");
       return;
     }
     const qty = Number(draft.qty);
@@ -211,11 +218,24 @@ function ProductFormFields({
           </p>
           <button
             type="button"
+            disabled={uploadingCount > 0}
             onClick={() => fileRef.current?.click()}
-            className="flex h-[140px] w-full flex-col items-center justify-center rounded-lg border border-dashed border-[#d0d5dd] bg-[#fafbfc] text-[#8a94a6] hover:border-[#2563EB] hover:text-[#2563EB]"
+            className="flex h-35 w-full flex-col items-center justify-center rounded-lg border border-dashed border-neutral-border bg-[#fafbfc] text-neutral-muted hover:border-[#2563EB] hover:text-[#2563EB] disabled:cursor-wait disabled:opacity-70"
           >
-            <Upload className="mb-2 h-6 w-6" />
-            <span className="text-[12px]">Upload multiple images</span>
+            {uploadingCount > 0 ? (
+              <>
+                <Loader2 className="mb-2 h-6 w-6 animate-spin text-[#2563EB]" />
+                <span className="text-[12px] text-[#2563EB]">
+                  Uploading {uploadingCount}{" "}
+                  {uploadingCount === 1 ? "image" : "images"}…
+                </span>
+              </>
+            ) : (
+              <>
+                <Upload className="mb-2 h-6 w-6" />
+                <span className="text-[12px]">Upload multiple images</span>
+              </>
+            )}
           </button>
           <input
             ref={fileRef}
@@ -230,14 +250,14 @@ function ProductFormFields({
               e.target.value = "";
             }}
           />
-          {images.length ? (
+          {images.length || uploadingCount > 0 ? (
             <div className="mt-3 grid grid-cols-2 gap-3">
               {images.map((img, index) => (
                 <div
                   key={`${img.url}-${index}`}
-                  className="overflow-hidden rounded-lg border border-[#e5e7eb] bg-white"
+                  className="rounded-lg border border-[#e5e7eb] bg-white"
                 >
-                  <div className="relative aspect-square bg-[#f8fafc]">
+                  <div className="relative aspect-square overflow-hidden rounded-t-lg bg-[#f8fafc]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={img.url} alt="" className="h-full w-full object-cover" />
                     <button
@@ -249,25 +269,35 @@ function ProductFormFields({
                       <X className="h-3 w-3" strokeWidth={2.5} />
                     </button>
                   </div>
-                  <select
+                  <Select
                     value={img.color}
-                    onChange={(e) =>
+                    onChange={(v) =>
                       setImages((prev) =>
                         prev.map((item, i) =>
-                          i === index ? { ...item, color: e.target.value } : item
+                          i === index ? { ...item, color: v } : item
                         )
                       )
                     }
-                    className="h-9 w-full border-t border-[#e5e7eb] bg-white px-2 text-[12px] text-[#333] outline-none"
-                    aria-label="Assign image color"
-                  >
-                    <option value="">Global (Default)</option>
-                    {COLOR_OPTIONS.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
+                    options={[
+                      { value: "", label: "Global (Default)" },
+                      ...COLOR_OPTIONS.map((c) => ({ value: c, label: c })),
+                    ]}
+                    className="h-9 rounded-none border-0 border-t border-[#e5e7eb] px-2 text-[12px] focus:border-[#e5e7eb]"
+                    ariaLabel="Assign image color"
+                  />
+                </div>
+              ))}
+              {Array.from({ length: uploadingCount }).map((_, i) => (
+                <div
+                  key={`uploading-${i}`}
+                  className="overflow-hidden rounded-lg border border-[#e5e7eb] bg-white"
+                >
+                  <div className="flex aspect-square animate-pulse items-center justify-center bg-[#f1f5f9]">
+                    <Loader2 className="h-6 w-6 animate-spin text-[#2563EB]" />
+                  </div>
+                  <div className="flex h-9 items-center justify-center border-t border-[#e5e7eb] text-[11px] text-neutral-muted">
+                    Uploading…
+                  </div>
                 </div>
               ))}
             </div>
@@ -313,44 +343,47 @@ function ProductFormFields({
             </label>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <label className="block text-[12px] font-medium text-[#6b7280]">
+            <div className="block text-[12px] font-medium text-[#6b7280]">
               Category <span className="text-red-500">*</span>
-              <select
-                required
-                value={form.categoryId}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setForm((f) => ({
-                    ...f,
-                    categoryId: value === NEW_CATEGORY ? NEW_CATEGORY : value,
-                  }));
-                  if (value !== NEW_CATEGORY) setNewCategoryName("");
-                }}
-                className={fieldClass}
-              >
-                <option value="">Select Category</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-                <option value={NEW_CATEGORY}>+ Create new category</option>
-              </select>
-            </label>
-            <label className="block text-[12px] font-medium text-[#6b7280]">
+              <div className="mt-1.5">
+                <Select
+                  value={form.categoryId}
+                  onChange={(value) => {
+                    setForm((f) => ({
+                      ...f,
+                      categoryId: value === NEW_CATEGORY ? NEW_CATEGORY : value,
+                    }));
+                    if (value !== NEW_CATEGORY) setNewCategoryName("");
+                  }}
+                  options={[
+                    ...categories.map((c) => ({ value: c.id, label: c.name })),
+                    {
+                      value: NEW_CATEGORY,
+                      label: "+ Create New Category",
+                      accent: true,
+                    },
+                  ]}
+                  placeholder="Select Category"
+                  ariaLabel="Category"
+                />
+              </div>
+            </div>
+            <div className="block text-[12px] font-medium text-[#6b7280]">
               Status
-              <select
-                value={form.isActive ? "active" : "inactive"}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, isActive: e.target.value === "active" }))
-                }
-                className={fieldClass}
-                aria-label="Product status"
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </label>
+              <div className="mt-1.5">
+                <Select
+                  value={form.isActive ? "active" : "inactive"}
+                  onChange={(v) =>
+                    setForm((f) => ({ ...f, isActive: v === "active" }))
+                  }
+                  options={[
+                    { value: "active", label: "Active" },
+                    { value: "inactive", label: "Inactive" },
+                  ]}
+                  ariaLabel="Product status"
+                />
+              </div>
+            </div>
           </div>
           {form.categoryId === NEW_CATEGORY ? (
             <div className="flex gap-2">
@@ -358,13 +391,13 @@ function ProductFormFields({
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
                 placeholder="New category name"
-                className="h-10 min-w-0 flex-1 rounded-md border border-[#d0d5dd] px-3 text-[13px] text-[#333] outline-none focus:border-[#2563EB]"
+                className="h-10 min-w-0 flex-1 rounded-md border border-neutral-border px-3 text-[13px] text-neutral-text outline-none focus:border-[#2563EB]"
               />
               <button
                 type="button"
                 disabled={creatingCategory}
                 onClick={() => void saveNewCategory()}
-                className="shrink-0 rounded-md bg-[#2563EB] px-3 text-[13px] font-medium text-white hover:bg-[#1e6aef] disabled:opacity-60"
+                className="shrink-0 rounded-md bg-[#2563EB] px-3 text-[13px] font-medium text-white hover:bg-brand-600 disabled:opacity-60"
               >
                 {creatingCategory ? "Saving…" : "Add"}
               </button>
@@ -375,49 +408,38 @@ function ProductFormFields({
             <p className="mb-2 text-[12px] font-medium text-[#6b7280]">
               Add Product Variants
             </p>
-            <p className="mb-2 text-[11px] text-[#8a94a6]">
-              Optional. Skip color and size to sell this product as Free Size.
-            </p>
             <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2">
-              <select
+              <Select
                 value={draft.color}
-                onChange={(e) => setDraft((d) => ({ ...d, color: e.target.value }))}
-                className="h-10 w-full rounded-md border border-[#d0d5dd] bg-white px-3 text-[13px] text-[#333] outline-none focus:border-[#2563EB]"
-                aria-label="Color"
-              >
-                <option value="">Select Color</option>
-                {COLOR_OPTIONS.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-              <select
+                onChange={(v) => setDraft((d) => ({ ...d, color: v }))}
+                options={[
+                  { value: "", label: "Select Color" },
+                  ...COLOR_OPTIONS.map((c) => ({ value: c, label: c })),
+                ]}
+                ariaLabel="Color"
+              />
+              <Select
                 value={draft.size}
-                onChange={(e) => setDraft((d) => ({ ...d, size: e.target.value }))}
-                className="h-10 w-full rounded-md border border-[#d0d5dd] bg-white px-3 text-[13px] text-[#333] outline-none focus:border-[#2563EB]"
-                aria-label="Size"
-              >
-                <option value="">Select Size</option>
-                {SIZE_OPTIONS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => setDraft((d) => ({ ...d, size: v }))}
+                options={[
+                  { value: "", label: "Select Size" },
+                  ...SIZE_OPTIONS.map((s) => ({ value: s, label: s })),
+                ]}
+                ariaLabel="Size"
+              />
               <input
                 type="number"
                 min={0}
                 placeholder="Enter Qty"
                 value={draft.qty}
                 onChange={(e) => setDraft((d) => ({ ...d, qty: e.target.value }))}
-                className="h-10 w-full rounded-md border border-[#d0d5dd] px-3 text-[13px] text-[#333] outline-none focus:border-[#2563EB]"
+                className="h-10 w-full rounded-md border border-neutral-border px-3 text-[13px] text-neutral-text outline-none focus:border-[#2563EB]"
                 aria-label="Quantity"
               />
               <button
                 type="button"
                 onClick={addVariant}
-                className="flex h-10 w-10 items-center justify-center rounded-md bg-[#2563EB] text-white hover:bg-[#1e6aef]"
+                className="flex h-10 w-10 items-center justify-center rounded-md bg-[#2563EB] text-white hover:bg-brand-600"
                 aria-label="Add color and size"
               >
                 <Plus className="h-5 w-5" strokeWidth={2.5} />
@@ -429,18 +451,18 @@ function ProductFormFields({
                   key={`${v.color}-${v.size}`}
                   className="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-2"
                 >
-                  <div className="flex h-10 items-center rounded-md border border-[#d0d5dd] px-3 text-[13px] text-[#333]">
-                    {v.color}
+                  <div className="flex h-10 items-center rounded-md border border-neutral-border px-3 text-[13px] text-neutral-text">
+                    {v.color || "—"}
                   </div>
-                  <div className="flex h-10 items-center rounded-md border border-[#d0d5dd] px-3 text-[13px] text-[#333]">
-                    {v.size}
+                  <div className="flex h-10 items-center rounded-md border border-neutral-border px-3 text-[13px] text-neutral-text">
+                    {v.size || "—"}
                   </div>
                   <input
                     type="number"
                     min={0}
                     value={v.qty}
                     onChange={(e) => updateVariantQty(index, e.target.value)}
-                    className="h-10 w-full rounded-md border border-[#d0d5dd] px-3 text-[13px] tabular-nums text-[#333] outline-none focus:border-[#2563EB]"
+                    className="h-10 w-full rounded-md border border-neutral-border px-3 text-[13px] tabular-nums text-neutral-text outline-none focus:border-[#2563EB]"
                     aria-label={`Quantity for ${v.color} ${v.size}`}
                   />
                   <button
@@ -463,8 +485,8 @@ function ProductFormFields({
       <div className="mt-auto flex justify-end pt-8">
         <button
           type="submit"
-          disabled={loading}
-          className="min-w-[120px] rounded-md bg-[#2563EB] px-6 py-2.5 text-[14px] font-semibold text-white hover:bg-[#1e6aef] disabled:opacity-60"
+          disabled={loading || uploadingCount > 0}
+          className="min-w-30 rounded-md bg-[#2563EB] px-6 py-2.5 text-[14px] font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
         >
           {loading ? "Saving…" : submitLabel}
         </button>
@@ -514,22 +536,29 @@ export function AddProductDrawer({
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [images, setImages] = useState<ProductImageDraft[]>([]);
   const [loading, setLoading] = useState(false);
+  const [uploadingCount, setUploadingCount] = useState(0);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const { categories, setCategories, newCategoryName, setNewCategoryName } =
     useCategoryLoader(open);
 
-  useEffect(() => {
-    if (!open) return;
-    setForm(emptyForm());
-    setDraft(emptyDraft());
-    setVariants([]);
-    setImages([]);
-    setNewCategoryName("");
-    setError("");
-  }, [open, setNewCategoryName]);
+  // Reset the form whenever the drawer opens (state adjustment during render).
+  const [prevOpen, setPrevOpen] = useState(false);
+  if (prevOpen !== open) {
+    setPrevOpen(open);
+    if (open) {
+      setForm(emptyForm());
+      setDraft(emptyDraft());
+      setVariants([]);
+      setImages([]);
+      setUploadingCount(0);
+      setNewCategoryName("");
+      setError("");
+    }
+  }
 
   async function onUpload(file: File) {
+    setUploadingCount((c) => c + 1);
     try {
       const url = await uploadAdminImage(file);
       setImages((prev) => {
@@ -539,6 +568,8 @@ export function AddProductDrawer({
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploadingCount((c) => Math.max(0, c - 1));
     }
   }
 
@@ -547,7 +578,7 @@ export function AddProductDrawer({
       open={open}
       onClose={onClose}
       title="Add a Single Product"
-      widthClassName="max-w-[900px]"
+      widthClassName="max-w-225"
     >
       <ProductFormFields
         form={form}
@@ -568,6 +599,7 @@ export function AddProductDrawer({
         submitLabel="Save"
         fileRef={fileRef}
         onUpload={onUpload}
+        uploadingCount={uploadingCount}
         onSubmit={async () => {
           if (!form.categoryId || form.categoryId === NEW_CATEGORY) {
             setError("Select or create a category first");
@@ -624,35 +656,49 @@ export function EditProductDrawer({
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [images, setImages] = useState<ProductImageDraft[]>([]);
   const [loading, setLoading] = useState(false);
+  const [uploadingCount, setUploadingCount] = useState(0);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const { categories, setCategories, newCategoryName, setNewCategoryName } =
     useCategoryLoader(open);
 
-  useEffect(() => {
-    if (!product || !open) return;
-    const nextVariants = variantsFromProduct(product);
-    const nextImages = product.images?.length
-      ? product.images.map((img) => ({ url: img.url, color: img.color ?? "" }))
-      : product.imageUrl
-        ? [{ url: product.imageUrl, color: "" }]
-        : [];
-    setForm({
-      title: product.name,
-      price: String(product.price),
-      stock: totalStock(nextVariants, String(product.stock ?? 0)),
-      image: nextImages[0]?.url ?? product.imageUrl,
-      categoryId: product.categoryId ?? product.category?.id ?? "",
-      isActive: product.isActive !== false,
-    });
-    setVariants(nextVariants);
-    setImages(nextImages);
-    setDraft(emptyDraft());
-    setNewCategoryName("");
-    setError("");
-  }, [product, open, setNewCategoryName]);
+  // Repopulate the form when the drawer opens or the product changes
+  // (state adjustment during render).
+  const [prev, setPrev] = useState<{ open: boolean; product: Product | null }>({
+    open: false,
+    product: null,
+  });
+  if (prev.open !== open || prev.product !== product) {
+    setPrev({ open, product });
+    if (open && product) {
+      const nextVariants = variantsFromProduct(product);
+      const nextImages = product.images?.length
+        ? product.images.map((img) => ({
+            url: img.url,
+            color: img.color ?? "",
+          }))
+        : product.imageUrl
+          ? [{ url: product.imageUrl, color: "" }]
+          : [];
+      setForm({
+        title: product.name,
+        price: String(product.price),
+        stock: totalStock(nextVariants, String(product.stock ?? 0)),
+        image: nextImages[0]?.url ?? product.imageUrl,
+        categoryId: product.categoryId ?? product.category?.id ?? "",
+        isActive: product.isActive !== false,
+      });
+      setVariants(nextVariants);
+      setImages(nextImages);
+      setUploadingCount(0);
+      setDraft(emptyDraft());
+      setNewCategoryName("");
+      setError("");
+    }
+  }
 
   async function onUpload(file: File) {
+    setUploadingCount((c) => c + 1);
     try {
       const url = await uploadAdminImage(file);
       setImages((prev) => {
@@ -662,6 +708,8 @@ export function EditProductDrawer({
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploadingCount((c) => Math.max(0, c - 1));
     }
   }
 
@@ -670,7 +718,7 @@ export function EditProductDrawer({
       open={open && !!product}
       onClose={onClose}
       title="Edit a Single Product"
-      widthClassName="max-w-[900px]"
+      widthClassName="max-w-225"
     >
       <ProductFormFields
         form={form}
@@ -691,6 +739,7 @@ export function EditProductDrawer({
         submitLabel="Update"
         fileRef={fileRef}
         onUpload={onUpload}
+        uploadingCount={uploadingCount}
         onSubmit={async () => {
           if (!form.categoryId || form.categoryId === NEW_CATEGORY) {
             setError("Select or create a category first");

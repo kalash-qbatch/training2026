@@ -1,10 +1,14 @@
 import { z } from "zod";
 
-export const productVariantSchema = z.object({
-  color: z.string().min(1),
-  size: z.string().min(1),
-  qty: z.coerce.number().int().min(0),
-});
+export const productVariantSchema = z
+  .object({
+    color: z.string().trim().optional().default(""),
+    size: z.string().trim().optional().default(""),
+    qty: z.coerce.number().int().min(0),
+  })
+  .refine((v) => v.color || v.size, {
+    message: "Each variant needs at least a color or a size",
+  });
 
 export const productImageSchema = z.object({
   url: z.string().min(1),

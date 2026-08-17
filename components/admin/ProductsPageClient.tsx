@@ -19,10 +19,11 @@ import {
   EditProductDrawer,
 } from "@/components/admin/ProductDrawers";
 import { AddMultipleProductsModal } from "@/components/admin/AddMultipleProductsModal";
+import { Select } from "@/components/ui/Select";
 import { ProductPreviewModal } from "@/components/admin/ProductPreviewModal";
 
 const inputClass =
-  "h-10 w-full rounded-md border border-[#d0d5dd] bg-white px-3 text-[13px] text-[#333333] outline-none placeholder:text-[#8a94a6] focus:border-[#2563EB]";
+  "h-10 w-full rounded-md border border-neutral-border bg-white px-3 text-[13px] text-neutral-text outline-none placeholder:text-neutral-muted focus:border-[#2563EB]";
 
 function stockByColor(product: Product): Array<{ color: string; qty: number }> {
   if (product.variants?.length) {
@@ -76,7 +77,7 @@ export function ProductsPageClient() {
   const [debounced, setDebounced] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [status, setStatus] = useState<"active" | "inactive" | "">("");
-  const [loading, setLoading] = useState(true);
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
 
   const [addOpen, setAddOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -96,8 +97,10 @@ export function ProductsPageClient() {
       .catch(() => setCategories([]));
   }, [addOpen, editProduct]);
 
+  const queryKey = `${debounced}|${categoryId}|${status}|${page}`;
+  const loading = loadedKey !== queryKey;
+
   const load = useCallback(async () => {
-    setLoading(true);
     try {
       const data = await fetchAdminProducts({
         search: debounced,
@@ -110,13 +113,26 @@ export function ProductsPageClient() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to load");
     } finally {
-      setLoading(false);
+      setLoadedKey(queryKey);
     }
-  }, [debounced, categoryId, status, page, toast]);
+  }, [debounced, categoryId, status, page, queryKey, toast]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    fetchAdminProducts({
+      search: debounced,
+      categoryId: categoryId || undefined,
+      status,
+      page,
+    })
+      .then((data) => {
+        setProducts(data.products);
+        setTotalPages(data.totalPages);
+      })
+      .catch((err: unknown) => {
+        toast.error(err instanceof Error ? err.message : "Failed to load");
+      })
+      .finally(() => setLoadedKey(queryKey));
+  }, [debounced, categoryId, status, page, queryKey, toast]);
 
   const resetPage = () => setPage(1);
 
@@ -135,7 +151,7 @@ export function ProductsPageClient() {
           <button
             type="button"
             onClick={() => setBulkOpen(true)}
-            className="rounded-md bg-[#2563EB] px-3.5 py-2 text-[13px] font-medium text-white transition hover:bg-[#1e6aef]"
+            className="rounded-md bg-[#2563EB] px-3.5 py-2 text-[13px] font-medium text-white transition hover:bg-brand-600"
           >
             + Add Multiple Products
           </button>
@@ -153,42 +169,39 @@ export function ProductsPageClient() {
             placeholder="Search by name"
             className={`${inputClass} pr-10`}
           />
-          <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a94a6]" />
+          <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-muted" />
         </div>
-        <select
+        <Select
           value={categoryId}
-          onChange={(e) => {
-            setCategoryId(e.target.value);
+          onChange={(v) => {
+            setCategoryId(v);
             resetPage();
           }}
-          className={inputClass}
-        >
-          <option value="">All categories</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        <select
+          options={[
+            { value: "", label: "All categories" },
+            ...categories.map((c) => ({ value: c.id, label: c.name })),
+          ]}
+          ariaLabel="Filter by category"
+        />
+        <Select
           value={status}
-          onChange={(e) => {
-            setStatus(e.target.value as "active" | "inactive" | "");
+          onChange={(v) => {
+            setStatus(v as "active" | "inactive" | "");
             resetPage();
           }}
-          className={inputClass}
-          aria-label="Filter by status"
-        >
-          <option value="">All statuses</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
+          options={[
+            { value: "", label: "All statuses" },
+            { value: "active", label: "Active" },
+            { value: "inactive", label: "Inactive" },
+          ]}
+          ariaLabel="Filter by status"
+        />
       </div>
 
       <div className="overflow-x-auto">
         <table className="min-w-full border-collapse text-left text-[13px]">
           <thead>
-            <tr className="border-b border-[#e5e7eb] text-[12px] font-medium text-[#8a94a6]">
+            <tr className="border-b border-[#e5e7eb] text-[12px] font-medium text-neutral-muted">
               <th className="pb-3 pr-4 font-medium">Title</th>
               <th className="pb-3 pr-4 font-medium">Category</th>
               <th className="pb-3 pr-4 font-medium">Price</th>
@@ -200,13 +213,13 @@ export function ProductsPageClient() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="py-10 text-center text-[#8a94a6]">
+                <td colSpan={6} className="py-10 text-center text-neutral-muted">
                   Loading…
                 </td>
               </tr>
             ) : !products.length ? (
               <tr>
-                <td colSpan={6} className="py-10 text-center text-[#8a94a6]">
+                <td colSpan={6} className="py-10 text-center text-neutral-muted">
                   No products found
                 </td>
               </tr>
@@ -224,13 +237,13 @@ export function ProductsPageClient() {
                         alt=""
                         className="h-10 w-10 rounded object-cover"
                       />
-                      <p className="font-medium text-[#333333]">{p.name}</p>
+                      <p className="font-medium text-neutral-text">{p.name}</p>
                     </div>
                   </td>
-                  <td className="py-3.5 pr-4 text-[#333333]">
+                  <td className="py-3.5 pr-4 text-neutral-text">
                     {p.category?.name ?? "—"}
                   </td>
-                  <td className="py-3.5 pr-4 tabular-nums text-[#333333]">
+                  <td className="py-3.5 pr-4 tabular-nums text-neutral-text">
                     {formatCurrency(p.price)}
                   </td>
                   <td className="py-3.5 pr-4">

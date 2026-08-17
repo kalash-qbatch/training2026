@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { ChevronDown, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import {
   getCategories,
   getProducts,
@@ -11,6 +11,7 @@ import type { Category, Product } from "@/types";
 import { ProductCard } from "./ProductCard";
 import { ProductGridSkeleton } from "./ProductGridSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Select } from "@/components/ui/Select";
 
 export function ProductListing() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -34,10 +35,18 @@ export function ProductListing() {
     return () => window.clearTimeout(t);
   }, [search]);
 
-  useEffect(() => {
-    let cancelled = false;
+  // Reset loading/error during render when the query changes
+  // (https://react.dev/learn/you-might-not-need-an-effect)
+  const queryKey = `${debounced}|${sort}|${categoryId}`;
+  const [prevQueryKey, setPrevQueryKey] = useState(queryKey);
+  if (queryKey !== prevQueryKey) {
+    setPrevQueryKey(queryKey);
     setLoading(true);
     setError(null);
+  }
+
+  useEffect(() => {
+    let cancelled = false;
     getProducts({
       search: debounced,
       sort,
@@ -93,7 +102,7 @@ export function ProductListing() {
         </h1>
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-end">
-          <div className="flex h-10 w-full overflow-hidden rounded-lg border border-[#d0d5dd] bg-white sm:w-[320px]">
+          <div className="flex h-10 w-full overflow-hidden rounded-lg border border-neutral-border bg-white sm:w-80">
             <input
               value={search}
               onChange={(e) => startTransition(() => setSearch(e.target.value))}
@@ -102,7 +111,7 @@ export function ProductListing() {
             />
             <button
               type="button"
-              className="flex h-full w-10 shrink-0 items-center justify-center border-l border-[#d0d5dd] bg-[#F3F4F6] text-[#333333]"
+              className="flex h-full w-10 shrink-0 items-center justify-center border-l border-neutral-border bg-[#F3F4F6] text-neutral-text"
               aria-label="Search"
               tabIndex={-1}
             >
@@ -110,45 +119,33 @@ export function ProductListing() {
             </button>
           </div>
 
-          <label className="relative inline-flex h-10 w-full shrink-0 sm:w-[160px]">
-            <select
+          <div className="w-full shrink-0 sm:w-40">
+            <Select
               value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              aria-label="Filter by category"
-              className="h-full w-full cursor-pointer appearance-none rounded-lg border border-[#d0d5dd] bg-white py-2 pl-3 pr-8 text-[13px] text-neutral-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-            >
-              <option value="">All categories</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown
-              className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6b7280]"
-              aria-hidden
+              onChange={setCategoryId}
+              options={[
+                { value: "", label: "All categories" },
+                ...categories.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+              ariaLabel="Filter by category"
+              className="rounded-lg"
             />
-          </label>
+          </div>
 
-          <label className="relative inline-flex h-10 w-full shrink-0 sm:w-[148px]">
-            <span className="pointer-events-none absolute inset-y-0 left-3 z-10 flex items-center text-[13px] text-[#8E94A9]">
-              Sort by:
-            </span>
-            <select
+          <div className="w-full shrink-0 sm:w-52.5">
+            <Select
               value={sort}
-              onChange={(e) => setSort(e.target.value as ProductSort)}
-              aria-label="Sort by"
-              className="h-full w-full cursor-pointer appearance-none rounded-lg border border-[#d0d5dd] bg-white py-2 pl-3 pr-8 text-[13px] text-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 [&>option]:text-neutral-text"
-            >
-              <option value="name-asc">Name</option>
-              <option value="price-asc">Price: Low to High</option>
-              <option value="price-desc">Price: High to Low</option>
-            </select>
-            <ChevronDown
-              className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6b7280]"
-              aria-hidden
+              onChange={(v) => setSort(v as ProductSort)}
+              options={[
+                { value: "name-asc", label: "Name" },
+                { value: "price-asc", label: "Price: Low to High" },
+                { value: "price-desc", label: "Price: High to Low" },
+              ]}
+              prefix="Sort by:"
+              ariaLabel="Sort by"
+              className="rounded-lg"
             />
-          </label>
+          </div>
         </div>
       </div>
 

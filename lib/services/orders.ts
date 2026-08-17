@@ -61,9 +61,11 @@ export async function createOrder(userId: string, items: PlaceOrderItemInput[]) 
       let size = item.size?.trim() || undefined;
 
       if (hasSpecs) {
-        if (!color || !size) {
+        const needsColor = product.specifications.some((s) => s.color.trim());
+        const needsSize = product.specifications.some((s) => s.size.trim());
+        if ((needsColor && !color) || (needsSize && !size)) {
           throw new OrderError(
-            `Color and size are required for "${product.title}".`
+            `A ${needsColor && !color ? "color" : "size"} selection is required for "${product.title}".`
           );
         }
 
@@ -71,8 +73,8 @@ export async function createOrder(userId: string, items: PlaceOrderItemInput[]) 
         const spec = await tx.specification.findFirst({
           where: {
             productId: product.id,
-            color: { equals: color, mode: "insensitive" },
-            size: { equals: size, mode: "insensitive" },
+            color: { equals: color ?? "", mode: "insensitive" },
+            size: { equals: size ?? "", mode: "insensitive" },
           },
         });
 
@@ -246,11 +248,11 @@ async function restoreStockForOrderItems(
     });
     if (!product) continue;
 
-    const color = item.color?.trim();
-    const size = item.size?.trim();
+    const color = item.color?.trim() ?? "";
+    const size = item.size?.trim() ?? "";
     const hasSpecs = product.specifications.length > 0;
 
-    if (hasSpecs && color && size) {
+    if (hasSpecs && (color || size)) {
       const spec = await tx.specification.findFirst({
         where: {
           productId: product.id,
@@ -294,14 +296,14 @@ async function consumeStockForOrderItems(
       throw new OrderError("Product not found for order item", 404);
     }
 
-    const color = item.color?.trim();
-    const size = item.size?.trim();
+    const color = item.color?.trim() ?? "";
+    const size = item.size?.trim() ?? "";
     const hasSpecs = product.specifications.length > 0;
 
     if (hasSpecs) {
-      if (!color || !size) {
+      if (!color && !size) {
         throw new OrderError(
-          `Color and size are required to restore stock for "${product.title}".`
+          `A variant selection is required to restore stock for "${product.title}".`
         );
       }
       const spec = await tx.specification.findFirst({

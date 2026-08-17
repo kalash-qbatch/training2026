@@ -21,7 +21,7 @@ import { useToast } from "@/components/ui/Toast";
 import { AdminPagination } from "@/components/admin/AdminPagination";
 
 const inputClass =
-  "h-10 w-full rounded-md border border-[#d0d5dd] bg-white px-3 text-[13px] text-[#333333] outline-none placeholder:text-[#8a94a6] focus:border-[#2563EB]";
+  "h-10 w-full rounded-md border border-[#d0d5dd] bg-white px-3 text-[13px] text-neutral-text outline-none placeholder:text-neutral-muted focus:border-[#2563EB]";
 
 function StatCard({
   label,
@@ -37,9 +37,9 @@ function StatCard({
   return (
     <div className="flex items-center justify-between rounded-lg border border-[#e5e7eb] bg-white p-5">
       <div>
-        <p className="text-[12px] text-[#8a94a6]">{label}</p>
+        <p className="text-[12px] text-neutral-muted">{label}</p>
         <p
-          className={`mt-1 text-xl font-bold text-[#111827] ${valueClassName ?? ""}`}
+          className={`mt-1 text-xl font-bold text-neutral-900 ${valueClassName ?? ""}`}
         >
           {value}
         </p>
@@ -64,36 +64,45 @@ export function OrdersPageClient() {
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [loading, setLoading] = useState(true);
+  const [prevDebounced, setPrevDebounced] = useState(debounced);
+  const queryKey = `${debounced}|${page}`;
+  const [prevQueryKey, setPrevQueryKey] = useState(queryKey);
+
+  // Adjust state during render instead of inside effects
+  // (https://react.dev/learn/you-might-not-need-an-effect)
+  if (debounced !== prevDebounced) {
+    setPrevDebounced(debounced);
+    if (page !== 1) setPage(1);
+  }
+  if (queryKey !== prevQueryKey) {
+    setPrevQueryKey(queryKey);
+    setLoading(true);
+  }
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebounced(search), 300);
     return () => window.clearTimeout(t);
   }, [search]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await fetchAdminOrders({
-        search: debounced,
-        page,
-      });
-      setOrders(data.orders);
-      setStats(data.stats);
-      setTotalPages(data.totalPages);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load orders");
-    } finally {
-      setLoading(false);
-    }
+  const load = useCallback(() => {
+    fetchAdminOrders({
+      search: debounced,
+      page,
+    })
+      .then((data) => {
+        setOrders(data.orders);
+        setStats(data.stats);
+        setTotalPages(data.totalPages);
+      })
+      .catch((err) => {
+        toast.error(err instanceof Error ? err.message : "Failed to load orders");
+      })
+      .finally(() => setLoading(false));
   }, [debounced, page, toast]);
 
   useEffect(() => {
-    void load();
+    load();
   }, [load]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [debounced]);
 
   return (
     <div>
@@ -125,14 +134,14 @@ export function OrdersPageClient() {
             placeholder="Search by user & order ID"
             className={`${inputClass} pr-10`}
           />
-          <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a94a6]" />
+          <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-muted" />
         </div>
       </div>
 
       <div className="overflow-x-auto">
         <table className="min-w-full border-collapse text-left text-[13px]">
           <thead>
-            <tr className="border-b border-[#e5e7eb] text-[12px] font-medium text-[#8a94a6]">
+            <tr className="border-b border-[#e5e7eb] text-[12px] font-medium text-neutral-muted">
               <th className="pb-3 pr-4 font-medium">Date</th>
               <th className="pb-3 pr-4 font-medium">Order #</th>
               <th className="pb-3 pr-4 font-medium">User</th>
@@ -145,13 +154,13 @@ export function OrdersPageClient() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={7} className="py-10 text-center text-[#8a94a6]">
+                <td colSpan={7} className="py-10 text-center text-neutral-muted">
                   Loading…
                 </td>
               </tr>
             ) : !orders.length ? (
               <tr>
-                <td colSpan={7} className="py-10 text-center text-[#8a94a6]">
+                <td colSpan={7} className="py-10 text-center text-neutral-muted">
                   No orders found
                 </td>
               </tr>
@@ -163,15 +172,15 @@ export function OrdersPageClient() {
                     key={o.id}
                     className="border-b border-[#f3f4f6] last:border-0"
                   >
-                    <td className="py-3.5 pr-4 text-[#333333]">
+                    <td className="py-3.5 pr-4 text-neutral-text">
                       {formatDate(o.date)}
                     </td>
-                    <td className="py-3.5 pr-4 font-medium text-[#333333]">
+                    <td className="py-3.5 pr-4 font-medium text-neutral-text">
                       {o.id}
                     </td>
-                    <td className="py-3.5 pr-4 text-[#333333]">{o.userName}</td>
-                    <td className="py-3.5 pr-4 text-[#333333]">{productCount}</td>
-                    <td className="py-3.5 pr-4 font-medium tabular-nums text-[#333333]">
+                    <td className="py-3.5 pr-4 text-neutral-text">{o.userName}</td>
+                    <td className="py-3.5 pr-4 text-neutral-text">{productCount}</td>
+                    <td className="py-3.5 pr-4 font-medium tabular-nums text-neutral-text">
                       {formatCurrency(o.amount)}
                     </td>
                     <td className="py-3.5 pr-4">

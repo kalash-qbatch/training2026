@@ -18,10 +18,18 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
   const [order, setOrder] = useState<Order | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [prevOrderId, setPrevOrderId] = useState(orderId);
+
+  // Reset loading during render when the order id changes
+  // (https://react.dev/learn/you-might-not-need-an-effect)
+  if (orderId !== prevOrderId) {
+    setPrevOrderId(orderId);
+    setLoading(true);
+    setError("");
+  }
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     fetchAdminOrder(orderId)
       .then((data) => {
         if (!cancelled) setOrder(data);
@@ -40,7 +48,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
   }, [orderId]);
 
   if (loading) {
-    return <div className="py-8 text-[13px] text-[#8a94a6]">Loading…</div>;
+    return <div className="py-8 text-[13px] text-neutral-muted">Loading…</div>;
   }
 
   if (error || !order) {
@@ -63,7 +71,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
     <div>
       <Link
         href="/admin/orders"
-        className="mb-6 inline-flex items-center gap-2 text-[22px] font-semibold text-[#2563EB] hover:text-[#1e6aef]"
+        className="mb-6 inline-flex items-center gap-2 text-[22px] font-semibold text-[#2563EB] hover:text-brand-600"
       >
         <ArrowLeft className="h-5 w-5" strokeWidth={2.25} />
         Order Detail
@@ -80,7 +88,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
           <Meta label="Total" value={formatCurrency(order.amount)} />
         </div>
         <div className="flex flex-col gap-2">
-          <p className="text-[12px] text-[#8a94a6]">Status</p>
+          <p className="text-[12px] text-neutral-muted">Status</p>
           <span
             className={`inline-flex w-fit rounded px-2.5 py-1 text-[11px] font-semibold ${orderStatusClass(order.status)}`}
           >
@@ -96,7 +104,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
       <div className="overflow-x-auto">
         <table className="min-w-full border-collapse text-left text-[13px]">
           <thead>
-            <tr className="border-b border-[#e5e7eb] text-[12px] font-medium text-[#8a94a6]">
+            <tr className="border-b border-[#e5e7eb] text-[12px] font-medium text-neutral-muted">
               <th className="pb-3 pr-4 font-medium">Title</th>
               <th className="pb-3 pr-4 font-medium">Color</th>
               <th className="pb-3 pr-4 font-medium">Size</th>
@@ -119,22 +127,22 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
                       alt=""
                       className="h-10 w-10 rounded object-cover"
                     />
-                    <p className="line-clamp-2 max-w-[260px] font-medium text-[#333333]">
+                    <p className="line-clamp-2 max-w-65 font-medium text-neutral-text">
                       {item.title}
                     </p>
                   </div>
                 </td>
-                <td className="py-3.5 pr-4 text-[#333333]">
+                <td className="py-3.5 pr-4 text-neutral-text">
                   {formatLineColor(item.color)}
                 </td>
-                <td className="py-3.5 pr-4 text-[#333333]">
-                  {formatLineSize(item.size, item.color)}
+                <td className="py-3.5 pr-4 text-neutral-text">
+                  {formatLineSize(item.size)}
                 </td>
-                <td className="py-3.5 pr-4 tabular-nums text-[#333333]">
+                <td className="py-3.5 pr-4 tabular-nums text-neutral-text">
                   {formatCurrency(item.price)}
                 </td>
-                <td className="py-3.5 pr-4 text-[#333333]">{item.qty}</td>
-                <td className="py-3.5 text-[#333333]">{item.stock ?? "—"}</td>
+                <td className="py-3.5 pr-4 text-neutral-text">{item.qty}</td>
+                <td className="py-3.5 text-neutral-text">{item.stock ?? "—"}</td>
               </tr>
             ))}
           </tbody>
@@ -147,8 +155,8 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
 function Meta({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[12px] text-[#8a94a6]">{label}</p>
-      <p className="mt-1 text-sm font-medium text-[#333333]">{value}</p>
+      <p className="text-[12px] text-neutral-muted">{label}</p>
+      <p className="mt-1 text-sm font-medium text-neutral-text">{value}</p>
     </div>
   );
 }

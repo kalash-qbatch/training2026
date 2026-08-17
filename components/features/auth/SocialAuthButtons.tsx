@@ -34,13 +34,16 @@ type SocialAuthButtonsProps = {
   getRememberMe?: () => boolean;
 };
 
+function setRememberMeCookie(isRemember: boolean) {
+  document.cookie = `auth_remember_me=${isRemember}; path=/; max-age=300; SameSite=Lax`;
+}
+
 export function SocialAuthButtons({ context = "login", getRememberMe }: SocialAuthButtonsProps) {
   const { toast } = useToast();
 
   async function handleProvider(id: Provider, label: string) {
     try {
-      const isRemember = getRememberMe ? getRememberMe() : true;
-      document.cookie = `auth_remember_me=${isRemember}; path=/; max-age=300; SameSite=Lax`;
+      setRememberMeCookie(getRememberMe ? getRememberMe() : true);
       await signIn(id, { callbackUrl: "/products" });
     } catch {
       toast.error(

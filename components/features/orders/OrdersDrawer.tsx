@@ -24,24 +24,33 @@ export function OrdersDrawer({
   const [error, setError] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [detail, setDetail] = useState<Order | null | undefined>(undefined);
+  const [prevOpen, setPrevOpen] = useState(open);
+  const [prevInitialOrderId, setPrevInitialOrderId] = useState(initialOrderId);
+  const [prevSelectedOrderId, setPrevSelectedOrderId] = useState(selectedOrderId);
 
-  useEffect(() => {
+  // Adjust state during render instead of inside effects
+  // (https://react.dev/learn/you-might-not-need-an-effect)
+  if (open !== prevOpen || initialOrderId !== prevInitialOrderId) {
+    setPrevOpen(open);
+    setPrevInitialOrderId(initialOrderId);
     if (!open) {
       setSelectedOrderId(null);
       setDetail(undefined);
       setError(null);
-      return;
+    } else {
+      setLoading(true);
+      setError(null);
+      if (initialOrderId) setSelectedOrderId(initialOrderId);
     }
-    if (initialOrderId) {
-      setSelectedOrderId(initialOrderId);
-    }
-  }, [open, initialOrderId]);
+  }
+  if (selectedOrderId !== prevSelectedOrderId) {
+    setPrevSelectedOrderId(selectedOrderId);
+    setDetail(undefined);
+  }
 
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    setLoading(true);
-    setError(null);
     getOrders(1, 100)
       .then((res) => {
         if (!cancelled) setOrders(res.orders);
@@ -60,12 +69,8 @@ export function OrdersDrawer({
   }, [open]);
 
   useEffect(() => {
-    if (!selectedOrderId) {
-      setDetail(undefined);
-      return;
-    }
+    if (!selectedOrderId) return;
     let cancelled = false;
-    setDetail(undefined);
     getOrderById(selectedOrderId)
       .then((data) => {
         if (!cancelled) setDetail(data);
@@ -172,7 +177,7 @@ function OrderDetailsContent({
           Product Information
         </h2>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px] border-collapse">
+          <table className="w-full min-w-140 border-collapse">
             <thead>
               <tr className="border-b border-neutral-border text-left text-[12px] font-medium text-neutral-muted">
                 <th className="pb-3 font-medium">Title</th>
@@ -199,7 +204,7 @@ function OrderDetailsContent({
                           sizes="48px"
                         />
                       </div>
-                      <p className="line-clamp-2 max-w-[260px] text-sm font-medium text-neutral-text">
+                      <p className="line-clamp-2 max-w-65 text-sm font-medium text-neutral-text">
                         {item.title}
                       </p>
                     </div>
@@ -208,7 +213,7 @@ function OrderDetailsContent({
                     {formatLineColor(item.color)}
                   </td>
                   <td className="py-4 text-sm text-neutral-text">
-                    {formatLineSize(item.size, item.color)}
+                    {formatLineSize(item.size)}
                   </td>
                   <td className="py-4 text-sm tabular-nums text-neutral-text">
                     {formatCurrency(item.price)}

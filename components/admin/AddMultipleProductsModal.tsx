@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { CloudUpload, Trash2 } from "lucide-react";
 import { bulkUploadProducts } from "@/lib/api/admin";
 import { Modal } from "@/components/ui/Modal";
@@ -17,15 +17,19 @@ export function AddMultipleProductsModal({
   const [files, setFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [prevOpen, setPrevOpen] = useState(open);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
+  // Reset state during render when the modal closes
+  // (https://react.dev/learn/you-might-not-need-an-effect)
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     if (!open) {
       setFiles([]);
       setError("");
       setLoading(false);
     }
-  }, [open]);
+  }
 
   function addFiles(list: FileList | null) {
     if (!list) return;
@@ -121,7 +125,7 @@ export function AddMultipleProductsModal({
               setLoading(false);
             }
           }}
-          className="rounded-lg bg-[#2563EB] px-5 py-2 text-[13px] font-semibold text-white transition hover:bg-[#1e6aef] disabled:opacity-60"
+          className="rounded-lg bg-[#2563EB] px-5 py-2 text-[13px] font-semibold text-white transition hover:bg-brand-600 disabled:opacity-60"
         >
           {loading ? "Uploading…" : "Upload File"}
         </button>

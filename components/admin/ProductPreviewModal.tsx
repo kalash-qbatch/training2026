@@ -5,7 +5,11 @@ import Image from "next/image";
 import { X } from "lucide-react";
 import type { Product } from "@/types";
 import { cn, colorSwatch, formatCurrency } from "@/lib/utils";
-import { FREE_SIZE_LABEL, isFreeSizeProduct } from "@/lib/product";
+import {
+  FREE_SIZE_LABEL,
+  getColorSlideIndex,
+  isFreeSizeProduct,
+} from "@/lib/product";
 import { Modal } from "@/components/ui/Modal";
 
 function PreviewContent({ product }: { product: Product }) {
@@ -47,14 +51,10 @@ function PreviewContent({ product }: { product: Product }) {
     if (product.images?.length) return product.images;
     return [{ url: product.imageUrl, color: undefined as string | undefined }];
   }, [product.images, product.imageUrl]);
-  const slideIndex = useMemo(() => {
-    const byColor = slides.findIndex(
-      (img) => img.color && img.color.toLowerCase() === color.toLowerCase()
-    );
-    if (byColor >= 0) return byColor;
-    const global = slides.findIndex((img) => !img.color);
-    return global >= 0 ? global : 0;
-  }, [slides, color]);
+  const slideIndex = useMemo(
+    () => getColorSlideIndex(slides, colors, color),
+    [slides, colors, color]
+  );
 
   return (
     <>
@@ -118,20 +118,26 @@ function PreviewContent({ product }: { product: Product }) {
             </div>
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              {sizes.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  aria-pressed={size === s}
-                  onClick={() => setSize(s)}
-                  className={cn(
-                    "h-8 min-w-10 rounded-md border border-[#e1e5eb] px-3 text-[12px] font-semibold uppercase text-neutral-900",
-                    size === s && "border-neutral-900 bg-neutral-900 text-white"
-                  )}
-                >
-                  {s}
-                </button>
-              ))}
+              {sizes.length ? (
+                sizes.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    aria-pressed={size === s}
+                    onClick={() => setSize(s)}
+                    className={cn(
+                      "h-8 min-w-10 rounded-md border border-[#e1e5eb] px-3 text-[12px] font-semibold uppercase text-neutral-900",
+                      size === s && "border-neutral-900 bg-neutral-900 text-white"
+                    )}
+                  >
+                    {s}
+                  </button>
+                ))
+              ) : (
+                <span className="inline-flex h-7 items-center rounded-sm bg-neutral-900 px-2.5 text-[11px] font-medium uppercase text-white">
+                  {FREE_SIZE_LABEL}
+                </span>
+              )}
             </div>
           </>
         )}

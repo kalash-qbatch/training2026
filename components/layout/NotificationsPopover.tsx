@@ -76,35 +76,32 @@ export function NotificationsPopover() {
   const [activeTab, setActiveTab] = useState<"unread" | "all">("all");
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-
-    try {
-      const data = await fetchNotifications();
-      setNotifications(data.notifications ?? []);
-      setUnreadCount(data.unreadCount ?? 0);
-    } catch (err) {
-      console.error("Notification Error:", err);
-
-      setNotifications([]);
-      setUnreadCount(0);
-    } finally {
-      setLoading(false);
-    }
+  const load = useCallback(() => {
+    fetchNotifications()
+      .then((data) => {
+        setNotifications(data.notifications ?? []);
+        setUnreadCount(data.unreadCount ?? 0);
+      })
+      .catch((err) => {
+        console.error("Notification Error:", err);
+        setNotifications([]);
+        setUnreadCount(0);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    void load();
-    const id = window.setInterval(() => void load(), 30000);
+    load();
+    const id = window.setInterval(load, 30000);
     return () => window.clearInterval(id);
   }, [load]);
 
   useEffect(() => {
     if (!open) return;
-    void load();
+    load();
 
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -156,13 +153,13 @@ export function NotificationsPopover() {
     <div ref={rootRef} className="relative flex items-center">
       <button
         type="button"
-        className="relative p-1 text-[#333333] hover:text-brand-500 transition-colors"
+        className="relative p-1 text-neutral-text hover:text-brand-500 transition-colors"
         aria-label="Notifications"
         aria-expanded={open}
         aria-haspopup="dialog"
         onClick={() => setOpen((v) => !v)}
       >
-        <Bell className="h-5 w-5 sm:h-[22px] sm:w-[22px]" strokeWidth={1.5} />
+        <Bell className="h-5 w-5 sm:h-5.5 sm:w-5.5" strokeWidth={1.5} />
         {unreadCount > 0 ? (
           <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#EF4444] px-1 text-[10px] font-semibold text-white">
             {unreadCount > 9 ? "9+" : unreadCount}
@@ -186,14 +183,14 @@ export function NotificationsPopover() {
             className={cn(
               "z-50 overflow-hidden border border-[#e5e7eb] bg-white shadow-xl animate-fade-in-up origin-top-right",
               // Mobile: bottom sheet–style panel
-              "fixed inset-x-3 top-[3.75rem] max-h-[min(70dvh,32rem)] rounded-2xl",
+              "fixed inset-x-3 top-15 max-h-[min(70dvh,32rem)] rounded-2xl",
               // Desktop: anchored dropdown
-              "sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2.5 sm:w-[25rem] sm:max-h-[30rem] sm:rounded-2xl"
+              "sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2.5 sm:w-100 sm:max-h-120 sm:rounded-2xl"
             )}
           >
             {/* Header */}
             <div className="flex items-center justify-between gap-3 border-b border-[#e5e7eb] px-4 py-3.5">
-              <p className="text-[15px] font-bold text-[#111827]">
+              <p className="text-[15px] font-bold text-neutral-900">
                 Notifications
               </p>
               <div className="flex items-center gap-2">
@@ -209,7 +206,7 @@ export function NotificationsPopover() {
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="rounded-md p-1 text-[#8a94a6] hover:bg-[#f3f4f6] hover:text-[#111827] sm:hidden"
+                  className="rounded-md p-1 text-neutral-muted hover:bg-[#f3f4f6] hover:text-neutral-900 sm:hidden"
                   aria-label="Close"
                 >
                   <X className="h-4 w-4" />
@@ -231,7 +228,7 @@ export function NotificationsPopover() {
               >
                 Unread
                 {activeTab === "unread" && (
-                  <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-brand-500 rounded-t-full" />
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500 rounded-t-full" />
                 )}
               </button>
               <button
@@ -246,13 +243,13 @@ export function NotificationsPopover() {
               >
                 All
                 {activeTab === "all" && (
-                  <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-brand-500 rounded-t-full" />
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500 rounded-t-full" />
                 )}
               </button>
             </div>
 
             {/* Content Area */}
-            <div className="max-h-[calc(min(70dvh,32rem)-6.75rem)] overflow-y-auto overscroll-contain sm:max-h-[22.5rem]">
+            <div className="max-h-[calc(min(70dvh,32rem)-6.75rem)] overflow-y-auto overscroll-contain sm:max-h-90">
               {loading && !notifications.length ? (
                 <div className="space-y-3 p-4">
                   {Array.from({ length: 3 }).map((_, i) => (
@@ -263,7 +260,7 @@ export function NotificationsPopover() {
                   ))}
                 </div>
               ) : !filteredNotifications.length ? (
-                <p className="px-4 py-12 text-center text-[13px] font-medium text-[#8a94a6]">
+                <p className="px-4 py-12 text-center text-[13px] font-medium text-neutral-muted">
                   {activeTab === "unread"
                     ? "No unread notifications"
                     : "No notifications yet"}
@@ -302,7 +299,7 @@ export function NotificationsPopover() {
                             <div className="flex items-start justify-between gap-2">
                               <p
                                 className={cn(
-                                  "text-[13.5px] leading-snug tracking-tight break-words",
+                                  "text-[13.5px] leading-snug tracking-tight wrap-break-word",
                                   !n.read
                                     ? "text-gray-900 font-semibold"
                                     : "text-gray-800 font-medium"
@@ -314,7 +311,7 @@ export function NotificationsPopover() {
                                 <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-500" />
                               )}
                             </div>
-                            <p className="mt-1 text-[12.5px] leading-relaxed text-gray-500 break-words font-normal">
+                            <p className="mt-1 text-[12.5px] leading-relaxed text-gray-500 wrap-break-word font-normal">
                               {n.message}
                             </p>
                             <p className="mt-1.5 text-[11px] font-semibold text-gray-400">

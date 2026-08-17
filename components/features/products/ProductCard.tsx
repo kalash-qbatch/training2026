@@ -5,7 +5,11 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { Product, ProductVariant } from "@/types";
 import { cn, colorSwatch, formatCurrency } from "@/lib/utils";
-import { FREE_SIZE_LABEL, isFreeSizeProduct } from "@/lib/product";
+import {
+  FREE_SIZE_LABEL,
+  getColorSlideIndex,
+  isFreeSizeProduct,
+} from "@/lib/product";
 import { useCartStore } from "@/lib/store/useCartStore";
 import { useAuthStore } from "@/lib/store/useAuthStore";
 import { useToast } from "@/components/ui/Toast";
@@ -74,7 +78,9 @@ export function ProductCard({ product }: { product: Product }) {
   const outOfStock = stock <= 0;
   const productFullyOut = totalStock <= 0;
   const invalidCombo = hasVariants && !selectedVariant;
-  const needsSelection = hasVariants && (!color || !size);
+  const needsSelection =
+    hasVariants &&
+    ((colors.length > 0 && !color) || (sizes.length > 0 && !size));
 
   const [qty, setQty] = useState(outOfStock ? 0 : 1);
   const selectedQty = outOfStock ? 0 : Math.min(Math.max(1, qty), stock);
@@ -86,14 +92,10 @@ export function ProductCard({ product }: { product: Product }) {
     if (product.images?.length) return product.images;
     return [{ url: product.imageUrl, color: undefined as string | undefined }];
   }, [product.images, product.imageUrl]);
-  const slideIndex = useMemo(() => {
-    const byColor = slides.findIndex(
-      (img) => img.color && img.color.toLowerCase() === color.toLowerCase()
-    );
-    if (byColor >= 0) return byColor;
-    const global = slides.findIndex((img) => !img.color);
-    return global >= 0 ? global : 0;
-  }, [slides, color]);
+  const slideIndex = useMemo(
+    () => getColorSlideIndex(slides, colors, color),
+    [slides, colors, color]
+  );
 
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-[7px] border border-[#e5e7eb] bg-white shadow-sm">
@@ -157,29 +159,36 @@ export function ProductCard({ product }: { product: Product }) {
                 />
               ))}
             </div>
-
-            <div className="mt-2 flex min-h-6 flex-wrap items-center gap-1.5">
-              {sizes.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  aria-pressed={size === s}
-                  onClick={() => setSize(s)}
-                  className={cn(
-                    "h-6 min-w-7 rounded-[3px] border border-[#e1e5eb] px-2 text-[11px] font-medium uppercase text-neutral-900",
-                    size === s && "border-neutral-900 bg-neutral-900 text-white"
-                  )}
-                >
-                  {s}
-                </button>
-              ))}
+            <div className="mt-2 flex items-center gap-1.5 justify-between">
+              <div className="mt-2 flex min-h-6 flex-wrap items-center gap-1.5">
+                {sizes.length ? (
+                  sizes.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      aria-pressed={size === s}
+                      onClick={() => setSize(s)}
+                      className={cn(
+                        "h-6 min-w-7 rounded-[3px] border border-[#e1e5eb] px-2 text-[11px] font-medium uppercase text-neutral-900",
+                        size === s && "border-neutral-900 bg-neutral-900 text-white"
+                      )}
+                    >
+                      {s}
+                    </button>
+                  ))
+                ) : (
+                  <span className="inline-flex h-6 items-center rounded-[3px] border border-neutral-900 bg-neutral-900 px-2 text-[11px] font-medium uppercase text-white">
+                    {FREE_SIZE_LABEL}
+                  </span>
+                )}
+              </div>
+              <p className="mt-2 text-[12px] font-bold tabular-nums border border-neutral-muted rounded-md px-2 py-1 leading-none text-neutral-muted">
+                {invalidCombo || outOfStock ? "0 in stock" : `${stock} in stock`}
+              </p>
             </div>
           </>
         )}
 
-        <p className="mt-2 text-[12px] leading-none text-neutral-muted">
-          {invalidCombo || outOfStock ? "0 in stock" : `${stock} in stock`}
-        </p>
 
         <div className="mt-3 flex items-center justify-between gap-2">
           <QtyStepper
@@ -191,7 +200,7 @@ export function ProductCard({ product }: { product: Product }) {
           <button
             type="button"
             disabled={outOfStock || invalidCombo || needsSelection}
-            className="h-[34px] rounded-[3px] bg-brand-500 px-3 text-[13px] font-semibold text-white transition hover:bg-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="h-8.5 rounded-[3px] bg-brand-500 px-3 text-[13px] font-semibold text-white transition hover:bg-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
             onClick={async () => {
               if (!isAuthenticated) {
                 router.push("/login");
@@ -202,7 +211,13 @@ export function ProductCard({ product }: { product: Product }) {
                 return;
               }
               if (needsSelection) {
-                toast.error("Select a color and size");
+                toast.error(
+                  colors.length && sizes.length
+                    ? "Select a color and size"
+                    : colors.length
+                      ? "Select a color"
+                      : "Select a size"
+                );
                 return;
               }
               const result = await addItem(

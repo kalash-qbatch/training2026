@@ -285,10 +285,10 @@ export async function createProduct(data: {
       stock,
       image,
       color: data.variants?.length
-        ? (data.color ?? data.variants[0].color)
+        ? data.color || data.variants[0].color || null
         : null,
       size: data.variants?.length
-        ? (data.size ?? data.variants[0].size)
+        ? data.size || data.variants[0].size || null
         : null,
       isActive: data.isActive ?? true,
       ...(categoryId ? { categoryId } : {}),
@@ -349,8 +349,8 @@ export async function updateProduct(
       ...(image != null ? { image } : {}),
       ...(data.variants != null
         ? {
-            color: data.variants[0]?.color ?? data.color ?? null,
-            size: data.variants[0]?.size ?? data.size ?? null,
+            color: data.variants[0]?.color || data.color || null,
+            size: data.variants[0]?.size || data.size || null,
           }
         : {
             ...(data.color !== undefined ? { color: data.color || null } : {}),

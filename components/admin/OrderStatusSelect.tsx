@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { Order } from "@/types";
 import {
   updateAdminOrderStatus,
@@ -8,6 +8,7 @@ import {
 } from "@/lib/api/admin";
 import { toAdminOrderStatus } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
+import { Select } from "@/components/ui/Select";
 
 /** Maps to Prisma OrderStatus. */
 const OPTIONS: Array<{ value: AdminOrderStatusUpdate; label: string }> = [
@@ -29,10 +30,16 @@ export function OrderStatusSelect({ order, onUpdated, className }: Props) {
     toAdminOrderStatus(order.status)
   );
   const [saving, setSaving] = useState(false);
+  const [prevStatus, setPrevStatus] = useState(order.status);
+  const [prevOrderId, setPrevOrderId] = useState(order.id);
 
-  useEffect(() => {
+  // Sync value during render when the order prop changes
+  // (https://react.dev/learn/you-might-not-need-an-effect)
+  if (order.status !== prevStatus || order.id !== prevOrderId) {
+    setPrevStatus(order.status);
+    setPrevOrderId(order.id);
     setValue(toAdminOrderStatus(order.status));
-  }, [order.status, order.id]);
+  }
 
   async function onChange(next: AdminOrderStatusUpdate) {
     if (next === value) return;
@@ -56,21 +63,15 @@ export function OrderStatusSelect({ order, onUpdated, className }: Props) {
   }
 
   return (
-    <select
-      value={value}
-      disabled={saving}
-      onChange={(e) => onChange(e.target.value as AdminOrderStatusUpdate)}
-      aria-label="Update order status"
-      className={
-        className ??
-        "h-9 min-w-[140px] rounded-md border border-[#d0d5dd] bg-white px-2 text-[12px] font-medium text-[#333333] outline-none focus:border-[#2563EB] disabled:opacity-60"
-      }
-    >
-      {OPTIONS.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
+    <div className={className ?? "min-w-35"}>
+      <Select
+        value={value}
+        disabled={saving}
+        onChange={(v) => onChange(v as AdminOrderStatusUpdate)}
+        options={OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+        ariaLabel="Update order status"
+        className="h-9 px-2 text-[12px] font-medium"
+      />
+    </div>
   );
 }

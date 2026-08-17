@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -31,19 +31,25 @@ export function CartPageClient() {
 
   const [pendingRemove, setPendingRemove] = useState<CartItem | null>(null);
   const [placing, setPlacing] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(
+    () => new Set(items.map(itemKey))
+  );
   const [successOpen, setSuccessOpen] = useState(false);
   const [placedOrderId, setPlacedOrderId] = useState<string | null>(null);
   const [ordersOpen, setOrdersOpen] = useState(false);
+  const [prevItems, setPrevItems] = useState(items);
 
-  useEffect(() => {
+  // Sync selection with cart items during render
+  // (https://react.dev/learn/you-might-not-need-an-effect)
+  if (items !== prevItems) {
+    setPrevItems(items);
     const keys = new Set(items.map(itemKey));
     setSelected((prev) => {
       if (prev.size === 0) return keys;
       const next = new Set([...prev].filter((k) => keys.has(k)));
       return next.size > 0 ? next : keys;
     });
-  }, [items]);
+  }
 
   const selectedItems = useMemo(
     () => items.filter((i) => selected.has(itemKey(i))),
@@ -112,7 +118,7 @@ export function CartPageClient() {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="hidden w-full min-w-[900px] border-collapse md:table">
+        <table className="hidden w-full min-w-225 border-collapse md:table">
           <thead>
             <tr className="border-b border-neutral-border text-left text-[12px] font-medium text-neutral-muted">
               <th className="w-10 pb-3">

@@ -28,7 +28,7 @@ export function AdminSidebar() {
       <div className="border-b border-gray-200 px-5 py-[15.5px]">
         <Link
           href="/admin/products"
-          className="text-[15px] font-semibold tracking-tight text-[#333333] transition-colors duration-200 hover:text-[#2563EB]"
+          className="text-[15px] font-semibold tracking-tight text-neutral-text transition-colors duration-200 hover:text-[#2563EB]"
         >
           E-commerce
         </Link>
@@ -47,7 +47,7 @@ export function AdminSidebar() {
                   "flex cursor-pointer items-center gap-2.5 rounded-md px-3 py-2.5 text-[13px] font-medium transition-all duration-200 ease-in-out",
                   active
                     ? "bg-[#2563EB] text-white shadow-sm"
-                    : "text-[#6b7280] hover:bg-[#f3f4f6] hover:text-[#111827]"
+                    : "text-[#6b7280] hover:bg-[#f3f4f6] hover:text-neutral-900"
                 )}
               >
                 <Icon
@@ -64,7 +64,7 @@ export function AdminSidebar() {
         <button
           type="button"
           onClick={onLogout}
-          className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-3 py-2.5 text-[13px] font-medium text-[#6b7280] transition-all duration-200 ease-in-out hover:bg-[#f3f4f6] hover:text-[#111827]"
+          className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-3 py-2.5 text-[13px] font-medium text-[#6b7280] transition-all duration-200 ease-in-out hover:bg-[#f3f4f6] hover:text-neutral-900"
         >
           <LogOut className="h-4 w-4" strokeWidth={1.75} />
           Logout
@@ -77,7 +77,7 @@ export function AdminSidebar() {
     <>
       <button
         type="button"
-        className="fixed left-3 top-3 z-40 cursor-pointer rounded-md border border-[#d0d5dd] bg-white p-2 shadow-sm transition-all duration-200 hover:bg-[#f8fafc] lg:hidden"
+        className="fixed left-3 top-3 z-40 cursor-pointer rounded-md border border-neutral-border bg-white p-2 shadow-sm transition-all duration-200 hover:bg-[#f8fafc] lg:hidden"
         onClick={() => setOpen(true)}
         aria-label="Open menu"
       >
@@ -100,14 +100,14 @@ export function AdminSidebar() {
         />
         <aside
           className={cn(
-            "absolute left-0 top-0 h-full w-[220px] border-r border-[#e5e7eb] bg-white shadow-xl transition-transform duration-300 ease-in-out",
+            "absolute left-0 top-0 h-full w-55 border-r border-[#e5e7eb] bg-white shadow-xl transition-transform duration-300 ease-in-out",
             open ? "translate-x-0" : "-translate-x-full"
           )}
           onClick={(e) => e.stopPropagation()}
         >
           <button
             type="button"
-            className="absolute right-2 top-2 z-10 cursor-pointer rounded p-1 text-gray-400 transition-colors duration-200 hover:bg-[#f3f4f6] hover:text-[#111827]"
+            className="absolute right-2 top-2 z-10 cursor-pointer rounded p-1 text-gray-400 transition-colors duration-200 hover:bg-[#f3f4f6] hover:text-neutral-900"
             onClick={() => setOpen(false)}
             aria-label="Close menu"
           >
@@ -117,7 +117,7 @@ export function AdminSidebar() {
         </aside>
       </div>
 
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[220px] border-r border-[#e5e7eb] bg-white lg:block">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-55 border-r border-[#e5e7eb] bg-white lg:block">
         {content}
       </aside>
     </>

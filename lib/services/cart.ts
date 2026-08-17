@@ -30,7 +30,7 @@ function mapCartItem(row: {
 }): CartItem {
   const specs = row.product.specifications ?? [];
   let stock = row.product.stock;
-  if (specs.length && row.color && row.size) {
+  if (specs.length && (row.color || row.size)) {
     const match = specs.find(
       (s) =>
         s.color.toLowerCase() === row.color.toLowerCase() &&
@@ -71,8 +71,16 @@ async function resolveLine(
     return { title: product.title, stock: product.stock, color: "", size: "" };
   }
 
-  if (!color || !size) {
-    throw new CartError(`Color and size are required for "${product.title}".`);
+  const needsColor = product.specifications.some((s) => s.color.trim());
+  const needsSize = product.specifications.some((s) => s.size.trim());
+  if ((needsColor && !color) || (needsSize && !size)) {
+    const missing =
+      needsColor && !color && needsSize && !size
+        ? "Color and size are"
+        : needsColor && !color
+          ? "Color is"
+          : "Size is";
+    throw new CartError(`${missing} required for "${product.title}".`);
   }
   const spec = product.specifications.find(
     (s) =>
