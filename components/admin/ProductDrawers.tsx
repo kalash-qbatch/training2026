@@ -3,11 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Plus, Trash2, Upload, X } from "lucide-react";
 import type { Category, Product, ProductVariant } from "@/types";
-import {
-  createAdminCategory,
-  fetchAdminCategories,
-  uploadAdminImage,
-} from "@/lib/api/admin";
+import { fetchAdminCategories } from "@/lib/api/admin";
 import { Drawer } from "@/components/ui/Drawer";
 import { Select } from "@/components/ui/Select";
 
@@ -37,6 +33,7 @@ type FormState = {
 type ProductImageDraft = {
   url: string;
   color: string;
+  file?: File;
 };
 
 type DraftVariant = {
@@ -84,7 +81,6 @@ function ProductFormFields({
   images,
   setImages,
   categories,
-  setCategories,
   newCategoryName,
   setNewCategoryName,
   error,
@@ -105,7 +101,6 @@ function ProductFormFields({
   images: ProductImageDraft[];
   setImages: React.Dispatch<React.SetStateAction<ProductImageDraft[]>>;
   categories: Category[];
-  setCategories: React.Dispatch<React.SetStateAction<Category[]>>;
   newCategoryName: string;
   setNewCategoryName: React.Dispatch<React.SetStateAction<string>>;
   error: string;
@@ -118,29 +113,14 @@ function ProductFormFields({
   uploadingCount: number;
 }) {
   const hasVariants = variants.length > 0;
-  const [creatingCategory, setCreatingCategory] = useState(false);
 
-  async function saveNewCategory() {
+  function saveNewCategory() {
     const name = newCategoryName.trim();
     if (!name) {
       setError("Enter a category name");
       return;
     }
-    setCreatingCategory(true);
     setError("");
-    try {
-      const category = await createAdminCategory(name);
-      setCategories((prev) => {
-        if (prev.some((c) => c.id === category.id)) return prev;
-        return [...prev, category].sort((a, b) => a.name.localeCompare(b.name));
-      });
-      setForm((f) => ({ ...f, categoryId: category.id }));
-      setNewCategoryName("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create category");
-    } finally {
-      setCreatingCategory(false);
-    }
   }
 
   function addVariant() {
@@ -197,6 +177,8 @@ function ProductFormFields({
 
   function removeImage(index: number) {
     setImages((prev) => {
+      const removed = prev[index];
+      if (removed?.file) URL.revokeObjectURL(removed.url);
       const next = prev.filter((_, i) => i !== index);
       setForm((f) => ({ ...f, image: next[0]?.url ?? "" }));
       return next;
@@ -395,11 +377,10 @@ function ProductFormFields({
               />
               <button
                 type="button"
-                disabled={creatingCategory}
-                onClick={() => void saveNewCategory()}
-                className="shrink-0 rounded-md bg-[#2563EB] px-3 text-[13px] font-medium text-white hover:bg-brand-600 disabled:opacity-60"
+                onClick={saveNewCategory}
+                className="shrink-0 rounded-md bg-[#2563EB] px-3 text-[13px] font-medium text-white hover:bg-brand-600"
               >
-                {creatingCategory ? "Saving…" : "Add"}
+                Add
               </button>
             </div>
           ) : null}
@@ -505,8 +486,41 @@ export type ProductSavePayload = {
   size?: string;
   variants: ProductVariant[];
   categoryId?: string | null;
+  categoryName?: string | null;
   isActive: boolean;
 };
+
+function revokeDraftImages(items: ProductImageDraft[]) {
+  for (const img of items) {
+    if (img.file) URL.revokeObjectURL(img.url);
+  }
+}
+
+function buildSavePayload(
+  form: FormState,
+  variants: ProductVariant[],
+  images: ProductImageDraft[],
+  newCategoryName: string
+): ProductSavePayload {
+  const stock =
+    variants.length > 0
+      ? variants.reduce((sum, v) => sum + v.qty, 0)
+      : Number(form.stock);
+  const isNewCategory = form.categoryId === NEW_CATEGORY;
+  return {
+    title: form.title,
+    price: Number(form.price),
+    stock,
+    image: images[0]?.file ? undefined : images[0]?.url,
+    images,
+    color: variants[0]?.color,
+    size: variants[0]?.size,
+    variants,
+    categoryId: isNewCategory ? null : form.categoryId,
+    categoryName: isNewCategory ? newCategoryName.trim() : undefined,
+    isActive: form.isActive,
+  };
+}
 
 function useCategoryLoader(open: boolean) {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -539,7 +553,7 @@ export function AddProductDrawer({
   const [uploadingCount, setUploadingCount] = useState(0);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
-  const { categories, setCategories, newCategoryName, setNewCategoryName } =
+  const { categories, newCategoryName, setNewCategoryName } =
     useCategoryLoader(open);
 
   // Reset the form whenever the drawer opens (state adjustment during render).
@@ -547,10 +561,13 @@ export function AddProductDrawer({
   if (prevOpen !== open) {
     setPrevOpen(open);
     if (open) {
+      setImages((prev) => {
+        revokeDraftImages(prev);
+        return [];
+      });
       setForm(emptyForm());
       setDraft(emptyDraft());
       setVariants([]);
-      setImages([]);
       setUploadingCount(0);
       setNewCategoryName("");
       setError("");
@@ -558,19 +575,12 @@ export function AddProductDrawer({
   }
 
   async function onUpload(file: File) {
-    setUploadingCount((c) => c + 1);
-    try {
-      const url = await uploadAdminImage(file);
-      setImages((prev) => {
-        const next = [...prev, { url, color: "" }];
-        setForm((f) => ({ ...f, image: next[0]?.url ?? "" }));
-        return next;
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setUploadingCount((c) => Math.max(0, c - 1));
-    }
+    const url = URL.createObjectURL(file);
+    setImages((prev) => {
+      const next = [...prev, { url, color: "", file }];
+      setForm((f) => ({ ...f, image: next[0]?.url ?? "" }));
+      return next;
+    });
   }
 
   return (
@@ -590,7 +600,6 @@ export function AddProductDrawer({
         images={images}
         setImages={setImages}
         categories={categories}
-        setCategories={setCategories}
         newCategoryName={newCategoryName}
         setNewCategoryName={setNewCategoryName}
         error={error}
@@ -601,7 +610,10 @@ export function AddProductDrawer({
         onUpload={onUpload}
         uploadingCount={uploadingCount}
         onSubmit={async () => {
-          if (!form.categoryId || form.categoryId === NEW_CATEGORY) {
+          if (
+            !form.categoryId ||
+            (form.categoryId === NEW_CATEGORY && !newCategoryName.trim())
+          ) {
             setError("Select or create a category first");
             return;
           }
@@ -612,22 +624,9 @@ export function AddProductDrawer({
           setLoading(true);
           setError("");
           try {
-            const stock =
-              variants.length > 0
-                ? variants.reduce((sum, v) => sum + v.qty, 0)
-                : Number(form.stock);
-            await onSave({
-              title: form.title,
-              price: Number(form.price),
-              stock,
-              image: images[0]?.url,
-              images,
-              color: variants[0]?.color,
-              size: variants[0]?.size,
-              variants,
-              categoryId: form.categoryId,
-              isActive: form.isActive,
-            });
+            await onSave(
+              buildSavePayload(form, variants, images, newCategoryName)
+            );
             onClose();
           } catch (err) {
             setError(err instanceof Error ? err.message : "Save failed");
@@ -659,7 +658,7 @@ export function EditProductDrawer({
   const [uploadingCount, setUploadingCount] = useState(0);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
-  const { categories, setCategories, newCategoryName, setNewCategoryName } =
+  const { categories, newCategoryName, setNewCategoryName } =
     useCategoryLoader(open);
 
   // Repopulate the form when the drawer opens or the product changes
@@ -689,7 +688,10 @@ export function EditProductDrawer({
         isActive: product.isActive !== false,
       });
       setVariants(nextVariants);
-      setImages(nextImages);
+      setImages((prev) => {
+        revokeDraftImages(prev);
+        return nextImages;
+      });
       setUploadingCount(0);
       setDraft(emptyDraft());
       setNewCategoryName("");
@@ -698,19 +700,12 @@ export function EditProductDrawer({
   }
 
   async function onUpload(file: File) {
-    setUploadingCount((c) => c + 1);
-    try {
-      const url = await uploadAdminImage(file);
-      setImages((prev) => {
-        const next = [...prev, { url, color: "" }];
-        setForm((f) => ({ ...f, image: next[0]?.url ?? "" }));
-        return next;
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setUploadingCount((c) => Math.max(0, c - 1));
-    }
+    const url = URL.createObjectURL(file);
+    setImages((prev) => {
+      const next = [...prev, { url, color: "", file }];
+      setForm((f) => ({ ...f, image: next[0]?.url ?? "" }));
+      return next;
+    });
   }
 
   return (
@@ -730,7 +725,6 @@ export function EditProductDrawer({
         images={images}
         setImages={setImages}
         categories={categories}
-        setCategories={setCategories}
         newCategoryName={newCategoryName}
         setNewCategoryName={setNewCategoryName}
         error={error}
@@ -741,7 +735,10 @@ export function EditProductDrawer({
         onUpload={onUpload}
         uploadingCount={uploadingCount}
         onSubmit={async () => {
-          if (!form.categoryId || form.categoryId === NEW_CATEGORY) {
+          if (
+            !form.categoryId ||
+            (form.categoryId === NEW_CATEGORY && !newCategoryName.trim())
+          ) {
             setError("Select or create a category first");
             return;
           }
@@ -752,22 +749,9 @@ export function EditProductDrawer({
           setLoading(true);
           setError("");
           try {
-            const stock =
-              variants.length > 0
-                ? variants.reduce((sum, v) => sum + v.qty, 0)
-                : Number(form.stock);
-            await onSave({
-              title: form.title,
-              price: Number(form.price),
-              stock,
-              image: images[0]?.url,
-              images,
-              color: variants[0]?.color,
-              size: variants[0]?.size,
-              variants,
-              categoryId: form.categoryId,
-              isActive: form.isActive,
-            });
+            await onSave(
+              buildSavePayload(form, variants, images, newCategoryName)
+            );
             onClose();
           } catch (err) {
             setError(err instanceof Error ? err.message : "Update failed");

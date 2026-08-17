@@ -1,29 +1,12 @@
 import { NextResponse } from "next/server";
-import { findProducts, type ProductSort } from "@/lib/services/products";
+import { listProducts } from "@/lib/controllers/products";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const search = searchParams.get("search") ?? undefined;
-    const sort = (searchParams.get("sort") as ProductSort | null) ?? "name-asc";
-    const page = Number(searchParams.get("page") || 1);
-    const pageSize = Number(
-      searchParams.get("pageSize") || searchParams.get("limit") || 8
-    );
-    const categoryId = searchParams.get("categoryId") ?? undefined;
-    const categorySlug = searchParams.get("category") ?? undefined;
-
-    const result = await findProducts({
-      search,
-      sort,
-      page,
-      pageSize,
-      categoryId,
-      categorySlug,
-    });
-    return NextResponse.json({ success: true, ...result });
+    const result = await listProducts(request);
+    return NextResponse.json(result.body, { status: result.status });
   } catch (error) {
     console.error("products GET error:", error);
     return NextResponse.json(

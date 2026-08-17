@@ -18,7 +18,7 @@ export function ForgotPasswordForm() {
   const { toast } = useToast();
   const {
     register,
-    handleSubmit,
+  handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<ForgotPasswordInput>({
     resolver: zodResolver(forgotPasswordSchema),

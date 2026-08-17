@@ -1,18 +1,13 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin";
 import {
-  createCategory,
-  listCategories,
-} from "@/lib/services/categories";
-import { adminCategorySchema } from "@/lib/validations/admin";
+  createAdminCategory,
+  listAdminCategories,
+} from "@/lib/controllers/admin-categories";
 
 export async function GET() {
-  const { error } = await requireAdmin();
-  if (error) return error;
-
   try {
-    const categories = await listCategories();
-    return NextResponse.json({ success: true, categories });
+    const result = await listAdminCategories();
+    return NextResponse.json(result.body, { status: result.status });
   } catch (err) {
     console.error("admin categories GET:", err);
     return NextResponse.json(
@@ -23,28 +18,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const { error } = await requireAdmin();
-  if (error) return error;
-
   try {
     const body = await request.json();
-    const parsed = adminCategorySchema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: parsed.error.issues[0]?.message ?? "Invalid category",
-        },
-        { status: 400 }
-      );
-    }
-
-    const category = await createCategory(parsed.data.name);
-    return NextResponse.json({
-      success: true,
-      category,
-      message: "Category saved",
-    });
+    const result = await createAdminCategory(body);
+    return NextResponse.json(result.body, { status: result.status });
   } catch (err) {
     console.error("admin categories POST:", err);
     return NextResponse.json(

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { findOrderById } from "@/lib/services/orders";
+import { getOrder } from "@/lib/controllers/orders";
 
 export async function GET(
   _request: Request,
@@ -7,14 +7,8 @@ export async function GET(
 ) {
   try {
     const { id } = await context.params;
-    const order = await findOrderById(id);
-    if (!order) {
-      return NextResponse.json(
-        { success: false, error: "Order not found" },
-        { status: 404 }
-      );
-    }
-    return NextResponse.json({ success: true, order });
+    const result = await getOrder(id);
+    return NextResponse.json(result.body, { status: result.status });
   } catch (error) {
     console.error("order detail GET error:", error);
     return NextResponse.json(

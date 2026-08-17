@@ -1,44 +1,10 @@
-import path from "path";
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin";
-import { uploadProductImage } from "@/lib/supabase";
+import { uploadAdminImage } from "@/lib/controllers/admin-upload";
 
 export async function POST(request: Request) {
-  const { error } = await requireAdmin();
-  if (error) return error;
-
   try {
-    const form = await request.formData();
-    const file = form.get("file");
-    if (!(file instanceof File)) {
-      return NextResponse.json(
-        { success: false, error: "Image file is required" },
-        { status: 400 }
-      );
-    }
-
-    if (!file.type.startsWith("image/")) {
-      return NextResponse.json(
-        { success: false, error: "Only image files are allowed" },
-        { status: 400 }
-      );
-    }
-
-    const ext = path.extname(file.name) || ".jpg";
-    const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
-    const bytes = Buffer.from(await file.arrayBuffer());
-
-    const url = await uploadProductImage({
-      bytes,
-      filename,
-      contentType: file.type || "image/jpeg",
-    });
-
-    return NextResponse.json({
-      success: true,
-      url,
-      message: "Uploaded to Supabase Storage",
-    });
+    const result = await uploadAdminImage(request);
+    return NextResponse.json(result.body, { status: result.status });
   } catch (err) {
     console.error("admin upload:", err);
     return NextResponse.json(

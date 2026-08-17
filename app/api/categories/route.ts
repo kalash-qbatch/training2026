@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { listCategories } from "@/lib/services/categories";
+import { getCategories } from "@/lib/controllers/categories";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const categories = await listCategories();
-    return NextResponse.json({ success: true, categories });
+    const result = await getCategories();
+    return NextResponse.json(result.body, { status: result.status });
   } catch (error) {
     console.error("categories GET error:", error);
     return NextResponse.json(

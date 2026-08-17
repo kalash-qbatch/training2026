@@ -1,25 +1,15 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import {
-  listNotifications,
-  markAllNotificationsRead,
-} from "@/lib/services/notifications";
+  getNotifications,
+  markNotificationsRead,
+} from "@/lib/controllers/notifications";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const session = await auth();
-    const userId = session?.user?.id;
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
-    const result = await listNotifications(userId);
-    return NextResponse.json({ success: true, ...result });
+    const result = await getNotifications();
+    return NextResponse.json(result.body, { status: result.status });
   } catch (error) {
     console.error("notifications GET error:", error);
     return NextResponse.json(
@@ -31,17 +21,8 @@ export async function GET() {
 
 export async function PATCH() {
   try {
-    const session = await auth();
-    const userId = session?.user?.id;
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
-    await markAllNotificationsRead(userId);
-    return NextResponse.json({ success: true });
+    const result = await markNotificationsRead();
+    return NextResponse.json(result.body, { status: result.status });
   } catch (error) {
     console.error("notifications PATCH error:", error);
     return NextResponse.json(

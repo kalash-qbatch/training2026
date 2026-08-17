@@ -50,51 +50,65 @@ export async function createAdminCategory(name: string) {
   return data.category;
 }
 
-export async function createAdminProduct(body: {
+type AdminProductBody = {
   title: string;
   description?: string;
   price: number;
   stock: number;
   image?: string;
-  images?: Array<{ url: string; color?: string }>;
+  images?: Array<{ url?: string; color?: string; file?: File }>;
   size?: string;
   color?: string;
   variants?: Array<{ color: string; size: string; qty: number }>;
   categoryId?: string | null;
   categoryName?: string | null;
   isActive?: boolean;
-}) {
+};
+
+function toProductFormData(body: AdminProductBody) {
+  const form = new FormData();
+  const files: File[] = [];
+  const images = (body.images ?? []).map((img) => {
+    if (img.file) {
+      files.push(img.file);
+      return { color: img.color ?? "" };
+    }
+    return { url: img.url, color: img.color ?? "" };
+  });
+  form.append(
+    "payload",
+    JSON.stringify({
+      title: body.title,
+      description: body.description,
+      price: body.price,
+      stock: body.stock,
+      size: body.size,
+      color: body.color,
+      variants: body.variants,
+      categoryId: body.categoryId,
+      categoryName: body.categoryName,
+      isActive: body.isActive,
+      images,
+    })
+  );
+  for (const file of files) form.append("files", file);
+  return form;
+}
+
+export async function createAdminProduct(body: AdminProductBody) {
   const res = await fetch("/api/admin/products", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: toProductFormData(body),
   });
   const data = await parseJson<{ success: boolean; product: Product }>(res);
   if (!res.ok || !data.success) throw new Error(data.error || "Create failed");
   return data.product;
 }
 
-export async function updateAdminProduct(
-  id: string,
-  body: {
-    title: string;
-    description?: string;
-    price: number;
-    stock: number;
-    image?: string;
-    images?: Array<{ url: string; color?: string }>;
-    size?: string;
-    color?: string;
-    variants?: Array<{ color: string; size: string; qty: number }>;
-    categoryId?: string | null;
-    categoryName?: string | null;
-    isActive?: boolean;
-  }
-) {
+export async function updateAdminProduct(id: string, body: AdminProductBody) {
   const res = await fetch(`/api/admin/products/${id}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: toProductFormData(body),
   });
   const data = await parseJson<{ success: boolean; product: Product }>(res);
   if (!res.ok || !data.success) throw new Error(data.error || "Update failed");
