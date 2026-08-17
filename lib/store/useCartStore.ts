@@ -73,8 +73,8 @@ export const useCartStore = create<CartState>()((set, get) => ({
       )
       .reduce((sum, i) => sum + i.qty, 0),
   addItem: async (product, qty, opts) => {
-    const size = opts?.size ?? product.sizes?.[0];
-    const color = opts?.color ?? product.color;
+    const size = opts?.size?.trim() ?? "";
+    const color = opts?.color?.trim() ?? "";
     try {
       const items = await addCartItem({
         productId: product.id,

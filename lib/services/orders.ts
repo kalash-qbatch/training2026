@@ -52,10 +52,13 @@ export async function createOrder(userId: string, items: PlaceOrderItemInput[]) 
       if (!product) {
         throw new OrderError("Product not found", 404);
       }
+      if (!product.isActive) {
+        throw new OrderError(`"${product.title}" is no longer available.`);
+      }
 
       const hasSpecs = product.specifications.length > 0;
-      const color = item.color?.trim();
-      const size = item.size?.trim();
+      let color = item.color?.trim() || undefined;
+      let size = item.size?.trim() || undefined;
 
       if (hasSpecs) {
         if (!color || !size) {
@@ -109,6 +112,8 @@ export async function createOrder(userId: string, items: PlaceOrderItemInput[]) 
             `Not enough stock for "${product.title}". Only ${product.stock} left.`
           );
         }
+        color = undefined;
+        size = undefined;
       }
 
       lineData.push({

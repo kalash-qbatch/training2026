@@ -4,6 +4,12 @@ import Image from "next/image";
 import { Trash2 } from "lucide-react";
 import type { CartItem } from "@/types";
 import { colorSwatch, formatCurrency } from "@/lib/utils";
+import {
+  FREE_SIZE_LABEL,
+  formatLineColor,
+  formatLineSize,
+  isFreeSizeLine,
+} from "@/lib/product";
 import { QtyStepper } from "@/components/ui/QtyStepper";
 
 type Props = {
@@ -42,16 +48,22 @@ export function CartLineItem({
           <div className="min-w-0 flex-1">
             <p className="line-clamp-2 text-sm font-medium text-neutral-text">{item.name}</p>
             <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-neutral-muted">
-              {item.color ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <span
-                    className="h-3 w-3 rounded-full border border-neutral-border"
-                    style={{ backgroundColor: colorSwatch(item.color) }}
-                  />
-                  {item.color}
-                </span>
-              ) : null}
-              {item.size ? <span>Size {item.size}</span> : null}
+              {isFreeSizeLine(item.color, item.size) ? (
+                <span>{FREE_SIZE_LABEL}</span>
+              ) : (
+                <>
+                  {item.color ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <span
+                        className="h-3 w-3 rounded-full border border-neutral-border"
+                        style={{ backgroundColor: colorSwatch(item.color) }}
+                      />
+                      {item.color}
+                    </span>
+                  ) : null}
+                  {item.size ? <span>Size {item.size}</span> : null}
+                </>
+              )}
             </div>
             <p className="mt-2 text-sm font-semibold tabular-nums text-brand-600">
               {formatCurrency(lineTotal)}
@@ -107,10 +119,12 @@ export function CartLineItem({
             {item.color}
           </span>
         ) : (
-          <span className="text-sm text-neutral-muted">—</span>
+          <span className="text-sm text-neutral-muted">{formatLineColor(item.color)}</span>
         )}
       </td>
-      <td className="py-4 text-sm text-neutral-text">{item.size ?? "—"}</td>
+      <td className="py-4 text-sm text-neutral-text">
+        {formatLineSize(item.size, item.color)}
+      </td>
       <td className="py-4">
         <QtyStepper value={item.qty} onChange={onQtyChange} max={item.stock} />
       </td>

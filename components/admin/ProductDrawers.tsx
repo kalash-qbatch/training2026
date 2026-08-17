@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Camera, Pencil, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Upload, X } from "lucide-react";
 import type { Category, Product, ProductVariant } from "@/types";
 import {
   createAdminCategory,
@@ -17,10 +17,11 @@ const COLOR_OPTIONS = [
   "Green",
   "White",
   "Brown",
+  "Beige",
   "Gray",
   "Yellow",
 ];
-const SIZE_OPTIONS = ["Small", "Medium", "Large", "XL", "XXL"];
+const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL"];
 const NEW_CATEGORY = "__new__";
 
 type FormState = {
@@ -29,6 +30,12 @@ type FormState = {
   stock: string;
   image: string;
   categoryId: string;
+  isActive: boolean;
+};
+
+type ProductImageDraft = {
+  url: string;
+  color: string;
 };
 
 type DraftVariant = {
@@ -37,8 +44,18 @@ type DraftVariant = {
   qty: string;
 };
 
+const fieldClass =
+  "mt-1.5 h-10 w-full rounded-md border border-[#d0d5dd] bg-white px-3 text-[13px] text-[#333] outline-none placeholder:text-[#8a94a6] focus:border-[#2563EB]";
+
 function emptyForm(): FormState {
-  return { title: "", price: "", stock: "", image: "", categoryId: "" };
+  return {
+    title: "",
+    price: "",
+    stock: "",
+    image: "",
+    categoryId: "",
+    isActive: true,
+  };
 }
 
 function emptyDraft(): DraftVariant {
@@ -46,17 +63,7 @@ function emptyDraft(): DraftVariant {
 }
 
 function variantsFromProduct(product: Product): ProductVariant[] {
-  if (product.variants?.length) return product.variants;
-  if (product.color || product.sizes?.length) {
-    return [
-      {
-        color: product.color || "Black",
-        size: product.sizes?.[0] || "Medium",
-        qty: product.stock ?? 0,
-      },
-    ];
-  }
-  return [];
+  return product.variants?.length ? product.variants : [];
 }
 
 function totalStock(variants: ProductVariant[], fallback: string) {
@@ -73,6 +80,8 @@ function ProductFormFields({
   setDraft,
   variants,
   setVariants,
+  images,
+  setImages,
   categories,
   setCategories,
   newCategoryName,
@@ -91,6 +100,8 @@ function ProductFormFields({
   setDraft: React.Dispatch<React.SetStateAction<DraftVariant>>;
   variants: ProductVariant[];
   setVariants: React.Dispatch<React.SetStateAction<ProductVariant[]>>;
+  images: ProductImageDraft[];
+  setImages: React.Dispatch<React.SetStateAction<ProductImageDraft[]>>;
   categories: Category[];
   setCategories: React.Dispatch<React.SetStateAction<Category[]>>;
   newCategoryName: string;
@@ -177,6 +188,14 @@ function ProductFormFields({
     }));
   }
 
+  function removeImage(index: number) {
+    setImages((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      setForm((f) => ({ ...f, image: next[0]?.url ?? "" }));
+      return next;
+    });
+  }
+
   return (
     <form
       className="flex h-full flex-col"
@@ -185,49 +204,90 @@ function ProductFormFields({
         await onSubmit();
       }}
     >
-      <div className="flex flex-col gap-5 sm:flex-row">
-        <div className="relative mx-auto h-[140px] w-[140px] shrink-0 overflow-hidden rounded-lg border border-[#e5e7eb] bg-[#f8fafc] sm:mx-0">
-          {form.image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={form.image} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-[#9ca3af]">
-              <Camera className="h-8 w-8" />
-            </div>
-          )}
+      <div className="grid gap-6 lg:grid-cols-[minmax(240px,0.85fr)_1.15fr]">
+        <div>
+          <p className="mb-1.5 text-[12px] font-medium text-[#6b7280]">
+            Product Images <span className="text-red-500">*</span>
+          </p>
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            className="absolute right-2 top-2 rounded-full bg-[#2563EB] p-1.5 text-white shadow-sm"
-            aria-label="Upload image"
+            className="flex h-[140px] w-full flex-col items-center justify-center rounded-lg border border-dashed border-[#d0d5dd] bg-[#fafbfc] text-[#8a94a6] hover:border-[#2563EB] hover:text-[#2563EB]"
           >
-            <Pencil className="h-3.5 w-3.5" />
+            <Upload className="mb-2 h-6 w-6" />
+            <span className="text-[12px]">Upload multiple images</span>
           </button>
           <input
             ref={fileRef}
             type="file"
             accept="image/*"
+            multiple
             className="hidden"
             onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void onUpload(file);
+              const files = e.target.files;
+              if (!files?.length) return;
+              void Promise.all(Array.from(files).map((file) => onUpload(file)));
+              e.target.value = "";
             }}
           />
+          {images.length ? (
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              {images.map((img, index) => (
+                <div
+                  key={`${img.url}-${index}`}
+                  className="overflow-hidden rounded-lg border border-[#e5e7eb] bg-white"
+                >
+                  <div className="relative aspect-square bg-[#f8fafc]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={img.url} alt="" className="h-full w-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className="absolute right-1.5 top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-[#EF4444] text-white"
+                      aria-label="Remove image"
+                    >
+                      <X className="h-3 w-3" strokeWidth={2.5} />
+                    </button>
+                  </div>
+                  <select
+                    value={img.color}
+                    onChange={(e) =>
+                      setImages((prev) =>
+                        prev.map((item, i) =>
+                          i === index ? { ...item, color: e.target.value } : item
+                        )
+                      )
+                    }
+                    className="h-9 w-full border-t border-[#e5e7eb] bg-white px-2 text-[12px] text-[#333] outline-none"
+                    aria-label="Assign image color"
+                  >
+                    <option value="">Global (Default)</option>
+                    {COLOR_OPTIONS.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
 
-        <div className="min-w-0 flex-1 space-y-3">
+        <div className="min-w-0 space-y-3">
           <label className="block text-[12px] font-medium text-[#6b7280]">
-            Product Name
+            Product Name <span className="text-red-500">*</span>
             <input
               required
               value={form.title}
               onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-              className="mt-1.5 h-10 w-full rounded-md border border-[#d0d5dd] px-3 text-[13px] text-[#333] outline-none focus:border-[#2563EB]"
+              placeholder="e.g. Cargo Trousers for Men"
+              className={fieldClass}
             />
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-[12px] font-medium text-[#6b7280]">
-              Price
+              Price <span className="text-red-500">*</span>
               <input
                 required
                 type="number"
@@ -236,11 +296,11 @@ function ProductFormFields({
                 placeholder="$00.00"
                 value={form.price}
                 onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
-                className="mt-1.5 h-10 w-full rounded-md border border-[#d0d5dd] px-3 text-[13px] text-[#333] outline-none focus:border-[#2563EB]"
+                className={fieldClass}
               />
             </label>
             <label className="block text-[12px] font-medium text-[#6b7280]">
-              Quantity (total)
+              Total Quantity
               <input
                 required
                 type="number"
@@ -248,39 +308,50 @@ function ProductFormFields({
                 value={form.stock}
                 readOnly={hasVariants}
                 onChange={(e) => setForm((f) => ({ ...f, stock: e.target.value }))}
-                className="mt-1.5 h-10 w-full rounded-md border border-[#d0d5dd] px-3 text-[13px] text-[#333] outline-none focus:border-[#2563EB] read-only:bg-[#f8fafc]"
-                title={
-                  hasVariants
-                    ? "Auto total from color/size rows — edit qty on each row below"
-                    : undefined
-                }
+                className={`${fieldClass} read-only:bg-[#f8fafc]`}
               />
             </label>
           </div>
-          <label className="block text-[12px] font-medium text-[#6b7280]">
-            Category
-            <select
-              required
-              value={form.categoryId}
-              onChange={(e) => {
-                const value = e.target.value;
-                setForm((f) => ({
-                  ...f,
-                  categoryId: value === NEW_CATEGORY ? NEW_CATEGORY : value,
-                }));
-                if (value !== NEW_CATEGORY) setNewCategoryName("");
-              }}
-              className="mt-1.5 h-10 w-full rounded-md border border-[#d0d5dd] bg-white px-3 text-[13px] text-[#333] outline-none focus:border-[#2563EB]"
-            >
-              <option value="">Select category</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-              <option value={NEW_CATEGORY}>+ Create new category</option>
-            </select>
-          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-[12px] font-medium text-[#6b7280]">
+              Category <span className="text-red-500">*</span>
+              <select
+                required
+                value={form.categoryId}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setForm((f) => ({
+                    ...f,
+                    categoryId: value === NEW_CATEGORY ? NEW_CATEGORY : value,
+                  }));
+                  if (value !== NEW_CATEGORY) setNewCategoryName("");
+                }}
+                className={fieldClass}
+              >
+                <option value="">Select Category</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+                <option value={NEW_CATEGORY}>+ Create new category</option>
+              </select>
+            </label>
+            <label className="block text-[12px] font-medium text-[#6b7280]">
+              Status
+              <select
+                value={form.isActive ? "active" : "inactive"}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, isActive: e.target.value === "active" }))
+                }
+                className={fieldClass}
+                aria-label="Product status"
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </label>
+          </div>
           {form.categoryId === NEW_CATEGORY ? (
             <div className="flex gap-2">
               <input
@@ -299,95 +370,91 @@ function ProductFormFields({
               </button>
             </div>
           ) : null}
-        </div>
-      </div>
 
-      <div className="mt-6 space-y-3">
-        <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2">
-          <label className="block text-[12px] font-medium text-[#6b7280]">
-            <span className="sr-only">Color</span>
-            <select
-              value={draft.color}
-              onChange={(e) => setDraft((d) => ({ ...d, color: e.target.value }))}
-              className="mt-0 h-10 w-full rounded-md border border-[#d0d5dd] bg-white px-3 text-[13px] text-[#333] outline-none focus:border-[#2563EB]"
-            >
-              <option value="">Select Color</option>
-              {COLOR_OPTIONS.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-[12px] font-medium text-[#6b7280]">
-            <span className="sr-only">Size</span>
-            <select
-              value={draft.size}
-              onChange={(e) => setDraft((d) => ({ ...d, size: e.target.value }))}
-              className="h-10 w-full rounded-md border border-[#d0d5dd] bg-white px-3 text-[13px] text-[#333] outline-none focus:border-[#2563EB]"
-            >
-              <option value="">Select Size</option>
-              {SIZE_OPTIONS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-[12px] font-medium text-[#6b7280]">
-            <span className="sr-only">Qty</span>
-            <input
-              type="number"
-              min={0}
-              placeholder="Enter Qty"
-              value={draft.qty}
-              onChange={(e) => setDraft((d) => ({ ...d, qty: e.target.value }))}
-              className="h-10 w-full rounded-md border border-[#d0d5dd] px-3 text-[13px] text-[#333] outline-none focus:border-[#2563EB]"
-            />
-          </label>
-          <button
-            type="button"
-            onClick={addVariant}
-            className="flex h-10 w-10 items-center justify-center rounded-md bg-[#2563EB] text-white hover:bg-[#1e6aef]"
-            aria-label="Add color and size"
-          >
-            <Plus className="h-5 w-5" strokeWidth={2.5} />
-          </button>
-        </div>
-
-        <p className="text-[12px] text-[#8a94a6]">
-          Color / size stock — edit <strong>Qty</strong> on each row (this is what the storefront uses)
-        </p>
-        <div className="space-y-2">
-          {variants.map((v, index) => (
-            <div
-              key={`${v.color}-${v.size}`}
-              className="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-2"
-            >
-              <div className="flex h-10 items-center rounded-md border border-[#d0d5dd] px-3 text-[13px] text-[#333]">
-                {v.color}
-              </div>
-              <div className="flex h-10 items-center rounded-md border border-[#d0d5dd] px-3 text-[13px] text-[#333]">
-                {v.size}
-              </div>
+          <div className="pt-2">
+            <p className="mb-2 text-[12px] font-medium text-[#6b7280]">
+              Add Product Variants
+            </p>
+            <p className="mb-2 text-[11px] text-[#8a94a6]">
+              Optional. Skip color and size to sell this product as Free Size.
+            </p>
+            <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2">
+              <select
+                value={draft.color}
+                onChange={(e) => setDraft((d) => ({ ...d, color: e.target.value }))}
+                className="h-10 w-full rounded-md border border-[#d0d5dd] bg-white px-3 text-[13px] text-[#333] outline-none focus:border-[#2563EB]"
+                aria-label="Color"
+              >
+                <option value="">Select Color</option>
+                {COLOR_OPTIONS.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={draft.size}
+                onChange={(e) => setDraft((d) => ({ ...d, size: e.target.value }))}
+                className="h-10 w-full rounded-md border border-[#d0d5dd] bg-white px-3 text-[13px] text-[#333] outline-none focus:border-[#2563EB]"
+                aria-label="Size"
+              >
+                <option value="">Select Size</option>
+                {SIZE_OPTIONS.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
               <input
                 type="number"
                 min={0}
-                value={v.qty}
-                onChange={(e) => updateVariantQty(index, e.target.value)}
-                className="h-10 w-full rounded-md border border-[#d0d5dd] px-3 text-[13px] tabular-nums text-[#333] outline-none focus:border-[#2563EB]"
-                aria-label={`Quantity for ${v.color} ${v.size}`}
+                placeholder="Enter Qty"
+                value={draft.qty}
+                onChange={(e) => setDraft((d) => ({ ...d, qty: e.target.value }))}
+                className="h-10 w-full rounded-md border border-[#d0d5dd] px-3 text-[13px] text-[#333] outline-none focus:border-[#2563EB]"
+                aria-label="Quantity"
               />
               <button
                 type="button"
-                onClick={() => removeVariant(index)}
-                className="flex h-10 w-10 items-center justify-center rounded-md text-[#EF4444] hover:bg-red-50"
-                aria-label="Remove variant"
+                onClick={addVariant}
+                className="flex h-10 w-10 items-center justify-center rounded-md bg-[#2563EB] text-white hover:bg-[#1e6aef]"
+                aria-label="Add color and size"
               >
-                <Trash2 className="h-4 w-4" />
+                <Plus className="h-5 w-5" strokeWidth={2.5} />
               </button>
             </div>
-          ))}
+            <div className="mt-2 space-y-2">
+              {variants.map((v, index) => (
+                <div
+                  key={`${v.color}-${v.size}`}
+                  className="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-2"
+                >
+                  <div className="flex h-10 items-center rounded-md border border-[#d0d5dd] px-3 text-[13px] text-[#333]">
+                    {v.color}
+                  </div>
+                  <div className="flex h-10 items-center rounded-md border border-[#d0d5dd] px-3 text-[13px] text-[#333]">
+                    {v.size}
+                  </div>
+                  <input
+                    type="number"
+                    min={0}
+                    value={v.qty}
+                    onChange={(e) => updateVariantQty(index, e.target.value)}
+                    className="h-10 w-full rounded-md border border-[#d0d5dd] px-3 text-[13px] tabular-nums text-[#333] outline-none focus:border-[#2563EB]"
+                    aria-label={`Quantity for ${v.color} ${v.size}`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeVariant(index)}
+                    className="flex h-10 w-10 items-center justify-center rounded-md text-[#EF4444] hover:bg-red-50"
+                    aria-label="Remove variant"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -411,10 +478,12 @@ export type ProductSavePayload = {
   price: number;
   stock: number;
   image?: string;
+  images?: ProductImageDraft[];
   color?: string;
   size?: string;
   variants: ProductVariant[];
   categoryId?: string | null;
+  isActive: boolean;
 };
 
 function useCategoryLoader(open: boolean) {
@@ -443,6 +512,7 @@ export function AddProductDrawer({
   const [form, setForm] = useState<FormState>(emptyForm);
   const [draft, setDraft] = useState<DraftVariant>(emptyDraft);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [images, setImages] = useState<ProductImageDraft[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -454,6 +524,7 @@ export function AddProductDrawer({
     setForm(emptyForm());
     setDraft(emptyDraft());
     setVariants([]);
+    setImages([]);
     setNewCategoryName("");
     setError("");
   }, [open, setNewCategoryName]);
@@ -461,14 +532,23 @@ export function AddProductDrawer({
   async function onUpload(file: File) {
     try {
       const url = await uploadAdminImage(file);
-      setForm((f) => ({ ...f, image: url }));
+      setImages((prev) => {
+        const next = [...prev, { url, color: "" }];
+        setForm((f) => ({ ...f, image: next[0]?.url ?? "" }));
+        return next;
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     }
   }
 
   return (
-    <Drawer open={open} onClose={onClose} title="Add a Single Product">
+    <Drawer
+      open={open}
+      onClose={onClose}
+      title="Add a Single Product"
+      widthClassName="max-w-[900px]"
+    >
       <ProductFormFields
         form={form}
         setForm={setForm}
@@ -476,6 +556,8 @@ export function AddProductDrawer({
         setDraft={setDraft}
         variants={variants}
         setVariants={setVariants}
+        images={images}
+        setImages={setImages}
         categories={categories}
         setCategories={setCategories}
         newCategoryName={newCategoryName}
@@ -491,6 +573,10 @@ export function AddProductDrawer({
             setError("Select or create a category first");
             return;
           }
+          if (!images.length) {
+            setError("Upload at least one product image");
+            return;
+          }
           setLoading(true);
           setError("");
           try {
@@ -502,11 +588,13 @@ export function AddProductDrawer({
               title: form.title,
               price: Number(form.price),
               stock,
-              image: form.image || undefined,
+              image: images[0]?.url,
+              images,
               color: variants[0]?.color,
               size: variants[0]?.size,
               variants,
               categoryId: form.categoryId,
+              isActive: form.isActive,
             });
             onClose();
           } catch (err) {
@@ -534,6 +622,7 @@ export function EditProductDrawer({
   const [form, setForm] = useState<FormState>(emptyForm);
   const [draft, setDraft] = useState<DraftVariant>(emptyDraft);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [images, setImages] = useState<ProductImageDraft[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -543,14 +632,21 @@ export function EditProductDrawer({
   useEffect(() => {
     if (!product || !open) return;
     const nextVariants = variantsFromProduct(product);
+    const nextImages = product.images?.length
+      ? product.images.map((img) => ({ url: img.url, color: img.color ?? "" }))
+      : product.imageUrl
+        ? [{ url: product.imageUrl, color: "" }]
+        : [];
     setForm({
       title: product.name,
       price: String(product.price),
       stock: totalStock(nextVariants, String(product.stock ?? 0)),
-      image: product.imageUrl,
+      image: nextImages[0]?.url ?? product.imageUrl,
       categoryId: product.categoryId ?? product.category?.id ?? "",
+      isActive: product.isActive !== false,
     });
     setVariants(nextVariants);
+    setImages(nextImages);
     setDraft(emptyDraft());
     setNewCategoryName("");
     setError("");
@@ -559,14 +655,23 @@ export function EditProductDrawer({
   async function onUpload(file: File) {
     try {
       const url = await uploadAdminImage(file);
-      setForm((f) => ({ ...f, image: url }));
+      setImages((prev) => {
+        const next = [...prev, { url, color: "" }];
+        setForm((f) => ({ ...f, image: next[0]?.url ?? "" }));
+        return next;
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     }
   }
 
   return (
-    <Drawer open={open && !!product} onClose={onClose} title="Edit a Single Product">
+    <Drawer
+      open={open && !!product}
+      onClose={onClose}
+      title="Edit a Single Product"
+      widthClassName="max-w-[900px]"
+    >
       <ProductFormFields
         form={form}
         setForm={setForm}
@@ -574,6 +679,8 @@ export function EditProductDrawer({
         setDraft={setDraft}
         variants={variants}
         setVariants={setVariants}
+        images={images}
+        setImages={setImages}
         categories={categories}
         setCategories={setCategories}
         newCategoryName={newCategoryName}
@@ -589,6 +696,10 @@ export function EditProductDrawer({
             setError("Select or create a category first");
             return;
           }
+          if (!images.length) {
+            setError("Upload at least one product image");
+            return;
+          }
           setLoading(true);
           setError("");
           try {
@@ -600,11 +711,13 @@ export function EditProductDrawer({
               title: form.title,
               price: Number(form.price),
               stock,
-              image: form.image || undefined,
+              image: images[0]?.url,
+              images,
               color: variants[0]?.color,
               size: variants[0]?.size,
               variants,
               categoryId: form.categoryId,
+              isActive: form.isActive,
             });
             onClose();
           } catch (err) {

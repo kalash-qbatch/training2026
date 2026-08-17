@@ -3,7 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 /** Bump when schema models/relations change so the cached client is recreated. */
-const PRISMA_CLIENT_VERSION = 5;
+const PRISMA_CLIENT_VERSION = 6;
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;

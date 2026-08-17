@@ -33,11 +33,13 @@ export async function PUT(request: Request, context: Ctx) {
       price: parsed.data.price,
       stock: parsed.data.stock,
       image: parsed.data.image,
+      images: parsed.data.images,
       color: parsed.data.color,
       size: parsed.data.size,
       variants: parsed.data.variants,
       categoryId: parsed.data.categoryId,
       categoryName: parsed.data.categoryName,
+      isActive: parsed.data.isActive,
     });
 
     return NextResponse.json({
@@ -67,10 +69,13 @@ export async function DELETE(_request: Request, context: Ctx) {
 
   try {
     const { id } = await context.params;
-    await deleteProduct(id);
+    const result = await deleteProduct(id);
     return NextResponse.json({
       success: true,
-      message: "Product deleted successfully",
+      deactivated: result.deactivated,
+      message: result.deactivated
+        ? "Product set to Inactive because it appears in past orders"
+        : "Product deleted successfully",
     });
   } catch (err) {
     const productErr = getProductError(err);

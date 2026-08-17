@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { Product, ProductVariant } from "@/types";
-import { formatCurrency } from "@/lib/utils";
+import { cn, colorSwatch, formatCurrency } from "@/lib/utils";
+import { FREE_SIZE_LABEL, isFreeSizeProduct } from "@/lib/product";
 import { useCartStore } from "@/lib/store/useCartStore";
 import { useAuthStore } from "@/lib/store/useAuthStore";
 import { useToast } from "@/components/ui/Toast";
@@ -26,8 +27,6 @@ function allColors(product: Product): string[] {
   if (product.variants?.length) {
     return [...new Set(product.variants.map((v) => v.color).filter(Boolean))];
   }
-  if (product.colors?.length) return [...new Set(product.colors)];
-  if (product.color) return [product.color];
   return [];
 }
 
@@ -35,7 +34,6 @@ function allSizes(product: Product): string[] {
   if (product.variants?.length) {
     return [...new Set(product.variants.map((v) => v.size).filter(Boolean))];
   }
-  if (product.sizes?.length) return [...new Set(product.sizes)];
   return [];
 }
 
@@ -49,16 +47,14 @@ function defaultInStockVariant(product: Product): {
   const first = product.variants?.[0];
   if (first) return { color: first.color, size: first.size };
 
-  return {
-    color: allColors(product)[0] ?? "",
-    size: allSizes(product)[0] ?? "",
-  };
+  return { color: "", size: "" };
 }
 
 export function ProductCard({ product }: { product: Product }) {
   const colors = useMemo(() => allColors(product), [product]);
   const sizes = useMemo(() => allSizes(product), [product]);
   const hasVariants = Boolean(product.variants?.length);
+  const freeSize = isFreeSizeProduct(product);
 
   const initial = useMemo(
     () => defaultInStockVariant(product),
@@ -78,110 +74,124 @@ export function ProductCard({ product }: { product: Product }) {
   const outOfStock = stock <= 0;
   const productFullyOut = totalStock <= 0;
   const invalidCombo = hasVariants && !selectedVariant;
+  const needsSelection = hasVariants && (!color || !size);
 
   const [qty, setQty] = useState(outOfStock ? 0 : 1);
+  const selectedQty = outOfStock ? 0 : Math.min(Math.max(1, qty), stock);
   const addItem = useCartStore((s) => s.addItem);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const router = useRouter();
   const { toast } = useToast();
-
-  useEffect(() => {
-    if (stock > 0 && qty > stock) setQty(stock);
-    if (stock <= 0) setQty(0);
-    if (stock > 0 && qty < 1) setQty(1);
-  }, [stock, qty]);
+  const slides = useMemo(() => {
+    if (product.images?.length) return product.images;
+    return [{ url: product.imageUrl, color: undefined as string | undefined }];
+  }, [product.images, product.imageUrl]);
+  const slideIndex = useMemo(() => {
+    const byColor = slides.findIndex(
+      (img) => img.color && img.color.toLowerCase() === color.toLowerCase()
+    );
+    if (byColor >= 0) return byColor;
+    const global = slides.findIndex((img) => !img.color);
+    return global >= 0 ? global : 0;
+  }, [slides, color]);
 
   return (
-    <article className="flex h-full flex-col overflow-hidden rounded-[4px] border border-[#d0d5dd] bg-white">
-      <div className="relative aspect-[5/4] w-full bg-[#f3f4f6]">
-        <Image
-          src={product.imageUrl}
-          alt={product.name}
-          fill
-          className="object-cover"
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-        />
+    <article className="flex h-full flex-col overflow-hidden rounded-[7px] border border-[#e5e7eb] bg-white shadow-sm">
+      <div className="relative aspect-square w-full overflow-hidden bg-[#eef1f4]">
+        <div
+          className="absolute inset-0 flex transition-transform duration-300 ease-out"
+          style={{ transform: `translateX(-${slideIndex * 100}%)` }}
+        >
+          {slides.map((img, i) => (
+            <div key={`${img.url}-${img.color ?? "global"}-${i}`} className="relative h-full w-full shrink-0">
+              <Image
+                src={img.url}
+                alt={product.name}
+                fill
+                className="object-cover"
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+              />
+            </div>
+          ))}
+        </div>
         {(productFullyOut || outOfStock || invalidCombo) ? (
-          <span className="absolute right-2 top-2 z-10 rounded-[2px] bg-[#e53935] px-2 py-1 text-[11px] font-semibold text-white">
+          <span className="absolute right-2 top-2 z-10 rounded-xs bg-status-error-fg px-2 py-1 text-[11px] font-semibold text-white">
             Out Of Stock
           </span>
         ) : null}
       </div>
 
       <div className="flex flex-1 flex-col px-3 pb-3 pt-2.5">
-        <h3 className="line-clamp-2 min-h-[40px] text-[14px] font-semibold leading-[20px] text-[#111827]">
+        <h3 className="line-clamp-2 text-[14px] font-medium leading-5 text-neutral-900">
           {product.name}
         </h3>
-        {product.category?.name ? (
-          <p className="mt-1 text-[12px] text-[#8a94a6]">{product.category.name}</p>
-        ) : null}
 
-        <div className="mt-2 flex items-center justify-between gap-2">
-          <p className="text-[13px] leading-none">
-            <span className="text-[#6b7280]">Price: </span>
-            <span className="font-bold tabular-nums text-brand-500">
-              {formatCurrency(product.price)}
+        <p className="mt-2 text-[13px] leading-none">
+          <span className="text-[#6b7280]">Price: </span>
+          <span className="font-bold tabular-nums text-brand-500">
+            {formatCurrency(product.price)}
+          </span>
+        </p>
+
+        {freeSize ? (
+          <div className="mt-3">
+            <span className="inline-flex h-6 items-center rounded-[3px] border border-neutral-900 bg-neutral-900 px-2 text-[11px] font-medium uppercase text-white">
+              {FREE_SIZE_LABEL}
             </span>
-          </p>
-          <p
-            className={`text-[12px] font-medium ${
-              outOfStock || invalidCombo ? "text-[#e53935]" : "text-[#22c55e]"
-            }`}
-          >
-            {invalidCombo
-              ? "Out of stock"
-              : outOfStock
-                ? "Out of stock"
-                : `${stock} Items Left`}
-          </p>
-        </div>
+          </div>
+        ) : (
+          <>
+            <div className="mt-3 flex min-h-4 items-center gap-1.5">
+              {colors.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  aria-label={`Select ${c}`}
+                  aria-pressed={color === c}
+                  onClick={() => setColor(c)}
+                  className={cn(
+                    "h-4 w-4 rounded-full border border-[#d9dee7] ring-offset-1",
+                    color === c && "ring-1 ring-brand-500"
+                  )}
+                  style={{ backgroundColor: colorSwatch(c) }}
+                />
+              ))}
+            </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <select
-            value={size}
-            onChange={(e) => setSize(e.target.value)}
-            className="h-9 rounded-[3px] cursor-pointer border border-[#d0d5dd] bg-white px-2 text-[12px] text-[#333] outline-none focus:border-brand-500"
-            aria-label="Select size"
-          >
-            {sizes.length === 0 ? (
-              <option value="">No sizes</option>
-            ) : (
-              sizes.map((s) => (
-                <option key={s} value={s}>
+            <div className="mt-2 flex min-h-6 flex-wrap items-center gap-1.5">
+              {sizes.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  aria-pressed={size === s}
+                  onClick={() => setSize(s)}
+                  className={cn(
+                    "h-6 min-w-7 rounded-[3px] border border-[#e1e5eb] px-2 text-[11px] font-medium uppercase text-neutral-900",
+                    size === s && "border-neutral-900 bg-neutral-900 text-white"
+                  )}
+                >
                   {s}
-                </option>
-              ))
-            )}
-          </select>
-          <select
-            value={color}
-            onChange={(e) => setColor(e.target.value)}
-            className="h-9 rounded-[3px] cursor-pointer border border-[#d0d5dd] bg-white px-2 text-[12px] text-[#333] outline-none focus:border-brand-500"
-            aria-label="Select color"
-          >
-            {colors.length === 0 ? (
-              <option value="">No colors</option>
-            ) : (
-              colors.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))
-            )}
-          </select>
-        </div>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
 
-        <div className="mt-3 flex items-center gap-2">
+        <p className="mt-2 text-[12px] leading-none text-neutral-muted">
+          {invalidCombo || outOfStock ? "0 in stock" : `${stock} in stock`}
+        </p>
+
+        <div className="mt-3 flex items-center justify-between gap-2">
           <QtyStepper
-            value={outOfStock ? 0 : Math.max(1, qty)}
+            value={selectedQty}
             min={outOfStock ? 0 : 1}
             max={Math.max(0, stock)}
             onChange={setQty}
           />
           <button
             type="button"
-            disabled={outOfStock || invalidCombo || !color || !size}
-            className="h-[34px] flex-1 rounded-[3px] cursor-pointer bg-brand-500 px-3 text-[13px] font-semibold text-white transition hover:bg-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={outOfStock || invalidCombo || needsSelection}
+            className="h-[34px] rounded-[3px] bg-brand-500 px-3 text-[13px] font-semibold text-white transition hover:bg-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
             onClick={async () => {
               if (!isAuthenticated) {
                 router.push("/login");
@@ -191,7 +201,15 @@ export function ProductCard({ product }: { product: Product }) {
                 toast.error("That color and size combination is out of stock");
                 return;
               }
-              const result = await addItem(product, qty, { size, color });
+              if (needsSelection) {
+                toast.error("Select a color and size");
+                return;
+              }
+              const result = await addItem(
+                product,
+                selectedQty,
+                freeSize ? { size: "", color: "" } : { size, color }
+              );
               if (!result.ok) {
                 toast.error(result.error);
                 return;

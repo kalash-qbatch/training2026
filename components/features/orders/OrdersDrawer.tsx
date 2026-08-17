@@ -5,6 +5,7 @@ import Image from "next/image";
 import { getOrderById, getOrders } from "@/lib/api/orders";
 import type { Order } from "@/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatLineColor, formatLineSize } from "@/lib/product";
 import { Drawer } from "@/components/ui/Drawer";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { OrdersTable } from "./OrdersTable";
@@ -204,10 +205,10 @@ function OrderDetailsContent({
                     </div>
                   </td>
                   <td className="py-4 text-sm text-neutral-text">
-                    {item.color ?? "—"}
+                    {formatLineColor(item.color)}
                   </td>
                   <td className="py-4 text-sm text-neutral-text">
-                    {item.size ?? "—"}
+                    {formatLineSize(item.size, item.color)}
                   </td>
                   <td className="py-4 text-sm tabular-nums text-neutral-text">
                     {formatCurrency(item.price)}

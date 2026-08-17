@@ -15,6 +15,11 @@ export type ProductVariant = {
   qty: number;
 };
 
+export type ProductImage = {
+  url: string;
+  color?: string;
+};
+
 export type Category = {
   id: string;
   name: string;
@@ -27,6 +32,7 @@ export type Product = {
   description?: string;
   price: number;
   imageUrl: string;
+  images?: ProductImage[];
   stock?: number;
   color?: string;
   colors?: string[];
@@ -34,6 +40,7 @@ export type Product = {
   variants?: ProductVariant[];
   categoryId?: string;
   category?: Category;
+  isActive: boolean;
 };
 
 export type AdminOrderStats = {

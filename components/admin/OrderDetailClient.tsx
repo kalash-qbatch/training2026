@@ -11,6 +11,7 @@ import {
   orderStatusLabel,
 } from "@/lib/utils";
 import { fetchAdminOrder } from "@/lib/api/admin";
+import { formatLineColor, formatLineSize } from "@/lib/product";
 import { OrderStatusSelect } from "@/components/admin/OrderStatusSelect";
 
 export function OrderDetailClient({ orderId }: { orderId: string }) {
@@ -123,8 +124,12 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
                     </p>
                   </div>
                 </td>
-                <td className="py-3.5 pr-4 text-[#333333]">{item.color ?? "—"}</td>
-                <td className="py-3.5 pr-4 text-[#333333]">{item.size ?? "—"}</td>
+                <td className="py-3.5 pr-4 text-[#333333]">
+                  {formatLineColor(item.color)}
+                </td>
+                <td className="py-3.5 pr-4 text-[#333333]">
+                  {formatLineSize(item.size, item.color)}
+                </td>
                 <td className="py-3.5 pr-4 tabular-nums text-[#333333]">
                   {formatCurrency(item.price)}
                 </td>

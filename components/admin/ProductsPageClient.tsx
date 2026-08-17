@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Pencil, Trash2, Search } from "lucide-react";
+import { Eye, Pencil, Trash2, Search } from "lucide-react";
 import { colorSwatch, formatCurrency, isLightSwatch } from "@/lib/utils";
 import type { Category, Product, ProductVariant } from "@/types";
 import {
@@ -19,6 +19,7 @@ import {
   EditProductDrawer,
 } from "@/components/admin/ProductDrawers";
 import { AddMultipleProductsModal } from "@/components/admin/AddMultipleProductsModal";
+import { ProductPreviewModal } from "@/components/admin/ProductPreviewModal";
 
 const inputClass =
   "h-10 w-full rounded-md border border-[#d0d5dd] bg-white px-3 text-[13px] text-[#333333] outline-none placeholder:text-[#8a94a6] focus:border-[#2563EB]";
@@ -74,11 +75,13 @@ export function ProductsPageClient() {
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [status, setStatus] = useState<"active" | "inactive" | "">("");
   const [loading, setLoading] = useState(true);
 
   const [addOpen, setAddOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
+  const [previewProduct, setPreviewProduct] = useState<Product | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -99,6 +102,7 @@ export function ProductsPageClient() {
       const data = await fetchAdminProducts({
         search: debounced,
         categoryId: categoryId || undefined,
+        status,
         page,
       });
       setProducts(data.products);
@@ -108,7 +112,7 @@ export function ProductsPageClient() {
     } finally {
       setLoading(false);
     }
-  }, [debounced, categoryId, page, toast]);
+  }, [debounced, categoryId, status, page, toast]);
 
   useEffect(() => {
     void load();
@@ -138,7 +142,7 @@ export function ProductsPageClient() {
         </div>
       </div>
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-2">
+      <div className="mb-5 grid gap-3 sm:grid-cols-3">
         <div className="relative">
           <input
             value={search}
@@ -166,6 +170,19 @@ export function ProductsPageClient() {
             </option>
           ))}
         </select>
+        <select
+          value={status}
+          onChange={(e) => {
+            setStatus(e.target.value as "active" | "inactive" | "");
+            resetPage();
+          }}
+          className={inputClass}
+          aria-label="Filter by status"
+        >
+          <option value="">All statuses</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
       </div>
 
       <div className="overflow-x-auto">
@@ -176,19 +193,20 @@ export function ProductsPageClient() {
               <th className="pb-3 pr-4 font-medium">Category</th>
               <th className="pb-3 pr-4 font-medium">Price</th>
               <th className="pb-3 pr-4 font-medium">Stock</th>
+              <th className="pb-3 pr-4 font-medium">Status</th>
               <th className="pb-3 font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} className="py-10 text-center text-[#8a94a6]">
+                <td colSpan={6} className="py-10 text-center text-[#8a94a6]">
                   Loading…
                 </td>
               </tr>
             ) : !products.length ? (
               <tr>
-                <td colSpan={5} className="py-10 text-center text-[#8a94a6]">
+                <td colSpan={6} className="py-10 text-center text-[#8a94a6]">
                   No products found
                 </td>
               </tr>
@@ -218,8 +236,27 @@ export function ProductsPageClient() {
                   <td className="py-3.5 pr-4">
                     <StockColorCircles product={p} />
                   </td>
+                  <td className="py-3.5 pr-4">
+                    <span
+                      className={
+                        p.isActive
+                          ? "rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-700"
+                          : "rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600"
+                      }
+                    >
+                      {p.isActive ? "Active" : "Inactive"}
+                    </span>
+                  </td>
                   <td className="py-3.5">
                     <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewProduct(p)}
+                        className="rounded p-1.5 text-[#6b7280] transition hover:bg-neutral-bg"
+                        aria-label="Preview"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
                       <button
                         type="button"
                         onClick={() => setEditProduct(p)}
@@ -247,6 +284,10 @@ export function ProductsPageClient() {
 
       <AdminPagination page={page} totalPages={totalPages} onChange={setPage} />
 
+      <ProductPreviewModal
+        product={previewProduct}
+        onClose={() => setPreviewProduct(null)}
+      />
       <AddProductDrawer
         open={addOpen}
         onClose={() => setAddOpen(false)}
@@ -283,13 +324,17 @@ export function ProductsPageClient() {
           if (!deleteId) return;
           setDeleting(true);
           try {
-            await deleteAdminProduct(deleteId);
-            setProducts((prev) => prev.filter((p) => p.id !== deleteId));
-            toast.success("Product deleted successfully");
+            const result = await deleteAdminProduct(deleteId);
             setDeleteId(null);
+            toast.success(
+              result.deactivated
+                ? "Product set to Inactive because it appears in past orders"
+                : "Product deleted successfully"
+            );
             const data = await fetchAdminProducts({
               search: debounced,
               categoryId: categoryId || undefined,
+              status,
               page,
             });
             if (data.page > data.totalPages) {

@@ -7,11 +7,13 @@ async function parseJson<T>(res: Response): Promise<T & { error?: string }> {
 export async function fetchAdminProducts(params: {
   search?: string;
   categoryId?: string;
+  status?: "active" | "inactive" | "";
   page?: number;
 }) {
   const q = new URLSearchParams();
   if (params.search) q.set("search", params.search);
   if (params.categoryId) q.set("categoryId", params.categoryId);
+  if (params.status) q.set("status", params.status);
   q.set("page", String(params.page ?? 1));
 
   const res = await fetch(`/api/admin/products?${q}`);
@@ -54,11 +56,13 @@ export async function createAdminProduct(body: {
   price: number;
   stock: number;
   image?: string;
+  images?: Array<{ url: string; color?: string }>;
   size?: string;
   color?: string;
   variants?: Array<{ color: string; size: string; qty: number }>;
   categoryId?: string | null;
   categoryName?: string | null;
+  isActive?: boolean;
 }) {
   const res = await fetch("/api/admin/products", {
     method: "POST",
@@ -78,11 +82,13 @@ export async function updateAdminProduct(
     price: number;
     stock: number;
     image?: string;
+    images?: Array<{ url: string; color?: string }>;
     size?: string;
     color?: string;
     variants?: Array<{ color: string; size: string; qty: number }>;
     categoryId?: string | null;
     categoryName?: string | null;
+    isActive?: boolean;
   }
 ) {
   const res = await fetch(`/api/admin/products/${id}`, {
@@ -97,8 +103,13 @@ export async function updateAdminProduct(
 
 export async function deleteAdminProduct(id: string) {
   const res = await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
-  const data = await parseJson<{ success: boolean }>(res);
+  const data = await parseJson<{
+    success: boolean;
+    deactivated?: boolean;
+    message?: string;
+  }>(res);
   if (!res.ok || !data.success) throw new Error(data.error || "Delete failed");
+  return data;
 }
 
 export async function bulkUploadProducts(file: File) {

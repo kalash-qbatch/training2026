@@ -12,9 +12,17 @@ type ModalProps = {
   title: string;
   children: React.ReactNode;
   className?: string;
+  hideHeader?: boolean;
 };
 
-export function Modal({ open, onClose, title, children, className }: ModalProps) {
+export function Modal({
+  open,
+  onClose,
+  title,
+  children,
+  className,
+  hideHeader,
+}: ModalProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const { present, visible } = useOverlayTransition(open);
@@ -80,19 +88,25 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
           className
         )}
       >
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <h2 id={titleId} className="text-lg font-semibold text-neutral-text">
+        {hideHeader ? (
+          <h2 id={titleId} className="sr-only">
             {title}
           </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md p-1 text-neutral-muted transition hover:bg-neutral-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-            aria-label="Close dialog"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+        ) : (
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <h2 id={titleId} className="text-lg font-semibold text-neutral-text">
+              {title}
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md p-1 text-neutral-muted transition hover:bg-neutral-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+              aria-label="Close dialog"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
         {children}
       </div>
     </div>

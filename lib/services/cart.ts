@@ -53,35 +53,38 @@ function mapCartItem(row: {
   };
 }
 
-async function getProductStock(
+async function resolveLine(
   productId: string,
   color: string,
   size: string
-): Promise<{ title: string; stock: number }> {
+): Promise<{ title: string; stock: number; color: string; size: string }> {
   const product = await prisma.product.findUnique({
     where: { id: productId },
     include: { specifications: true },
   });
   if (!product) throw new CartError("Product not found", 404);
-
-  if (product.specifications.length) {
-    if (!color || !size) {
-      throw new CartError(`Color and size are required for "${product.title}".`);
-    }
-    const spec = product.specifications.find(
-      (s) =>
-        s.color.toLowerCase() === color.toLowerCase() &&
-        s.size.toLowerCase() === size.toLowerCase()
-    );
-    if (!spec) {
-      throw new CartError(
-        `Selected color/size is unavailable for "${product.title}".`
-      );
-    }
-    return { title: product.title, stock: spec.qty };
+  if (!product.isActive) {
+    throw new CartError(`"${product.title}" is no longer available.`);
   }
 
-  return { title: product.title, stock: product.stock };
+  if (!product.specifications.length) {
+    return { title: product.title, stock: product.stock, color: "", size: "" };
+  }
+
+  if (!color || !size) {
+    throw new CartError(`Color and size are required for "${product.title}".`);
+  }
+  const spec = product.specifications.find(
+    (s) =>
+      s.color.toLowerCase() === color.toLowerCase() &&
+      s.size.toLowerCase() === size.toLowerCase()
+  );
+  if (!spec) {
+    throw new CartError(
+      `Selected color/size is unavailable for "${product.title}".`
+    );
+  }
+  return { title: product.title, stock: spec.qty, color, size };
 }
 
 export async function getCart(userId: string): Promise<CartItem[]> {
@@ -109,9 +112,12 @@ export async function addToCart(
     throw new CartError("Quantity must be at least 1");
   }
 
-  const color = normalizeVariant(input.color);
-  const size = normalizeVariant(input.size);
-  const { title, stock } = await getProductStock(input.productId, color, size);
+  const resolved = await resolveLine(
+    input.productId,
+    normalizeVariant(input.color),
+    normalizeVariant(input.size)
+  );
+  const { title, stock, color, size } = resolved;
 
   if (stock <= 0) {
     throw new CartError(`"${title}" is out of stock`);
@@ -171,15 +177,17 @@ export async function updateCartItem(
     size?: string;
   }
 ): Promise<CartItem[]> {
-  const color = normalizeVariant(input.color);
-  const size = normalizeVariant(input.size);
   const qty = Math.floor(input.quantity);
 
   if (!Number.isFinite(qty) || qty < 1) {
     throw new CartError("Quantity must be at least 1");
   }
 
-  const { title, stock } = await getProductStock(input.productId, color, size);
+  const { title, stock, color, size } = await resolveLine(
+    input.productId,
+    normalizeVariant(input.color),
+    normalizeVariant(input.size)
+  );
   if (qty > stock) {
     throw new CartError(`Only ${stock} in stock for "${title}".`);
   }

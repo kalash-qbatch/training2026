@@ -12,6 +12,8 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { CartLineItem } from "./CartLineItem";
 import { CartSummary } from "./CartSummary";
 import { RemoveProductModal } from "./RemoveProductModal";
+import { OrderPlacedModal } from "./OrderPlacedModal";
+import { OrdersDrawer } from "@/components/features/orders/OrdersDrawer";
 import type { CartItem } from "@/types";
 
 function itemKey(item: CartItem) {
@@ -30,6 +32,9 @@ export function CartPageClient() {
   const [pendingRemove, setPendingRemove] = useState<CartItem | null>(null);
   const [placing, setPlacing] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [placedOrderId, setPlacedOrderId] = useState<string | null>(null);
+  const [ordersOpen, setOrdersOpen] = useState(false);
 
   useEffect(() => {
     const keys = new Set(items.map(itemKey));
@@ -50,6 +55,27 @@ export function CartPageClient() {
   const total = Number((subtotal + tax).toFixed(2));
   const allSelected = items.length > 0 && selected.size === items.length;
 
+  const overlays = (
+    <>
+      <OrderPlacedModal
+        open={successOpen}
+        onDetails={() => {
+          setSuccessOpen(false);
+          setOrdersOpen(true);
+        }}
+        onHome={() => {
+          setSuccessOpen(false);
+          router.push("/products");
+        }}
+      />
+      <OrdersDrawer
+        open={ordersOpen}
+        onClose={() => setOrdersOpen(false)}
+        initialOrderId={placedOrderId}
+      />
+    </>
+  );
+
   if (!items.length) {
     return (
       <section>
@@ -68,6 +94,7 @@ export function CartPageClient() {
           ctaHref="/products"
           ctaLabel="Browse products"
         />
+        {overlays}
       </section>
     );
   }
@@ -194,7 +221,7 @@ export function CartPageClient() {
             }
             setPlacing(true);
             try {
-              await placeOrderApi(
+              const order = await placeOrderApi(
                 selectedItems.map((i) => ({
                   productId: i.productId,
                   quantity: i.qty,
@@ -209,11 +236,8 @@ export function CartPageClient() {
                   color: i.color,
                 }))
               );
-              toast.success("Awesome, Your order has been placed successfully.");
-              const remaining = items.length - selectedItems.length;
-              if (remaining <= 0) {
-                router.push("/products");
-              }
+              setPlacedOrderId(order.id);
+              setSuccessOpen(true);
               router.refresh();
             } catch (err) {
               toast.error(
@@ -246,6 +270,7 @@ export function CartPageClient() {
           setPendingRemove(null);
         }}
       />
+      {overlays}
     </section>
   );
 }

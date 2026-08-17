@@ -10,6 +10,7 @@ import type { Product } from "@/types";
 
 const productInclude = {
   specifications: true,
+  images: { orderBy: { sortOrder: "asc" as const } },
   category: { select: { id: true, name: true, slug: true } },
 } as const;
 
@@ -57,6 +58,7 @@ export async function findProducts(opts?: {
   const q = opts?.search?.trim();
   const where: Prisma.ProductWhereInput = {
     AND: [
+      { isActive: true },
       q
         ? {
             OR: [
@@ -116,12 +118,14 @@ export async function findProductById(id: string): Promise<Product | null> {
     where: { id },
     include: productInclude,
   });
-  return row ? mapProduct(row) : null;
+  if (!row || !row.isActive) return null;
+  return mapProduct(row);
 }
 
 export async function findAdminProducts(opts: {
   search?: string;
   categoryId?: string;
+  isActive?: boolean;
   page?: number;
   pageSize?: number;
 }) {
@@ -140,6 +144,7 @@ export async function findAdminProducts(opts: {
           }
         : {},
       opts.categoryId ? { categoryId: opts.categoryId } : {},
+      opts.isActive != null ? { isActive: opts.isActive } : {},
     ],
   };
 
@@ -164,6 +169,7 @@ export async function findAdminProducts(opts: {
 }
 
 type ProductVariantInput = { color: string; size: string; qty: number };
+type ProductImageInput = { url: string; color?: string };
 
 function variantCreates(variants: ProductVariantInput[]) {
   return variants.map((v) => ({
@@ -171,6 +177,21 @@ function variantCreates(variants: ProductVariantInput[]) {
     size: v.size.trim(),
     qty: v.qty,
   }));
+}
+
+function imageCreates(images: ProductImageInput[]) {
+  return images.map((img, i) => ({
+    url: img.url,
+    color: img.color?.trim() ?? "",
+    sortOrder: i,
+  }));
+}
+
+function primaryImage(images?: ProductImageInput[], fallback?: string) {
+  if (images?.length) {
+    return images.find((img) => !img.color?.trim())?.url ?? images[0].url;
+  }
+  return fallback || "/products/tee.jpg";
 }
 
 async function syncSpecifications(
@@ -189,6 +210,8 @@ async function syncSpecifications(
     },
   });
 
+  if (!variants?.length) return;
+
   const agg = await prisma.specification.aggregate({
     where: { productId },
     _sum: { qty: true },
@@ -196,6 +219,19 @@ async function syncSpecifications(
   await prisma.product.update({
     where: { id: productId },
     data: { stock: agg._sum.qty ?? 0 },
+  });
+}
+
+async function syncImages(productId: string, images?: ProductImageInput[]) {
+  if (images == null) return;
+  await prisma.product.update({
+    where: { id: productId },
+    data: {
+      images: {
+        deleteMany: {},
+        ...(images.length ? { create: imageCreates(images) } : {}),
+      },
+    },
   });
 }
 
@@ -219,11 +255,13 @@ export async function createProduct(data: {
   price: number;
   stock: number;
   image?: string;
+  images?: ProductImageInput[];
   color?: string;
   size?: string;
   variants?: ProductVariantInput[];
   categoryId?: string | null;
   categoryName?: string | null;
+  isActive?: boolean;
 }) {
   const title = normalizeTitle(data.title);
   await assertTitleAvailable(title);
@@ -237,6 +275,7 @@ export async function createProduct(data: {
     categoryId: data.categoryId,
     categoryName: data.categoryName,
   });
+  const image = primaryImage(data.images, data.image);
 
   const row = await prisma.product.create({
     data: {
@@ -244,13 +283,23 @@ export async function createProduct(data: {
       description: data.description?.trim() || title,
       price: data.price,
       stock,
-      image: data.image || "/products/tee.jpg",
-      color: data.color ?? data.variants?.[0]?.color,
-      size: data.size ?? data.variants?.[0]?.size,
+      image,
+      color: data.variants?.length
+        ? (data.color ?? data.variants[0].color)
+        : null,
+      size: data.variants?.length
+        ? (data.size ?? data.variants[0].size)
+        : null,
+      isActive: data.isActive ?? true,
       ...(categoryId ? { categoryId } : {}),
       ...(data.variants?.length
         ? { specifications: { create: variantCreates(data.variants) } }
         : {}),
+      ...(data.images?.length
+        ? { images: { create: imageCreates(data.images) } }
+        : data.image
+          ? { images: { create: imageCreates([{ url: data.image }]) } }
+          : {}),
     },
     include: productInclude,
   });
@@ -265,11 +314,13 @@ export async function updateProduct(
     price?: number;
     stock?: number;
     image?: string;
+    images?: ProductImageInput[];
     color?: string;
     size?: string;
     variants?: ProductVariantInput[];
     categoryId?: string | null;
     categoryName?: string | null;
+    isActive?: boolean;
   }
 ) {
   if (data.title != null) {
@@ -277,7 +328,7 @@ export async function updateProduct(
   }
 
   const stock =
-    data.variants != null
+    data.variants?.length
       ? data.variants.reduce((sum, v) => sum + v.qty, 0)
       : data.stock;
 
@@ -285,6 +336,8 @@ export async function updateProduct(
     categoryId: data.categoryId,
     categoryName: data.categoryName,
   });
+  const image =
+    data.images != null ? primaryImage(data.images, data.image) : data.image;
 
   const row = await prisma.product.update({
     where: { id },
@@ -293,18 +346,32 @@ export async function updateProduct(
       ...(data.description != null ? { description: data.description } : {}),
       ...(data.price != null ? { price: data.price } : {}),
       ...(stock != null ? { stock } : {}),
-      ...(data.image != null ? { image: data.image } : {}),
-      ...(data.color != null || data.variants?.[0]?.color
-        ? { color: data.color ?? data.variants?.[0]?.color }
+      ...(image != null ? { image } : {}),
+      ...(data.variants != null
+        ? {
+            color: data.variants[0]?.color ?? data.color ?? null,
+            size: data.variants[0]?.size ?? data.size ?? null,
+          }
+        : {
+            ...(data.color !== undefined ? { color: data.color || null } : {}),
+            ...(data.size !== undefined ? { size: data.size || null } : {}),
+          }),
+      ...(categoryId !== undefined
+        ? categoryId
+          ? { category: { connect: { id: categoryId } } }
+          : { category: { disconnect: true } }
         : {}),
-      ...(data.size != null || data.variants?.[0]?.size
-        ? { size: data.size ?? data.variants?.[0]?.size }
-        : {}),
-      ...(categoryId !== undefined ? { categoryId } : {}),
+      ...(data.isActive != null ? { isActive: data.isActive } : {}),
     },
   });
   if (data.variants != null) {
     await syncSpecifications(id, data.variants);
+  }
+  if (data.images != null) {
+    await syncImages(id, data.images);
+  }
+  if (data.isActive === false) {
+    await prisma.cartItem.deleteMany({ where: { productId: id } });
   }
   const full = await prisma.product.findUnique({
     where: { id: row.id },
@@ -313,7 +380,7 @@ export async function updateProduct(
   return mapProduct(full!);
 }
 
-export async function deleteProduct(id: string) {
+export async function deleteProduct(id: string): Promise<{ deactivated: boolean }> {
   const existing = await prisma.product.findUnique({
     where: { id },
     select: { id: true },
@@ -324,17 +391,21 @@ export async function deleteProduct(id: string) {
 
   const ordered = await prisma.orderItem.count({ where: { productId: id } });
   if (ordered > 0) {
-    const err = new Error(
-      "Cannot delete this product because it appears in past orders. Update stock to 0 instead."
-    ) as Error & { code: string };
-    err.code = "PRODUCT_IN_ORDERS";
-    throw err;
+    await prisma.$transaction([
+      prisma.cartItem.deleteMany({ where: { productId: id } }),
+      prisma.product.update({
+        where: { id },
+        data: { isActive: false },
+      }),
+    ]);
+    return { deactivated: true };
   }
 
   await prisma.$transaction([
     prisma.cartItem.deleteMany({ where: { productId: id } }),
     prisma.product.delete({ where: { id } }),
   ]);
+  return { deactivated: false };
 }
 
 export async function createProductsBulk(

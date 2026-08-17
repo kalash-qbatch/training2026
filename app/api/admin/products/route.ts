@@ -10,9 +10,12 @@ export async function GET(request: Request) {
 
   try {
     const { searchParams } = new URL(request.url);
+    const status = searchParams.get("status");
     const result = await findAdminProducts({
       search: searchParams.get("search") ?? undefined,
       categoryId: searchParams.get("categoryId") ?? undefined,
+      isActive:
+        status === "active" ? true : status === "inactive" ? false : undefined,
       page: Number(searchParams.get("page") || 1),
       pageSize: Number(searchParams.get("pageSize") || 8),
     });
@@ -49,11 +52,13 @@ export async function POST(request: Request) {
       price: parsed.data.price,
       stock: parsed.data.stock,
       image: parsed.data.image,
+      images: parsed.data.images,
       color: parsed.data.color,
       size: parsed.data.size,
       variants: parsed.data.variants,
       categoryId: parsed.data.categoryId,
       categoryName: parsed.data.categoryName,
+      isActive: parsed.data.isActive,
     });
 
     return NextResponse.json({

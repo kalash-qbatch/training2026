@@ -20,8 +20,15 @@ type DbSpecification = {
   qty: number;
 };
 
+type DbProductImage = {
+  url: string;
+  color: string;
+  sortOrder?: number;
+};
+
 type DbProductRow = DbProduct & {
   specifications?: DbSpecification[];
+  images?: DbProductImage[];
   category?: Pick<DbCategory, "id" | "name" | "slug"> | null;
 };
 type DbOrderWithRelations = DbOrder & {
@@ -47,36 +54,42 @@ export function mapCategory(
 
 export function mapProduct(row: DbProductRow): Product {
   const variants = mapVariants(row);
-  // When variants exist, only expose those color/size combos (avoid ghost
-  // options like product.size "M" mixed with variant size "Medium").
   const colors = variants.length
     ? [...new Set(variants.map((v) => v.color).filter(Boolean))]
-    : row.color
-      ? [row.color]
-      : [];
+    : [];
   const sizes = variants.length
     ? [...new Set(variants.map((v) => v.size).filter(Boolean))]
-    : row.size
-      ? [row.size]
-      : [];
+    : [];
 
   const stock = variants.length
     ? variants.reduce((sum, v) => sum + v.qty, 0)
     : row.stock;
+
+  const images = (row.images ?? [])
+    .slice()
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+    .map((img) => ({
+      url: img.url,
+      color: img.color || undefined,
+    }));
+  const imageUrl =
+    images.find((img) => !img.color)?.url ?? images[0]?.url ?? row.image;
 
   return {
     id: row.id,
     name: row.title,
     description: row.description,
     price: Number(row.price),
-    imageUrl: row.image,
+    imageUrl,
+    images: images.length ? images : undefined,
     stock,
-    color: colors[0] ?? row.color ?? undefined,
+    color: colors[0],
     colors: colors.length ? colors : undefined,
     sizes: sizes.length ? sizes : undefined,
     variants: variants.length ? variants : undefined,
     categoryId: row.categoryId ?? undefined,
     category: row.category ? mapCategory(row.category) : undefined,
+    isActive: row.isActive,
   };
 }
 
@@ -114,8 +127,8 @@ export function mapOrder(row: DbOrderWithRelations): Order {
         imageUrl: item.product.image,
         price: Number(item.price),
         qty: item.quantity,
-        color: item.color ?? item.product.color ?? undefined,
-        size: item.size ?? item.product.size ?? undefined,
+        color: item.color || undefined,
+        size: item.size || undefined,
         stock: item.product.stock,
       })
     ),
