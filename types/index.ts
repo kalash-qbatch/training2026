@@ -10,6 +10,7 @@ export type User = {
 };
 
 export type ProductVariant = {
+  id?: string;
   color: string;
   size: string;
   qty: number;
@@ -50,7 +51,9 @@ export type AdminOrderStats = {
 };
 
 export type CartItem = {
+  id?: string;
   productId: string;
+  specificationId?: string;
   name: string;
   imageUrl: string;
   color?: string;
@@ -64,6 +67,7 @@ export type OrderStatus = "processing" | "shipped" | "delivered" | "cancelled";
 
 export type OrderItem = {
   productId: string;
+  specificationId?: string;
   title: string;
   description?: string;
   imageUrl: string;

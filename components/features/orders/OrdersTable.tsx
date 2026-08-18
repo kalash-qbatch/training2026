@@ -39,7 +39,7 @@ export function OrdersTable({
                     {formatDate(order.date)}
                   </td>
                   <td className="py-4 text-sm font-medium text-neutral-text">
-                    {order.id}
+                    {order.id.slice(0, 8)}
                   </td>
                   <td className="py-4 text-sm text-neutral-text">{productCount}</td>
                   <td className="py-4 text-sm font-semibold tabular-nums text-neutral-text">
@@ -79,7 +79,7 @@ export function OrdersTable({
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-neutral-text">{order.id}</p>
+                  <p className="text-sm font-semibold text-neutral-text">{order.id.slice(0, 8)}</p>
                   <p className="mt-1 text-xs text-neutral-muted">
                     {formatDate(order.date)}
                   </p>

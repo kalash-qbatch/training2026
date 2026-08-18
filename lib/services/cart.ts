@@ -11,53 +11,43 @@ export class CartError extends Error {
   }
 }
 
-function normalizeVariant(value?: string | null) {
-  return value?.trim() ?? "";
-}
-
 function mapCartItem(row: {
+  id: string;
   quantity: number;
-  color: string;
-  size: string;
+  productId: string;
+  specificationId: string | null;
   product: {
     id: string;
     title: string;
     image: string;
     price: { toString(): string };
     stock: number;
-    specifications?: Array<{ color: string; size: string; qty: number }>;
   };
+  specification: {
+    id: string;
+    color: string;
+    size: string;
+    qty: number;
+  } | null;
 }): CartItem {
-  const specs = row.product.specifications ?? [];
-  let stock = row.product.stock;
-  if (specs.length && (row.color || row.size)) {
-    const match = specs.find(
-      (s) =>
-        s.color.toLowerCase() === row.color.toLowerCase() &&
-        s.size.toLowerCase() === row.size.toLowerCase()
-    );
-    stock = match?.qty ?? 0;
-  } else if (specs.length) {
-    stock = specs.reduce((sum, s) => sum + s.qty, 0);
-  }
-
   return {
+    id: row.id,
     productId: row.product.id,
+    specificationId: row.specificationId ?? undefined,
     name: row.product.title,
     imageUrl: row.product.image,
-    color: row.color || undefined,
-    size: row.size || undefined,
+    color: row.specification?.color || undefined,
+    size: row.specification?.size || undefined,
     price: Number(row.product.price),
     qty: row.quantity,
-    stock,
+    stock: row.specification ? row.specification.qty : row.product.stock,
   };
 }
 
 async function resolveLine(
   productId: string,
-  color: string,
-  size: string
-): Promise<{ title: string; stock: number; color: string; size: string }> {
+  specificationId?: string | null
+): Promise<{ title: string; stock: number; specificationId?: string }> {
   const product = await prisma.product.findUnique({
     where: { id: productId },
     include: { specifications: true },
@@ -67,39 +57,30 @@ async function resolveLine(
     throw new CartError(`"${product.title}" is no longer available.`);
   }
 
-  if (!product.specifications.length) {
-    return { title: product.title, stock: product.stock, color: "", size: "" };
+  if (product.specifications.length > 0) {
+    if (!specificationId) {
+      throw new CartError(
+        `A variant selection is required for "${product.title}".`
+      );
+    }
+    const spec = product.specifications.find((s) => s.id === specificationId);
+    if (!spec) {
+      throw new CartError(
+        `Selected variant is unavailable for "${product.title}".`
+      );
+    }
+    return { title: product.title, stock: spec.qty, specificationId: spec.id };
   }
 
-  const needsColor = product.specifications.some((s) => s.color.trim());
-  const needsSize = product.specifications.some((s) => s.size.trim());
-  if ((needsColor && !color) || (needsSize && !size)) {
-    const missing =
-      needsColor && !color && needsSize && !size
-        ? "Color and size are"
-        : needsColor && !color
-          ? "Color is"
-          : "Size is";
-    throw new CartError(`${missing} required for "${product.title}".`);
-  }
-  const spec = product.specifications.find(
-    (s) =>
-      s.color.toLowerCase() === color.toLowerCase() &&
-      s.size.toLowerCase() === size.toLowerCase()
-  );
-  if (!spec) {
-    throw new CartError(
-      `Selected color/size is unavailable for "${product.title}".`
-    );
-  }
-  return { title: product.title, stock: spec.qty, color, size };
+  return { title: product.title, stock: product.stock };
 }
 
 export async function getCart(userId: string): Promise<CartItem[]> {
   const rows = await prisma.cartItem.findMany({
     where: { userId },
     include: {
-      product: { include: { specifications: true } },
+      product: true,
+      specification: true,
     },
     orderBy: { createdAt: "desc" },
   });
@@ -110,9 +91,8 @@ export async function addToCart(
   userId: string,
   input: {
     productId: string;
+    specificationId?: string | null;
     quantity: number;
-    color?: string;
-    size?: string;
   }
 ): Promise<CartItem[]> {
   const qty = Math.floor(input.quantity);
@@ -120,25 +100,19 @@ export async function addToCart(
     throw new CartError("Quantity must be at least 1");
   }
 
-  const resolved = await resolveLine(
-    input.productId,
-    normalizeVariant(input.color),
-    normalizeVariant(input.size)
-  );
-  const { title, stock, color, size } = resolved;
+  const specId = input.specificationId?.trim() || null;
+  const resolved = await resolveLine(input.productId, specId);
+  const { title, stock } = resolved;
 
   if (stock <= 0) {
     throw new CartError(`"${title}" is out of stock`);
   }
 
-  const existing = await prisma.cartItem.findUnique({
+  const existing = await prisma.cartItem.findFirst({
     where: {
-      userId_productId_color_size: {
-        userId,
-        productId: input.productId,
-        color,
-        size,
-      },
+      userId,
+      productId: input.productId,
+      specificationId: specId,
     },
   });
 
@@ -154,24 +128,21 @@ export async function addToCart(
     throw new CartError(`Only ${stock} in stock. You can add ${left} more.`);
   }
 
-  await prisma.cartItem.upsert({
-    where: {
-      userId_productId_color_size: {
+  if (existing) {
+    await prisma.cartItem.update({
+      where: { id: existing.id },
+      data: { quantity: nextQty },
+    });
+  } else {
+    await prisma.cartItem.create({
+      data: {
         userId,
         productId: input.productId,
-        color,
-        size,
+        specificationId: specId,
+        quantity: qty,
       },
-    },
-    create: {
-      userId,
-      productId: input.productId,
-      color,
-      size,
-      quantity: qty,
-    },
-    update: { quantity: nextQty },
-  });
+    });
+  }
 
   return getCart(userId);
 }
@@ -180,9 +151,8 @@ export async function updateCartItem(
   userId: string,
   input: {
     productId: string;
+    specificationId?: string | null;
     quantity: number;
-    color?: string;
-    size?: string;
   }
 ): Promise<CartItem[]> {
   const qty = Math.floor(input.quantity);
@@ -191,17 +161,18 @@ export async function updateCartItem(
     throw new CartError("Quantity must be at least 1");
   }
 
-  const { title, stock, color, size } = await resolveLine(
-    input.productId,
-    normalizeVariant(input.color),
-    normalizeVariant(input.size)
-  );
+  const specId = input.specificationId?.trim() || null;
+  const { title, stock } = await resolveLine(input.productId, specId);
   if (qty > stock) {
     throw new CartError(`Only ${stock} in stock for "${title}".`);
   }
 
   const updated = await prisma.cartItem.updateMany({
-    where: { userId, productId: input.productId, color, size },
+    where: {
+      userId,
+      productId: input.productId,
+      specificationId: specId,
+    },
     data: { quantity: qty },
   });
   if (updated.count === 0) {
@@ -213,13 +184,16 @@ export async function updateCartItem(
 
 export async function removeCartItem(
   userId: string,
-  input: { productId: string; color?: string; size?: string }
+  input: { productId: string; specificationId?: string | null }
 ): Promise<CartItem[]> {
-  const color = normalizeVariant(input.color);
-  const size = normalizeVariant(input.size);
+  const specId = input.specificationId?.trim() || null;
 
   await prisma.cartItem.deleteMany({
-    where: { userId, productId: input.productId, color, size },
+    where: {
+      userId,
+      productId: input.productId,
+      specificationId: specId,
+    },
   });
 
   return getCart(userId);
@@ -227,15 +201,15 @@ export async function removeCartItem(
 
 export async function removeCartItems(
   userId: string,
-  items: Array<{ productId: string; color?: string; size?: string }>
+  items: Array<{ productId: string; specificationId?: string | null }>
 ): Promise<CartItem[]> {
   for (const item of items) {
+    const specId = item.specificationId?.trim() || null;
     await prisma.cartItem.deleteMany({
       where: {
         userId,
         productId: item.productId,
-        color: normalizeVariant(item.color),
-        size: normalizeVariant(item.size),
+        specificationId: specId,
       },
     });
   }

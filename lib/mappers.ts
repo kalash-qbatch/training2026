@@ -15,6 +15,7 @@ import type {
 } from "@/types";
 
 type DbSpecification = {
+  id?: string;
   color: string;
   size: string;
   qty: number;
@@ -40,6 +41,7 @@ function mapVariants(row: DbProductRow): ProductVariant[] {
   const specs = row.specifications ?? [];
   if (!specs.length) return [];
   return specs.map((s) => ({
+    id: s.id,
     color: s.color,
     size: s.size,
     qty: s.qty,
@@ -122,6 +124,7 @@ export function mapOrder(row: DbOrderWithRelations): Order {
     items: row.items.map(
       (item): OrderItem => ({
         productId: item.productId,
+        specificationId: item.specificationId ?? undefined,
         title: item.product.title,
         description: item.product.description,
         imageUrl: item.product.image,

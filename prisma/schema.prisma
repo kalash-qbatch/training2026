@@ -85,29 +85,31 @@ model ProductImage {
 }
 
 model Specification {
-  id        String  @id @default(uuid())
-  color     String
-  size      String
-  qty       Int     @default(0)
-  productId String
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id         String      @id @default(uuid())
+  color      String
+  size       String
+  qty        Int         @default(0)
+  productId  String
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  cartItems  CartItem[]
+  orderItems OrderItem[]
 
   @@unique([productId, color, size])
 }
 
 model CartItem {
-  id        String   @id @default(uuid())
-  quantity  Int      @default(1)
-  color     String   @default("")
-  size      String   @default("")
-  userId    String
-  productId String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String         @id @default(uuid())
+  quantity        Int            @default(1)
+  userId          String
+  productId       String
+  specificationId String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  product         Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  specification   Specification? @relation(fields: [specificationId], references: [id], onDelete: Cascade)
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, productId, color, size])
+  @@unique([userId, productId, specificationId])
 }
 
 model Order {
@@ -124,15 +126,17 @@ model Order {
 }
 
 model OrderItem {
-  id        String  @id @default(uuid())
-  quantity  Int
-  price     Decimal @db.Decimal(10, 2)
-  color     String?
-  size      String?
-  orderId   String
-  productId String
-  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  id              String         @id @default(uuid())
+  quantity        Int
+  price           Decimal        @db.Decimal(10, 2)
+  color           String?
+  size            String?
+  orderId         String
+  productId       String
+  specificationId String?
+  order           Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product         Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  specification   Specification? @relation(fields: [specificationId], references: [id], onDelete: SetNull)
 }
 
 model Notification {

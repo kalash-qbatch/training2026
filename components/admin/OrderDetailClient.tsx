@@ -80,7 +80,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-[#e5e7eb] pb-5">
         <div className="grid flex-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
           <Meta label="Date" value={formatDate(order.date)} />
-          <Meta label="Order #" value={order.id} />
+          <Meta label="Order #" value={order.id.slice(0, 8)} />
           <Meta label="User" value={order.userName} />
           <Meta label="Products" value={String(units).padStart(2, "0")} />
           <Meta label="Sub Total" value={formatCurrency(subTotal)} />

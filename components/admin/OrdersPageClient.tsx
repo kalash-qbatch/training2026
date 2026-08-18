@@ -176,7 +176,7 @@ export function OrdersPageClient() {
                       {formatDate(o.date)}
                     </td>
                     <td className="py-3.5 pr-4 font-medium text-neutral-text">
-                      {o.id}
+                      {o.id.slice(0, 8)}
                     </td>
                     <td className="py-3.5 pr-4 text-neutral-text">{o.userName}</td>
                     <td className="py-3.5 pr-4 text-neutral-text">{productCount}</td>

@@ -175,13 +175,19 @@ async function main() {
     })
   );
 
+  const spec0 = await prisma.specification.findFirst({
+    where: { productId: products[0].id },
+  });
+  const spec1 = await prisma.specification.findFirst({
+    where: { productId: products[1].id },
+  });
+
   await prisma.cartItem.create({
     data: {
       userId: user.id,
       productId: products[0].id,
+      specificationId: spec0?.id,
       quantity: 2,
-      color: "White",
-      size: "Medium",
     },
   });
 
@@ -196,6 +202,7 @@ async function main() {
         create: [
           {
             productId: products[1].id,
+            specificationId: spec1?.id,
             quantity: 1,
             price: 89,
             color: "Blue",
@@ -203,6 +210,7 @@ async function main() {
           },
           {
             productId: products[0].id,
+            specificationId: spec0?.id,
             quantity: 2,
             price: 28,
             color: "White",

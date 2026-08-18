@@ -23,23 +23,21 @@ type CartState = {
   addItem: (
     product: Product,
     qty: number,
-    opts?: { color?: string; size?: string }
+    opts?: { specificationId?: string }
   ) => Promise<AddItemResult>;
   updateQty: (
     productId: string,
     qty: number,
-    size?: string,
-    color?: string
+    specificationId?: string
   ) => Promise<void>;
   removeItem: (
     productId: string,
-    size?: string,
-    color?: string
+    specificationId?: string
   ) => Promise<void>;
   removeItems: (
-    items: Array<{ productId: string; size?: string; color?: string }>
+    items: Array<{ productId: string; specificationId?: string }>
   ) => Promise<void>;
-  getCartQty: (productId: string, size?: string, color?: string) => number;
+  getCartQty: (productId: string, specificationId?: string) => number;
   getSubtotal: () => number;
   getTax: () => number;
   getTotal: () => number;
@@ -47,8 +45,11 @@ type CartState = {
 
 const TAX_RATE = 0.08;
 
-function itemKey(productId: string, size?: string, color?: string) {
-  return `${productId}::${size ?? ""}::${color ?? ""}`;
+function matchesLine(item: CartItem, productId: string, specificationId?: string) {
+  return (
+    item.productId === productId &&
+    (item.specificationId || "") === (specificationId || "")
+  );
 }
 
 export const useCartStore = create<CartState>()((set, get) => ({
@@ -64,31 +65,23 @@ export const useCartStore = create<CartState>()((set, get) => ({
       set({ items: [], loaded: true });
     }
   },
-  getCartQty: (productId, size, color) =>
-    get()
-      .items.filter(
-        (i) =>
-          itemKey(i.productId, i.size, i.color) ===
-          itemKey(productId, size, color)
-      )
-      .reduce((sum, i) => sum + i.qty, 0),
+  getCartQty: (productId, specificationId) => {
+    const item = get().items.find((i) =>
+      matchesLine(i, productId, specificationId)
+    );
+    return item ? item.qty : 0;
+  },
   addItem: async (product, qty, opts) => {
-    const size = opts?.size?.trim() ?? "";
-    const color = opts?.color?.trim() ?? "";
+    const specId = opts?.specificationId?.trim() || undefined;
     try {
       const items = await addCartItem({
         productId: product.id,
+        specificationId: specId,
         quantity: qty,
-        color,
-        size,
       });
       set({ items, loaded: true });
       const nextQty =
-        items.find(
-          (i) =>
-            itemKey(i.productId, i.size, i.color) ===
-            itemKey(product.id, size, color)
-        )?.qty ?? qty;
+        items.find((i) => matchesLine(i, product.id, specId))?.qty ?? qty;
       return { ok: true, qty: nextQty };
     } catch (err) {
       return {
@@ -97,25 +90,28 @@ export const useCartStore = create<CartState>()((set, get) => ({
       };
     }
   },
-  updateQty: async (productId, qty, size, color) => {
+  updateQty: async (productId, qty, specificationId) => {
+    const specId = specificationId?.trim() || undefined;
     const items = await updateCartItemApi({
       productId,
+      specificationId: specId,
       quantity: qty,
-      color,
-      size,
     });
     set({ items, loaded: true });
   },
-  removeItem: async (productId, size, color) => {
-    const items = await removeCartItemApi({ productId, color, size });
+  removeItem: async (productId, specificationId) => {
+    const specId = specificationId?.trim() || undefined;
+    const items = await removeCartItemApi({
+      productId,
+      specificationId: specId,
+    });
     set({ items, loaded: true });
   },
   removeItems: async (lines) => {
     const items = await removeCartItemsApi(
       lines.map((i) => ({
         productId: i.productId,
-        color: i.color,
-        size: i.size,
+        specificationId: i.specificationId?.trim() || undefined,
       }))
     );
     set({ items, loaded: true });

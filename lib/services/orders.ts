@@ -11,6 +11,7 @@ const TAX_RATE = 0.08;
 
 export type PlaceOrderItemInput = {
   productId: string;
+  specificationId?: string;
   quantity: number;
   color?: string;
   size?: string;
@@ -34,6 +35,7 @@ export async function createOrder(userId: string, items: PlaceOrderItemInput[]) 
   return prisma.$transaction(async (tx) => {
     const lineData: Array<{
       productId: string;
+      specificationId?: string;
       quantity: number;
       price: number;
       color?: string;
@@ -59,30 +61,36 @@ export async function createOrder(userId: string, items: PlaceOrderItemInput[]) 
       const hasSpecs = product.specifications.length > 0;
       let color = item.color?.trim() || undefined;
       let size = item.size?.trim() || undefined;
+      let specificationId: string | undefined =
+        item.specificationId?.trim() || undefined;
 
       if (hasSpecs) {
-        const needsColor = product.specifications.some((s) => s.color.trim());
-        const needsSize = product.specifications.some((s) => s.size.trim());
-        if ((needsColor && !color) || (needsSize && !size)) {
-          throw new OrderError(
-            `A ${needsColor && !color ? "color" : "size"} selection is required for "${product.title}".`
-          );
-        }
+        let spec = specificationId
+          ? await tx.specification.findUnique({
+              where: { id: specificationId },
+            })
+          : null;
 
-        // Case-insensitive match against Specification rows (source of truth)
-        const spec = await tx.specification.findFirst({
-          where: {
-            productId: product.id,
-            color: { equals: color ?? "", mode: "insensitive" },
-            size: { equals: size ?? "", mode: "insensitive" },
-          },
-        });
+        // Fallback lookup if specificationId wasn't passed directly
+        if (!spec && (color || size)) {
+          spec = await tx.specification.findFirst({
+            where: {
+              productId: product.id,
+              color: { equals: color ?? "", mode: "insensitive" },
+              size: { equals: size ?? "", mode: "insensitive" },
+            },
+          });
+        }
 
         if (!spec) {
           throw new OrderError(
-            `Selected color/size is out of stock for "${product.title}".`
+            `A valid variant selection is required for "${product.title}".`
           );
         }
+
+        specificationId = spec.id;
+        color = spec.color;
+        size = spec.size;
 
         // Atomic decrement — fails if concurrent order already consumed stock
         const decremented = await tx.specification.updateMany({
@@ -114,12 +122,14 @@ export async function createOrder(userId: string, items: PlaceOrderItemInput[]) 
             `Not enough stock for "${product.title}". Only ${product.stock} left.`
           );
         }
+        specificationId = undefined;
         color = undefined;
         size = undefined;
       }
 
       lineData.push({
         productId: product.id,
+        specificationId,
         quantity: item.quantity,
         price: Number(product.price),
         color,
@@ -144,6 +154,7 @@ export async function createOrder(userId: string, items: PlaceOrderItemInput[]) 
         items: {
           create: lineData.map((line) => ({
             productId: line.productId,
+            specificationId: line.specificationId,
             quantity: line.quantity,
             price: line.price,
             color: line.color,
@@ -236,12 +247,22 @@ async function restoreStockForOrderItems(
   tx: TxClient,
   items: Array<{
     productId: string;
+    specificationId?: string | null;
     quantity: number;
     color: string | null;
     size: string | null;
   }>
 ) {
   for (const item of items) {
+    if (item.specificationId) {
+      await tx.specification.updateMany({
+        where: { id: item.specificationId },
+        data: { qty: { increment: item.quantity } },
+      });
+      await syncProductStockFromSpecs(tx, item.productId);
+      continue;
+    }
+
     const product = await tx.product.findUnique({
       where: { id: item.productId },
       include: { specifications: true },
@@ -282,12 +303,27 @@ async function consumeStockForOrderItems(
   tx: TxClient,
   items: Array<{
     productId: string;
+    specificationId?: string | null;
     quantity: number;
     color: string | null;
     size: string | null;
   }>
 ) {
   for (const item of items) {
+    if (item.specificationId) {
+      const decremented = await tx.specification.updateMany({
+        where: { id: item.specificationId, qty: { gte: item.quantity } },
+        data: { qty: { decrement: item.quantity } },
+      });
+      if (decremented.count !== 1) {
+        throw new OrderError(
+          `Not enough stock to reactivate order.`
+        );
+      }
+      await syncProductStockFromSpecs(tx, item.productId);
+      continue;
+    }
+
     const product = await tx.product.findUnique({
       where: { id: item.productId },
       include: { specifications: true },
@@ -354,6 +390,7 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
         items: {
           select: {
             productId: true,
+            specificationId: true,
             quantity: true,
             color: true,
             size: true,

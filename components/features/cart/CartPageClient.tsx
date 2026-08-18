@@ -17,7 +17,7 @@ import { OrdersDrawer } from "@/components/features/orders/OrdersDrawer";
 import type { CartItem } from "@/types";
 
 function itemKey(item: CartItem) {
-  return `${item.productId}::${item.size ?? ""}::${item.color ?? ""}`;
+  return item.id || (item.specificationId ? `${item.productId}::${item.specificationId}` : item.productId);
 }
 
 export function CartPageClient() {
@@ -40,7 +40,6 @@ export function CartPageClient() {
   const [prevItems, setPrevItems] = useState(items);
 
   // Sync selection with cart items during render
-  // (https://react.dev/learn/you-might-not-need-an-effect)
   if (items !== prevItems) {
     setPrevItems(items);
     const keys = new Set(items.map(itemKey));
@@ -163,7 +162,7 @@ export function CartPageClient() {
                     });
                   }}
                   onQtyChange={(qty) => {
-                    void updateQty(item.productId, qty, item.size, item.color).catch(
+                    void updateQty(item.productId, qty, item.specificationId).catch(
                       (err: unknown) =>
                         toast.error(
                           err instanceof Error ? err.message : "Failed to update qty"
@@ -196,7 +195,7 @@ export function CartPageClient() {
                 });
               }}
               onQtyChange={(qty) => {
-                void updateQty(item.productId, qty, item.size, item.color).catch(
+                void updateQty(item.productId, qty, item.specificationId).catch(
                   (err: unknown) =>
                     toast.error(
                       err instanceof Error ? err.message : "Failed to update qty"
@@ -230,16 +229,14 @@ export function CartPageClient() {
               const order = await placeOrderApi(
                 selectedItems.map((i) => ({
                   productId: i.productId,
+                  specificationId: i.specificationId,
                   quantity: i.qty,
-                  color: i.color,
-                  size: i.size,
                 }))
               );
               await removeItems(
                 selectedItems.map((i) => ({
                   productId: i.productId,
-                  size: i.size,
-                  color: i.color,
+                  specificationId: i.specificationId,
                 }))
               );
               setPlacedOrderId(order.id);
@@ -263,8 +260,7 @@ export function CartPageClient() {
           if (pendingRemove) {
             void removeItem(
               pendingRemove.productId,
-              pendingRemove.size,
-              pendingRemove.color
+              pendingRemove.specificationId
             )
               .then(() => toast.success("Item removed from bag"))
               .catch((err: unknown) =>

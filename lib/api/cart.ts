@@ -16,9 +16,8 @@ export async function fetchCart(): Promise<CartItem[]> {
 
 export async function addCartItem(body: {
   productId: string;
+  specificationId?: string;
   quantity: number;
-  color?: string;
-  size?: string;
 }): Promise<CartItem[]> {
   const res = await fetch("/api/cart", {
     method: "POST",
@@ -34,9 +33,8 @@ export async function addCartItem(body: {
 
 export async function updateCartItemApi(body: {
   productId: string;
+  specificationId?: string;
   quantity: number;
-  color?: string;
-  size?: string;
 }): Promise<CartItem[]> {
   const res = await fetch("/api/cart", {
     method: "PATCH",
@@ -52,8 +50,7 @@ export async function updateCartItemApi(body: {
 
 export async function removeCartItemApi(body: {
   productId: string;
-  color?: string;
-  size?: string;
+  specificationId?: string;
 }): Promise<CartItem[]> {
   const res = await fetch("/api/cart", {
     method: "DELETE",
@@ -68,7 +65,7 @@ export async function removeCartItemApi(body: {
 }
 
 export async function removeCartItemsApi(
-  items: Array<{ productId: string; color?: string; size?: string }>
+  items: Array<{ productId: string; specificationId?: string }>
 ): Promise<CartItem[]> {
   const res = await fetch("/api/cart", {
     method: "DELETE",

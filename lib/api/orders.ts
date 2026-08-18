@@ -55,6 +55,7 @@ export async function getOrderById(id: string): Promise<Order | null> {
 
 export async function placeOrder(items: Array<{
   productId: string;
+  specificationId?: string;
   quantity: number;
   color?: string;
   size?: string;

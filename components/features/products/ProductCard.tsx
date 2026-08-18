@@ -59,27 +59,27 @@ export function ProductCard({ product }: { product: Product }) {
   const sizes = useMemo(() => allSizes(product), [product]);
   const hasVariants = Boolean(product.variants?.length);
   const freeSize = isFreeSizeProduct(product);
-  
+
 
   // function getDefaultInStockVariant(product: Product) {
   //   const inStock = product.variants?.find((v) => v.qty > 0);
-  
+
   //   if (inStock) {
   //     return {
   //       color: inStock.color,
   //       size: inStock.size,
   //     };
   //   }
-  
+
   //   const first = product.variants?.[0];
-  
+
   //   if (first) {
   //     return {
   //       color: first.color,
   //       size: first.size,
   //     };
   //   }
-  
+
   //   return { color: "", size: "" };
   // }
   const [color, setColor] = useState(defaultInStockVariant(product).color);
@@ -140,7 +140,7 @@ export function ProductCard({ product }: { product: Product }) {
         ) : null}
       </div>
 
-      <div className="flex flex-1 flex-col px-2 pb-2 pt-2">
+      <div className="flex flex-1 flex-col justify-between px-2 pb-2 pt-2">
         <h3 className="line-clamp-2 text-[14px] font-medium leading-5 text-neutral-900">
           {product.name}
         </h3>
@@ -244,7 +244,7 @@ export function ProductCard({ product }: { product: Product }) {
               const result = await addItem(
                 product,
                 selectedQty,
-                freeSize ? { size: "", color: "" } : { size, color }
+                { specificationId: selectedVariant?.id }
               );
               if (!result.ok) {
                 toast.error(result.error);

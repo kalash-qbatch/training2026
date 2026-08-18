@@ -33,9 +33,8 @@ export async function addCartItem(body: unknown) {
 
   const data = body as {
     productId?: string;
+    specificationId?: string;
     quantity?: number;
-    color?: string;
-    size?: string;
   };
   if (!data.productId) {
     return {
@@ -47,9 +46,8 @@ export async function addCartItem(body: unknown) {
   try {
     const items = await addToCart(userId, {
       productId: data.productId,
+      specificationId: data.specificationId,
       quantity: data.quantity ?? 1,
-      color: data.color,
-      size: data.size,
     });
     return { status: 200, body: { success: true, items } };
   } catch (err) {
@@ -65,9 +63,8 @@ export async function patchCartItem(body: unknown) {
 
   const data = body as {
     productId?: string;
+    specificationId?: string;
     quantity?: number;
-    color?: string;
-    size?: string;
   };
   if (!data.productId || data.quantity == null) {
     return {
@@ -79,9 +76,8 @@ export async function patchCartItem(body: unknown) {
   try {
     const items = await updateCartItem(userId, {
       productId: data.productId,
+      specificationId: data.specificationId,
       quantity: data.quantity,
-      color: data.color,
-      size: data.size,
     });
     return { status: 200, body: { success: true, items } };
   } catch (err) {
@@ -106,9 +102,8 @@ export async function deleteCartItems(request: Request) {
     const body = (await request.json().catch(() => null)) as
       | {
           productId?: string;
-          color?: string;
-          size?: string;
-          items?: Array<{ productId: string; color?: string; size?: string }>;
+          specificationId?: string;
+          items?: Array<{ productId: string; specificationId?: string }>;
         }
       | null;
 
@@ -126,8 +121,7 @@ export async function deleteCartItems(request: Request) {
 
     const items = await removeCartItem(userId, {
       productId: body.productId,
-      color: body.color,
-      size: body.size,
+      specificationId: body.specificationId,
     });
     return { status: 200, body: { success: true, items } };
   } catch (err) {
