@@ -9,6 +9,8 @@ export type SelectOption = {
   label: string;
   /** Render in brand color (e.g. "+ Create new category"). */
   accent?: boolean;
+  /** Optional class names for specific option items (e.g. sticky bottom). */
+  className?: string;
 };
 
 type SelectProps = {
@@ -21,6 +23,7 @@ type SelectProps = {
   disabled?: boolean;
   className?: string;
   ariaLabel?: string;
+  labelClass?: string | null;
 };
 
 export function Select({
@@ -32,6 +35,7 @@ export function Select({
   disabled,
   className,
   ariaLabel,
+  labelClass
 }: SelectProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -100,12 +104,17 @@ export function Select({
       {open ? (
         <ul
           role="listbox"
-          className="absolute left-0 right-0 z-50 mt-1 max-h-60 overflow-auto rounded-lg border border-[#e5e7eb] bg-white py-1 shadow-lg"
+          className="absolute left-0 pb-0 right-0 z-50 mt-1 max-h-60 overflow-auto rounded-lg border border-[#e5e7eb] bg-white py-1 shadow-lg"
         >
           {options.map((opt) => {
             const isSelected = opt.value === value;
             return (
-              <li key={opt.value} role="option" aria-selected={isSelected}>
+              <li
+                key={opt.value}
+                role="option"
+                className={cn(labelClass, opt.className)}
+                aria-selected={isSelected}
+              >
                 <button
                   type="button"
                   onClick={() => {

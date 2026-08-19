@@ -13,6 +13,7 @@ import {
 import { fetchAdminOrder } from "@/lib/api/admin";
 import { formatLineColor, formatLineSize } from "@/lib/product";
 import { OrderStatusSelect } from "@/components/admin/OrderStatusSelect";
+import { TAX_RATE } from "@/lib/constants";
 
 export function OrderDetailClient({ orderId }: { orderId: string }) {
   const [order, setOrder] = useState<Order | null>(null);
@@ -65,7 +66,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
   const units = order.items.reduce((n, i) => n + i.qty, 0);
   const subTotal =
     order.subTotal ?? order.items.reduce((s, i) => s + i.price * i.qty, 0);
-  const tax = order.tax ?? Number((subTotal * 0.08).toFixed(2));
+  const tax = order.tax ?? Number((subTotal * TAX_RATE).toFixed(2));
 
   return (
     <div>

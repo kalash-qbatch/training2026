@@ -34,7 +34,6 @@ export function Drawer({
     if (!present) return;
     const previous = document.activeElement as HTMLElement | null;
     if (visible) panelRef.current?.focus();
-    const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -43,7 +42,8 @@ export function Drawer({
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = prevOverflow;
+      // Always unlock scroll on unmount — never restore a stale 'hidden' value
+      document.body.style.overflow = "";
       previous?.focus();
     };
   }, [present, visible, onClose]);

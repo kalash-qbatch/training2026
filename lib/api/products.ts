@@ -13,6 +13,7 @@ export async function getProducts(opts?: {
   categorySlug?: string;
   sizeFilters?: SizeFilter[];
   colorFilters?: ColorFilter[];
+  signal?: AbortSignal;
 }): Promise<{
   products: Product[];
   total: number;
@@ -30,6 +31,7 @@ export async function getProducts(opts?: {
 
   const res = await fetch(`/api/products?${params.toString()}`, {
     cache: "no-store",
+    signal: opts?.signal,
   });
   const data = (await res.json()) as {
     success?: boolean;

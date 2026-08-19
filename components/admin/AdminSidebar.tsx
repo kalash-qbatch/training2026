@@ -2,11 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut } from "next-auth/react";
-import { LayoutGrid, ShoppingBag, LogOut, Menu, X } from "lucide-react";
+import { LayoutGrid, ShoppingBag, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { useAuthStore } from "@/lib/store/useAuthStore";
 
 const nav = [
   { href: "/admin/products", label: "Products", icon: LayoutGrid },
@@ -15,13 +13,7 @@ const nav = [
 
 export function AdminSidebar() {
   const pathname = usePathname();
-  const logout = useAuthStore((s) => s.logout);
   const [open, setOpen] = useState(false);
-
-  async function onLogout() {
-    logout();
-    await signOut({ callbackUrl: "/login" });
-  }
 
   const content = (
     <div className="flex h-full flex-col bg-white">
@@ -60,16 +52,6 @@ export function AdminSidebar() {
           })}
         </div>
       </nav>
-      <div className="p-3">
-        <button
-          type="button"
-          onClick={onLogout}
-          className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-3 py-2.5 text-[13px] font-medium text-[#6b7280] transition-all duration-200 ease-in-out hover:bg-[#f3f4f6] hover:text-neutral-900"
-        >
-          <LogOut className="h-4 w-4" strokeWidth={1.75} />
-          Logout
-        </button>
-      </div>
     </div>
   );
 

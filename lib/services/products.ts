@@ -92,17 +92,12 @@ export async function findProducts(opts?: {
     }),
   ]);
 
-  // Heal Product.stock if Studio/manual edits drifted from Specification.qty
-  await Promise.all(
-    rows.map(async (row) => {
-      if (!row.specifications.length) return;
-      const sum = row.specifications.reduce((acc, s) => acc + s.qty, 0);
-      if (row.stock !== sum) {
-        await reconcileProductStock(row.id);
-        row.stock = sum;
-      }
-    })
-  );
+  // Compute live stock in memory if specifications exist, avoiding DB write locks on read path
+  for (const row of rows) {
+    if (row.specifications.length > 0) {
+      row.stock = row.specifications.reduce((acc, s) => acc + s.qty, 0);
+    }
+  }
 
   return {
     products: rows.map(mapProduct),

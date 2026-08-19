@@ -6,9 +6,9 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const result = await getNotifications();
+    const result = await getNotifications(req);
     return NextResponse.json(result.body, { status: result.status });
   } catch (error) {
     console.error("notifications GET error:", error);

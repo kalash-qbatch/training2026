@@ -56,7 +56,8 @@ export function Modal({
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = prevOverflow;
+      // Always unlock scroll on unmount — never restore a stale 'hidden' value
+      document.body.style.overflow = "";
       previous?.focus();
     };
   }, [present, visible, onClose]);

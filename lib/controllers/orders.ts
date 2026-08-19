@@ -1,3 +1,4 @@
+import { auth } from "@/auth";
 import {
   createOrder,
   findOrderById,
@@ -52,7 +53,13 @@ export async function placeOrder(body: unknown) {
 }
 
 export async function getOrder(id: string) {
-  const order = await findOrderById(id);
+  const { userId, error } = await requireUser();
+  if (error || !userId) return error!;
+
+  const session = await auth();
+  const isAdmin = session?.user?.role === "ADMIN";
+
+  const order = await findOrderById(id, isAdmin ? undefined : userId);
   if (!order) {
     return {
       status: 404,

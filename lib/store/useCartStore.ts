@@ -43,7 +43,7 @@ type CartState = {
   getTotal: () => number;
 };
 
-const TAX_RATE = 0.08;
+import { TAX_RATE } from "@/lib/constants";
 
 function matchesLine(item: CartItem, productId: string, specificationId?: string) {
   return (

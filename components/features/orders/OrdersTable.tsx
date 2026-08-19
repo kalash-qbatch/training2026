@@ -18,7 +18,7 @@ export function OrdersTable({
 }) {
   return (
     <>
-      <div className="hidden overflow-x-auto md:block">
+      <div className="hidden overflow-x-auto md:block table-custom-height-client-order-history">
         <table className="w-full min-w-180 border-collapse">
           <thead>
             <tr className="border-b border-neutral-border text-left text-[12px] font-medium text-neutral-muted">

@@ -353,6 +353,8 @@ function ProductFormFields({
                       value: NEW_CATEGORY,
                       label: "+ Create New Category",
                       accent: true,
+                      className:
+                        "sticky -bottom-0 w-full z-30 bg-white border-t border-[#e5e7eb]",
                     },
                   ]}
                   placeholder="Select Category"
@@ -683,9 +685,9 @@ export function EditProductDrawer({
       const nextVariants = variantsFromProduct(product);
       const nextImages = product.images?.length
         ? product.images.map((img) => ({
-            url: img.url,
-            color: img.color ?? "",
-          }))
+          url: img.url,
+          color: img.color ?? "",
+        }))
         : product.imageUrl
           ? [{ url: product.imageUrl, color: "" }]
           : [];

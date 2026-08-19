@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import {
@@ -6,6 +7,10 @@ import {
   updatePasswordAndClearResetToken,
 } from "@/lib/services/auth";
 import { passwordSchema } from "@/lib/validations/auth";
+
+function hashToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
 
 const resetBodySchema = z
   .object({
@@ -30,10 +35,11 @@ export async function validateResetToken(token: string | null) {
     };
   }
 
-  const user = await findUserByValidResetToken(token);
+  const hashedToken = hashToken(token);
+  const user = await findUserByValidResetToken(hashedToken);
 
   if (!user) {
-    await clearResetToken(token);
+    await clearResetToken(hashedToken);
     return {
       status: 400,
       body: {
@@ -68,10 +74,11 @@ export async function resetPassword(body: unknown) {
   }
 
   const { token, password } = parsed.data;
-  const user = await findUserByValidResetToken(token);
+  const hashedToken = hashToken(token);
+  const user = await findUserByValidResetToken(hashedToken);
 
   if (!user) {
-    await clearResetToken(token);
+    await clearResetToken(hashedToken);
     return {
       status: 400,
       body: {

@@ -98,13 +98,19 @@ export async function notifyOrderStatusChange(
   });
 }
 
-export async function listNotifications(userId: string, limit = 20) {
-  const [rows, unreadCount] = await Promise.all([
+export async function listNotifications(
+  userId: string,
+  page = 1,
+  pageSize = 8
+) {
+  const [rows, total, unreadCount] = await Promise.all([
     prisma.notification.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
-      take: limit,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
     }),
+    prisma.notification.count({ where: { userId } }),
     prisma.notification.count({ where: { userId, read: false } }),
   ]);
 
@@ -119,6 +125,10 @@ export async function listNotifications(userId: string, limit = 20) {
         createdAt: n.createdAt.toISOString(),
       })
     ),
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
     unreadCount,
   };
 }

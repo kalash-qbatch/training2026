@@ -6,6 +6,7 @@ import { getOrderById, getOrders } from "@/lib/api/orders";
 import type { Order } from "@/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { formatLineColor, formatLineSize } from "@/lib/product";
+import { TAX_RATE } from "@/lib/constants";
 import { Drawer } from "@/components/ui/Drawer";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { OrdersTable } from "./OrdersTable";
@@ -154,14 +155,14 @@ function OrderDetailsContent({
 
   const productCount = order.items.reduce((sum, i) => sum + i.qty, 0);
   const subTotal = order.subTotal ?? order.items.reduce((s, i) => s + i.price * i.qty, 0);
-  const tax = order.tax ?? Number((subTotal * 0.08).toFixed(2));
+  const tax = order.tax ?? Number((subTotal * TAX_RATE).toFixed(2));
   const total = order.amount;
 
   return (
     <div className="space-y-6">
       <div className="grid gap-4 border-b border-neutral-border pb-5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
         <Meta label="Date" value={formatDate(order.date)} />
-        <Meta label="Order #" value={order.id} />
+        <Meta label="Order #" value={order.id.slice(0, 8)} />
         <Meta label="User" value={order.userName} />
         <Meta
           label="Products"
@@ -193,7 +194,7 @@ function OrderDetailsContent({
                   key={`${item.productId}-${item.size}-${item.color}`}
                   className="border-b border-neutral-border last:border-0"
                 >
-                  <td className="py-4 pr-4">
+                  <td className="py-2 pr-4">
                     <div className="flex items-center gap-3">
                       <div className="relative h-12 w-12 overflow-hidden rounded-md bg-neutral-bg">
                         <Image

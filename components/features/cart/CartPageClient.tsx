@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, startTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -14,6 +14,7 @@ import { CartSummary } from "./CartSummary";
 import { RemoveProductModal } from "./RemoveProductModal";
 import { OrderPlacedModal } from "./OrderPlacedModal";
 import { OrdersDrawer } from "@/components/features/orders/OrdersDrawer";
+import { TAX_RATE } from "@/lib/constants";
 import type { CartItem } from "@/types";
 
 function itemKey(item: CartItem) {
@@ -56,7 +57,7 @@ export function CartPageClient() {
   );
 
   const subtotal = selectedItems.reduce((sum, i) => sum + i.price * i.qty, 0);
-  const tax = Number((subtotal * 0.08).toFixed(2));
+  const tax = Number((subtotal * TAX_RATE).toFixed(2));
   const total = Number((subtotal + tax).toFixed(2));
   const allSelected = items.length > 0 && selected.size === items.length;
 
@@ -241,7 +242,8 @@ export function CartPageClient() {
               );
               setPlacedOrderId(order.id);
               setSuccessOpen(true);
-              router.refresh();
+              // Defer refresh so it doesn't block the success modal rendering
+              startTransition(() => { router.refresh(); });
             } catch (err) {
               toast.error(
                 err instanceof Error ? err.message : "Failed to place order"

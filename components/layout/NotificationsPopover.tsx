@@ -77,34 +77,83 @@ export function NotificationsPopover() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const rootRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const load = useCallback(() => {
-    fetchNotifications()
-      .then((data) => {
-        setNotifications(data.notifications ?? []);
+  const fetchPage = useCallback(
+    async (pageNum: number, isFirstPage: boolean, withDelay = false) => {
+      abortControllerRef.current?.abort();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
+      if (isFirstPage) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
+
+      try {
+        // Only apply 1s delay when user opens popover or scrolls (not background polling)
+        if (withDelay) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          if (controller.signal.aborted) return;
+        }
+
+        const data = await fetchNotifications({
+          page: pageNum,
+          pageSize: 8,
+          signal: controller.signal,
+        });
+
+        if (controller.signal.aborted) return;
+
+        setNotifications((prev) =>
+          isFirstPage ? data.notifications : [...prev, ...data.notifications]
+        );
         setUnreadCount(data.unreadCount ?? 0);
-      })
-      .catch((err) => {
-        console.error("Notification Error:", err);
-        setNotifications([]);
-        setUnreadCount(0);
-      })
-      .finally(() => setLoading(false));
-  }, []);
+        setTotalPages(data.totalPages);
+        setPage(pageNum);
+      } catch (err: unknown) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        if (controller.signal.aborted) return;
+        if (isFirstPage) {
+          setNotifications([]);
+          setUnreadCount(0);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
+      }
+    },
+    []
+  );
+
+  // Background poll: no delay so it never blocks the UI
+  const pollInBackground = useCallback(() => {
+    void fetchPage(1, true, false);
+  }, [fetchPage]);
+
+  // User-triggered load: with delay for skeleton visibility
+  const loadInitial = useCallback(() => {
+    setPage(1);
+    void fetchPage(1, true, true);
+  }, [fetchPage]);
 
   useEffect(() => {
-    load();
-    const id = window.setInterval(load, 30000);
+    pollInBackground();
+    const id = window.setInterval(pollInBackground, 10000);
     return () => window.clearInterval(id);
-  }, [load]);
+  }, [pollInBackground]);
 
   useEffect(() => {
     if (!open) return;
-    load();
-
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    loadInitial();
 
     function onPointerDown(e: PointerEvent) {
       if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
@@ -119,7 +168,22 @@ export function NotificationsPopover() {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [open, load]);
+  }, [open, loadInitial]);
+
+  const handleScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+      if (
+        scrollHeight - scrollTop - clientHeight < 60 &&
+        !loading &&
+        !loadingMore &&
+        page < totalPages
+      ) {
+        void fetchPage(page + 1, false, true);
+      }
+    },
+    [loading, loadingMore, page, totalPages, fetchPage]
+  );
 
   async function onMarkAllRead() {
     try {
@@ -249,7 +313,11 @@ export function NotificationsPopover() {
             </div>
 
             {/* Content Area */}
-            <div className="max-h-[calc(min(70dvh,32rem)-6.75rem)] overflow-y-auto overscroll-contain sm:max-h-90">
+            <div
+              ref={scrollContainerRef}
+              onScroll={handleScroll}
+              className="max-h-[calc(min(70dvh,32rem)-6.75rem)] overflow-y-auto overscroll-contain sm:max-h-90"
+            >
               {loading && !notifications.length ? (
                 <div className="space-y-3 p-4">
                   {Array.from({ length: 3 }).map((_, i) => (
@@ -322,6 +390,11 @@ export function NotificationsPopover() {
                       </li>
                     );
                   })}
+                  {loadingMore ? (
+                    <li className="p-3 text-center">
+                      <div className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+                    </li>
+                  ) : null}
                 </ul>
               )}
             </div>

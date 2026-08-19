@@ -1,4 +1,4 @@
-import { randomBytes } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import { getResetTokenExpiryDate } from "@/lib/constants/auth";
 import { sendPasswordResetEmail } from "@/lib/mail";
 import { findUserByEmail, setUserResetToken } from "@/lib/services/auth";
@@ -30,9 +30,10 @@ export async function forgotPassword(body: unknown) {
   }
 
   const resetToken = randomBytes(32).toString("hex");
+  const hashedToken = createHash("sha256").update(resetToken).digest("hex");
   const resetTokenExp = getResetTokenExpiryDate();
 
-  await setUserResetToken(user.id, resetToken, resetTokenExp);
+  await setUserResetToken(user.id, hashedToken, resetTokenExp);
 
   const baseUrl =
     process.env.AUTH_URL ||
