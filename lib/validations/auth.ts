@@ -20,7 +20,7 @@ export const signUpSchema = z
   .object({
     fullName: z.string().min(2, "Enter your full name"),
     email: z.email("Enter a valid email address"),
-    mobile: z.string().min(7, "Enter a valid mobile number"),
+    mobile: z.string().min(10, "Enter a valid mobile number with country code (e.g. +911234567890)"),
     password: passwordSchema,
     confirmPassword: z.string(),
   })

@@ -27,7 +27,7 @@ export function SignUpForm() {
     try {
       await signUpRequest(values);
       toast.success(
-        "Your account has been created. Instructions sent to your email id."
+        "Your account has been created."
       );
       router.push("/login");
     } catch (err) {

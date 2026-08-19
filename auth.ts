@@ -42,7 +42,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
-        remember: { label: "Remember me", type: "checkbox" },
         rememberMe: { label: "Remember me", type: "checkbox" },
       },
       async authorize(credentials) {
@@ -58,7 +57,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         const valid = await bcrypt.compare(credentials.password, user.passwordHash);
         if (!valid) return null;
-        const rememberMeRaw = credentials.rememberMe ?? credentials.remember;
+        const rememberMeRaw = credentials.rememberMe;
         const isRememberMe =
           rememberMeRaw === true ||
           rememberMeRaw === "true" ||

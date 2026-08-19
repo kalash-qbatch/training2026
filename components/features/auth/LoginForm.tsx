@@ -49,7 +49,6 @@ export function LoginForm() {
       const result = await signIn("credentials", {
         email: values.email,
         password: values.password,
-        remember: values.remember ? "true" : "false",
         rememberMe: values.remember ? "true" : "false",
         redirect: false,
       });

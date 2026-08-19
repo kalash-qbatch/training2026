@@ -19,7 +19,7 @@ export function CartSummary({
   onPlaceOrder: () => void;
 }) {
   return (
-    <div className="md:ml-auto w-full max-w-[280px]">
+    <div className="md:ml-auto w-full max-w-70">
       <dl className="space-y-2.5 text-[13px]">
         <div className="flex justify-between gap-6">
           <dt className="text-neutral-muted">Sub Total</dt>

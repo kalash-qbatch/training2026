@@ -2,12 +2,13 @@ import type { OrderStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { mapOrder } from "@/lib/mappers";
 import type { Order } from "@/types";
+import { TAX_RATE } from "@/lib/constants";
 import {
   notifyOrderPlaced,
   notifyOrderStatusChange,
 } from "@/lib/services/notifications";
 
-const TAX_RATE = 0.08;
+
 
 export type PlaceOrderItemInput = {
   productId: string;
