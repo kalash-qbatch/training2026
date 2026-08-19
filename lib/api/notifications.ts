@@ -1,4 +1,4 @@
-import type { AppNotification } from "@/lib/services/notifications";
+import type { AppNotification } from "@/types";
 
 async function parseJson<T>(res: Response): Promise<T & { error?: string }> {
   return (await res.json()) as T & { error?: string };

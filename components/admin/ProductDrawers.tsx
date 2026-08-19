@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Plus, Trash2, Upload, X } from "lucide-react";
-import type { Category, Product, ProductVariant } from "@/types";
+import type { Category, Product, ProductSavePayload, ProductVariant } from "@/types";
 import { fetchAdminCategories } from "@/lib/api/admin";
 import { Drawer } from "@/components/ui/Drawer";
 import { Select } from "@/components/ui/Select";
@@ -488,19 +488,7 @@ function ProductFormFields({
   );
 }
 
-export type ProductSavePayload = {
-  title: string;
-  price: number;
-  stock: number;
-  image?: string;
-  images?: ProductImageDraft[];
-  color?: string;
-  size?: string;
-  variants: ProductVariant[];
-  categoryId?: string | null;
-  categoryName?: string | null;
-  isActive: boolean;
-};
+export type { ProductSavePayload };
 
 function revokeDraftImages(items: ProductImageDraft[]) {
   for (const img of items) {

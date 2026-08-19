@@ -1,4 +1,5 @@
-import { findProductById, findProducts, type ProductSort } from "@/lib/services/products";
+import { findProductById, findProducts } from "@/lib/services/products";
+import type { ProductSort } from "@/types";
 
 export async function listProducts(request: Request) {
   const { searchParams } = new URL(request.url);

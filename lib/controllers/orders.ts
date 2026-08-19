@@ -4,9 +4,9 @@ import {
   findOrderById,
   findOrders,
   OrderError,
-  type PlaceOrderItemInput,
 } from "@/lib/services/orders";
 import { requireUser } from "@/lib/controllers/http";
+import type { PlaceOrderItemInput } from "@/types";
 
 export async function listOrders(request: Request) {
   const { userId, error } = await requireUser();

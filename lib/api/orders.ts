@@ -1,5 +1,4 @@
-import type { Order } from "@/types";
-import { ColorFilter, SizeFilter } from "../services/products";
+import type { ColorFilter, Order, SizeFilter } from "@/types";
 
 /** Browser-safe: loads orders from `/api/orders` (Postgres). */
 export async function getOrders(page = 1, pageSize = 5): Promise<{

@@ -6,7 +6,9 @@ import {
 } from "@/lib/errors/products";
 import { mapProduct } from "@/lib/mappers";
 import { resolveCategoryId } from "@/lib/services/categories";
-import type { Product } from "@/types";
+import type { ColorFilter, Product, ProductSort, SizeFilter } from "@/types";
+
+export type { ProductSort, SizeFilter, ColorFilter };
 
 const productInclude = {
   specifications: true,
@@ -40,10 +42,6 @@ async function assertTitleAvailable(title: string, excludeId?: string) {
     throw duplicateProductError(existing.title);
   }
 }
-
-export type ProductSort = "price-asc" | "price-desc" | "name-asc";
-export type SizeFilter = "all" | "s" | "m" | "l" | "xl" | "xxl";
-export type ColorFilter = "all" | "red" | "blue" | "green" | "yellow" | "purple" | "orange" | "pink" | "brown" | "gray" | "black" | "white";
 
 export async function findProducts(opts?: {
   search?: string;

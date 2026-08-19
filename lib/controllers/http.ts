@@ -1,9 +1,5 @@
 import { auth } from "@/auth";
-
-export type ControllerResult = {
-  status: number;
-  body: Record<string, unknown>;
-};
+import type { ControllerResult } from "@/types";
 
 export async function requireUser() {
   const session = await auth();

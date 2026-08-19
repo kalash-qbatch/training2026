@@ -1,7 +1,6 @@
-import type { Product } from "@/types";
-import { ColorFilter, SizeFilter } from "../services/products";
+import type { ColorFilter, Product, ProductSort, SizeFilter } from "@/types";
 
-export type ProductSort = "price-asc" | "price-desc" | "name-asc";
+export type { ProductSort };
 
 /** Browser-safe: loads products from `/api/products` (Postgres). */
 export async function getProducts(opts?: {

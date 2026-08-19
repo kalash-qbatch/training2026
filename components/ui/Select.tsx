@@ -3,15 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { SelectOption } from "@/types";
 
-export type SelectOption = {
-  value: string;
-  label: string;
-  /** Render in brand color (e.g. "+ Create new category"). */
-  accent?: boolean;
-  /** Optional class names for specific option items (e.g. sticky bottom). */
-  className?: string;
-};
+export type { SelectOption };
 
 type SelectProps = {
   value: string;

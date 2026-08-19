@@ -1,22 +1,14 @@
 import type { OrderStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { mapOrder } from "@/lib/mappers";
-import type { Order } from "@/types";
+import type { AdminOrderFilters, Order, PlaceOrderItemInput } from "@/types";
 import { TAX_RATE } from "@/lib/constants";
 import {
   notifyOrderPlaced,
   notifyOrderStatusChange,
 } from "@/lib/services/notifications";
 
-
-
-export type PlaceOrderItemInput = {
-  productId: string;
-  specificationId?: string;
-  quantity: number;
-  color?: string;
-  size?: string;
-};
+export type { PlaceOrderItemInput, AdminOrderFilters };
 
 export class OrderError extends Error {
   constructor(
@@ -430,18 +422,6 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
     return mapOrder(row);
   });
 }
-
-export type AdminOrderFilters = {
-  search?: string;
-  userId?: string;
-  dateFrom?: string;
-  dateTo?: string;
-  minAmount?: number;
-  maxAmount?: number;
-  status?: OrderStatus;
-  page?: number;
-  pageSize?: number;
-};
 
 function buildOrderWhere(opts: AdminOrderFilters): Prisma.OrderWhereInput {
   const q = opts.search?.trim();

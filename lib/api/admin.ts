@@ -1,4 +1,6 @@
-import type { AdminOrderStats, Category, Product, Order } from "@/types";
+import type { AdminOrderStats, AdminOrderStatusUpdate, Category, Product, Order } from "@/types";
+
+export type { AdminOrderStatusUpdate };
 
 async function parseJson<T>(res: Response): Promise<T & { error?: string }> {
   return (await res.json()) as T & { error?: string };
@@ -173,12 +175,6 @@ export async function fetchAdminOrder(id: string) {
   if (!res.ok || !data.success) throw new Error(data.error || "Failed to load order");
   return data.order;
 }
-
-export type AdminOrderStatusUpdate =
-  | "PROCESSING"
-  | "SHIPPED"
-  | "DELIVERED"
-  | "CANCELLED";
 
 export async function updateAdminOrderStatus(
   id: string,

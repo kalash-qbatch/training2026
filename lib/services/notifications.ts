@@ -1,14 +1,8 @@
 import type { OrderStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import type { AppNotification } from "@/types";
 
-export type AppNotification = {
-  id: string;
-  title: string;
-  message: string;
-  orderId?: string;
-  read: boolean;
-  createdAt: string;
-};
+export type { AppNotification };
 
 type TxClient = Prisma.TransactionClient;
 

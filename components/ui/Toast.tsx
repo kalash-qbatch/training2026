@@ -7,14 +7,15 @@ import {
   useMemo,
   useState,
 } from "react";
-import { CheckCircle2, AlertCircle, Info, X } from "lucide-react";
+import { AlertCircle, AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ToastMessage, ToastType } from "@/types";
 
-type ToastContextValue = {
+export type ToastContextValue = {
   toast: {
     success: (message: string) => void;
     error: (message: string) => void;
+    warning: (message: string) => void;
     info: (message: string) => void;
   };
 };
@@ -24,12 +25,14 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 const icons = {
   success: CheckCircle2,
   error: AlertCircle,
+  warning: AlertTriangle,
   info: Info,
 };
 
 const styles: Record<ToastType, string> = {
   success: "bg-status-success-bg text-status-success-fg border-green-200",
   error: "bg-status-error-bg text-status-error-fg border-red-200",
+  warning: "bg-amber-50 text-amber-800 border-amber-200",
   info: "bg-brand-50 text-brand-700 border-brand-500/20",
 };
 
@@ -54,6 +57,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       toast: {
         success: (message: string) => push("success", message),
         error: (message: string) => push("error", message),
+        warning: (message: string) => push("warning", message),
         info: (message: string) => push("info", message),
       },
     }),
