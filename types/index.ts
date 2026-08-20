@@ -25,6 +25,13 @@ export type User = {
   role?: UserRole;
 };
 
+export type AuthState = {
+  user: User | null;
+  isAuthenticated: boolean;
+  login: (user: User) => void;
+  logout: () => void;
+};
+
 export type LoginInput = z.infer<typeof loginSchema>;
 export type SignUpInput = z.infer<typeof signUpSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
@@ -99,6 +106,26 @@ export type ColorFilter =
   | "black"
   | "white";
 
+export type GetProductsOptions = {
+  search?: string;
+  sort?: ProductSort;
+  page?: number;
+  pageSize?: number;
+  categoryId?: string;
+  categorySlug?: string;
+  sizeFilters?: SizeFilter[];
+  colorFilters?: ColorFilter[];
+  signal?: AbortSignal;
+};
+
+export type GetProductsResult = {
+  products: Product[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
 export type ProductErrorCode =
   | "PRODUCT_NOT_FOUND"
   | "INSUFFICIENT_STOCK"
@@ -117,6 +144,7 @@ export type CartItem = {
   specificationId?: string;
   name: string;
   imageUrl: string;
+  images?: { url: string; color?: string }[];
   color?: string;
   size?: string;
   price: number;

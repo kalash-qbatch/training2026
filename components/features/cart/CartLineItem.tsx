@@ -26,6 +26,15 @@ export function CartLineItem({
 }: Props) {
   const lineTotal = item.price * item.qty;
 
+  /** Pick the image that matches the selected color; fall back to imageUrl. */
+  const resolvedImage = (() => {
+    if (!item.color || !item.images?.length) return item.imageUrl;
+    const match = item.images.find(
+      (img) => img.color?.toLowerCase() === item.color?.toLowerCase()
+    );
+    return match?.url ?? item.imageUrl;
+  })();
+
   if (variant === "card") {
     return (
       <li className="rounded-lg border border-neutral-border bg-neutral-surface p-4">
@@ -38,7 +47,7 @@ export function CartLineItem({
             aria-label={`Select ${item.name}`}
           />
           <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md bg-neutral-bg">
-            <Image src={item.imageUrl} alt={item.name} fill className="object-cover" sizes="64px" />
+            <Image src={resolvedImage} alt={item.name} fill className="object-cover" sizes="64px" />
           </div>
           <div className="min-w-0 flex-1">
             <p className="line-clamp-2 text-sm font-medium text-neutral-text">{item.name}</p>
@@ -93,7 +102,7 @@ export function CartLineItem({
       <td className="py-4 pr-4">
         <div className="flex items-center gap-3">
           <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md bg-neutral-bg">
-            <Image src={item.imageUrl} alt={item.name} fill className="object-cover" sizes="56px" />
+            <Image src={resolvedImage} alt={item.name} fill className="object-cover" sizes="56px" />
           </div>
           <p className="line-clamp-2 max-w-70 text-sm font-medium text-neutral-text">
             {item.name}

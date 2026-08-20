@@ -2,14 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { User } from "@/types";
-
-type AuthState = {
-  user: User | null;
-  isAuthenticated: boolean;
-  login: (user: User) => void;
-  logout: () => void;
-};
+import type { AuthState } from "@/types";
 
 export const useAuthStore = create<AuthState>()(
   persist(

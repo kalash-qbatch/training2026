@@ -10,6 +10,7 @@ import {
 
 export type { PlaceOrderItemInput, AdminOrderFilters };
 
+// Error handling component with status code as well
 export class OrderError extends Error {
   constructor(
     message: string,
@@ -60,8 +61,8 @@ export async function createOrder(userId: string, items: PlaceOrderItemInput[]) 
       if (hasSpecs) {
         let spec = specificationId
           ? await tx.specification.findUnique({
-              where: { id: specificationId },
-            })
+            where: { id: specificationId },
+          })
           : null;
 
         // Fallback lookup if specificationId wasn't passed directly
@@ -434,20 +435,20 @@ function buildOrderWhere(opts: AdminOrderFilters): Prisma.OrderWhereInput {
       opts.dateFrom ? { createdAt: { gte: new Date(opts.dateFrom) } } : {},
       opts.dateTo
         ? {
-            createdAt: {
-              lte: new Date(`${opts.dateTo}T23:59:59.999Z`),
-            },
-          }
+          createdAt: {
+            lte: new Date(`${opts.dateTo}T23:59:59.999Z`),
+          },
+        }
         : {},
       q
         ? {
-            OR: [
-              { id: { contains: q, mode: "insensitive" } },
-              { user: { fullName: { contains: q, mode: "insensitive" } } },
-              { user: { email: { contains: q, mode: "insensitive" } } },
-              { user: { name: { contains: q, mode: "insensitive" } } },
-            ],
-          }
+          OR: [
+            { id: { contains: q, mode: "insensitive" } },
+            { user: { fullName: { contains: q, mode: "insensitive" } } },
+            { user: { email: { contains: q, mode: "insensitive" } } },
+            { user: { name: { contains: q, mode: "insensitive" } } },
+          ],
+        }
         : {},
     ],
   };

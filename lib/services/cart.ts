@@ -22,6 +22,7 @@ function mapCartItem(row: {
     image: string;
     price: { toString(): string };
     stock: number;
+    images: { url: string; color: string | null }[];
   };
   specification: {
     id: string;
@@ -36,6 +37,10 @@ function mapCartItem(row: {
     specificationId: row.specificationId ?? undefined,
     name: row.product.title,
     imageUrl: row.product.image,
+    images: row.product.images.map((img) => ({
+      url: img.url,
+      color: img.color ?? undefined,
+    })),
     color: row.specification?.color || undefined,
     size: row.specification?.size || undefined,
     price: Number(row.product.price),
@@ -79,7 +84,7 @@ export async function getCart(userId: string): Promise<CartItem[]> {
   const rows = await prisma.cartItem.findMany({
     where: { userId },
     include: {
-      product: true,
+      product: { include: { images: true } },
       specification: true,
     },
     orderBy: { createdAt: "desc" },

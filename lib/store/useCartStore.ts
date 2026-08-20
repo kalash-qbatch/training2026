@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import type { CartItem, Product } from "@/types";
+import type { CartItem, CartState } from "@/types";
 import {
   addCartItem,
   fetchCart,
@@ -9,41 +9,8 @@ import {
   removeCartItemsApi,
   updateCartItemApi,
 } from "@/lib/api/cart";
-
-type AddItemResult =
-  | { ok: true; qty: number }
-  | { ok: false; error: string };
-
-type CartState = {
-  items: CartItem[];
-  loaded: boolean;
-  setItems: (items: CartItem[]) => void;
-  fetchCart: () => Promise<void>;
-  clearLocal: () => void;
-  addItem: (
-    product: Product,
-    qty: number,
-    opts?: { specificationId?: string }
-  ) => Promise<AddItemResult>;
-  updateQty: (
-    productId: string,
-    qty: number,
-    specificationId?: string
-  ) => Promise<void>;
-  removeItem: (
-    productId: string,
-    specificationId?: string
-  ) => Promise<void>;
-  removeItems: (
-    items: Array<{ productId: string; specificationId?: string }>
-  ) => Promise<void>;
-  getCartQty: (productId: string, specificationId?: string) => number;
-  getSubtotal: () => number;
-  getTax: () => number;
-  getTotal: () => number;
-};
-
 import { TAX_RATE } from "@/lib/constants";
+
 
 function matchesLine(item: CartItem, productId: string, specificationId?: string) {
   return (

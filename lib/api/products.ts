@@ -1,25 +1,16 @@
-import type { ColorFilter, Product, ProductSort, SizeFilter } from "@/types";
+import type {
+  GetProductsOptions,
+  GetProductsResult,
+  Product,
+  ProductSort,
+} from "@/types";
 
-export type { ProductSort };
+export type { ProductSort, GetProductsOptions, GetProductsResult };
 
 /** Browser-safe: loads products from `/api/products` (Postgres). */
-export async function getProducts(opts?: {
-  search?: string;
-  sort?: ProductSort;
-  page?: number;
-  pageSize?: number;
-  categoryId?: string;
-  categorySlug?: string;
-  sizeFilters?: SizeFilter[];
-  colorFilters?: ColorFilter[];
-  signal?: AbortSignal;
-}): Promise<{
-  products: Product[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-}> {
+export async function getProducts(
+  opts?: GetProductsOptions
+): Promise<GetProductsResult> {
   const params = new URLSearchParams();
   if (opts?.search) params.set("search", opts.search);
   if (opts?.sort) params.set("sort", opts.sort);
