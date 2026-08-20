@@ -6,10 +6,11 @@ import { getOrderById, getOrders } from "@/lib/api/orders";
 import type { Order } from "@/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { formatLineColor, formatLineSize } from "@/lib/product";
-import { TAX_RATE } from "@/lib/constants";
+import { TABLE_PAGE_SIZE, TABLE_INITIAL_PAGE, TAX_RATE } from "@/lib/constants";
 import { Drawer } from "@/components/ui/Drawer";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { OrdersTable } from "./OrdersTable";
+import { Pagination } from "@/components/ui/Pagination";
 
 export function OrdersDrawer({
   open,
@@ -21,6 +22,8 @@ export function OrdersDrawer({
   initialOrderId?: string | null;
 }) {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(TABLE_INITIAL_PAGE);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -39,6 +42,7 @@ export function OrdersDrawer({
       setDetail(undefined);
       setError(null);
     } else {
+      setPage(TABLE_INITIAL_PAGE);
       setLoading(true);
       setError(null);
       if (initialOrderId) setSelectedOrderId(initialOrderId);
@@ -52,9 +56,13 @@ export function OrdersDrawer({
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    getOrders(1, 100)
+    setLoading(true);
+    getOrders(page, TABLE_PAGE_SIZE)
       .then((res) => {
-        if (!cancelled) setOrders(res.orders);
+        if (!cancelled) {
+          setOrders(res.orders);
+          setTotalCount(res.total);
+        }
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -67,7 +75,7 @@ export function OrdersDrawer({
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, page]);
 
   useEffect(() => {
     if (!selectedOrderId) return;
@@ -85,6 +93,7 @@ export function OrdersDrawer({
   }, [selectedOrderId]);
 
   const showingDetail = Boolean(selectedOrderId);
+  const totalPages = Math.max(1, Math.ceil(totalCount / TABLE_PAGE_SIZE));
 
   return (
     <Drawer
@@ -120,9 +129,16 @@ export function OrdersDrawer({
             orders={orders}
             onViewOrder={(id) => setSelectedOrderId(id)}
           />
-          <p className="text-sm text-neutral-muted">
-            {orders.length} Total Count
-          </p>
+          <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-neutral-muted">
+              {totalCount} Total Count
+            </p>
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              onChange={setPage}
+            />
+          </div>
         </div>
       )}
     </Drawer>

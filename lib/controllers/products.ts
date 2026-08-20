@@ -1,13 +1,14 @@
 import { findProductById, findProducts } from "@/lib/services/products";
 import type { ProductSort } from "@/types";
+import { CARD_PAGE_SIZE, CARD_INITIAL_PAGE } from "@/lib/constants";
 
 export async function listProducts(request: Request) {
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search") ?? undefined;
   const sort = (searchParams.get("sort") as ProductSort | null) ?? "name-asc";
-  const page = Number(searchParams.get("page") || 1);
+  const page = Number(searchParams.get("page") || CARD_INITIAL_PAGE);
   const pageSize = Number(
-    searchParams.get("pageSize") || searchParams.get("limit") || 8
+    searchParams.get("pageSize") || searchParams.get("limit") || CARD_PAGE_SIZE
   );
   const categoryId = searchParams.get("categoryId") ?? undefined;
   const categorySlug = searchParams.get("category") ?? undefined;

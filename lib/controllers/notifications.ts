@@ -4,18 +4,19 @@ import {
   markNotificationRead,
 } from "@/lib/services/notifications";
 import { requireUser } from "@/lib/controllers/http";
+import { NOTIFICATION_PAGE_SIZE, NOTIFICATION_INITIAL_PAGE } from "@/lib/constants";
 
 export async function getNotifications(req?: Request) {
   const { userId, error } = await requireUser();
   if (error || !userId) return error!;
 
-  let page = 1;
-  let pageSize = 8;
+  let page = NOTIFICATION_INITIAL_PAGE;
+  let pageSize = NOTIFICATION_PAGE_SIZE;
 
   if (req) {
     const { searchParams } = new URL(req.url);
-    const p = parseInt(searchParams.get("page") ?? "1", 10);
-    const ps = parseInt(searchParams.get("pageSize") ?? "8", 10);
+    const p = parseInt(searchParams.get("page") ?? String(NOTIFICATION_INITIAL_PAGE), 10);
+    const ps = parseInt(searchParams.get("pageSize") ?? String(NOTIFICATION_PAGE_SIZE), 10);
     if (!Number.isNaN(p) && p > 0) page = p;
     if (!Number.isNaN(ps) && ps > 0) pageSize = ps;
   }

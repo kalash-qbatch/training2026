@@ -18,7 +18,8 @@ import {
 } from "@/lib/utils";
 import { fetchAdminOrders } from "@/lib/api/admin";
 import { useToast } from "@/components/ui/Toast";
-import { AdminPagination } from "@/components/admin/AdminPagination";
+import { Pagination } from "@/components/ui/Pagination";
+import { TABLE_PAGE_SIZE, TABLE_INITIAL_PAGE } from "@/lib/constants";
 
 const inputClass =
   "h-10 w-full rounded-md border border-[#d0d5dd] bg-white px-3 text-[13px] text-neutral-text outline-none placeholder:text-neutral-muted focus:border-[#2563EB]";
@@ -59,7 +60,7 @@ export function OrdersPageClient() {
     totalUnits: 0,
     totalAmount: 0,
   });
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(TABLE_INITIAL_PAGE);
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -72,7 +73,7 @@ export function OrdersPageClient() {
   // (https://react.dev/learn/you-might-not-need-an-effect)
   if (debounced !== prevDebounced) {
     setPrevDebounced(debounced);
-    if (page !== 1) setPage(1);
+    if (page !== TABLE_INITIAL_PAGE) setPage(TABLE_INITIAL_PAGE);
   }
   if (queryKey !== prevQueryKey) {
     setPrevQueryKey(queryKey);
@@ -88,6 +89,7 @@ export function OrdersPageClient() {
     fetchAdminOrders({
       search: debounced,
       page,
+      pageSize: TABLE_PAGE_SIZE,
     })
       .then((data) => {
         setOrders(data.orders);
@@ -207,7 +209,7 @@ export function OrdersPageClient() {
         </table>
       </div>
 
-      <AdminPagination page={page} totalPages={totalPages} onChange={setPage} />
+      <Pagination page={page} totalPages={totalPages} onChange={setPage} className="mt-4" />
     </div>
   );
 }

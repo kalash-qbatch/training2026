@@ -10,6 +10,7 @@ import {
 } from "@/lib/services/products";
 import { uploadProductImage } from "@/lib/supabase";
 import { adminProductSchema } from "@/lib/validations/admin";
+import { TABLE_PAGE_SIZE, TABLE_INITIAL_PAGE } from "@/lib/constants";
 
 function productErrorResult(err: unknown) {
   const productErr = getProductError(err);
@@ -84,8 +85,8 @@ export async function listAdminProducts(request: Request) {
     categoryId: searchParams.get("categoryId") ?? undefined,
     isActive:
       status === "active" ? true : status === "inactive" ? false : undefined,
-    page: Number(searchParams.get("page") || 1),
-    pageSize: Number(searchParams.get("pageSize") || 8),
+    page: Number(searchParams.get("page") || TABLE_INITIAL_PAGE),
+    pageSize: Number(searchParams.get("pageSize") || TABLE_PAGE_SIZE),
   });
   return { status: 200, body: { success: true, ...result } };
 }

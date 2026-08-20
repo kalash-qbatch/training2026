@@ -12,7 +12,7 @@ import { ProductCard } from "./ProductCard";
 import { ProductGridSkeleton } from "./ProductGridSkeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Select } from "@/components/ui/Select";
-import { PAGE_SIZE } from "@/lib/constants";
+import { CARD_PAGE_SIZE, CARD_INITIAL_PAGE } from "@/lib/constants";
 
 export function ProductListing() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -23,7 +23,7 @@ export function ProductListing() {
   const [categoryId, setCategoryId] = useState("");
 
   // Pagination state
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(CARD_INITIAL_PAGE);
   const [totalPages, setTotalPages] = useState(1);
   const [initialLoading, setInitialLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -76,7 +76,7 @@ export function ProductListing() {
           sort,
           categoryId: categoryId || undefined,
           page: pageNum,
-          pageSize: PAGE_SIZE,
+          pageSize: CARD_PAGE_SIZE,
           signal: controller.signal,
         });
 
@@ -88,13 +88,15 @@ export function ProductListing() {
           isFirstPage ? data.products : [...prev, ...data.products]
         );
         setTotalPages(data.totalPages);
+        setPage(pageNum);
       } catch (err: unknown) {
-        // Aborting intentionally rejects the fetch — don't surface that
-        // as a user-facing error.
-        if (err instanceof DOMException && err.name === "AbortError") return;
         if (controller.signal.aborted) return;
-
-        setError(err instanceof Error ? err.message : "Failed to load products");
+        if (isFirstPage) {
+          setError(
+            err instanceof Error ? err.message : "Failed to load products"
+          );
+          setProducts([]);
+        }
       } finally {
         if (!controller.signal.aborted) {
           setInitialLoading(false);
@@ -105,18 +107,18 @@ export function ProductListing() {
     [debounced, sort, categoryId]
   );
 
-  // When filters change, reset page to 1 and fetch fresh results
+  // When filters change: trigger fetch for first page and reset page state
   useEffect(() => {
-    startTransition(() => setPage(1));
-    startTransition(() => void fetchPage(1, true));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debounced, sort, categoryId]);
+    setPage(CARD_INITIAL_PAGE);
+    void fetchPage(CARD_INITIAL_PAGE, true);
+  }, [debounced, sort, categoryId, fetchPage]);
 
+  // When user clicks pagination or scrolls (page state increases)
   // When page increments (infinite scroll), fetch next page after a short
   // delay (gives the "loading more" spinner a moment to be visible and
   // avoids hammering the API if the user scrolls quickly).
   useEffect(() => {
-    if (page === 1) return; // already handled by the filter effect above
+    if (page === CARD_INITIAL_PAGE) return;
 
     // Deferred (rather than called directly in the effect body) to avoid
     // the "setState synchronously within an effect" cascading-render

@@ -12,7 +12,7 @@ import {
   updateAdminProduct,
 } from "@/lib/api/admin";
 import { useToast } from "@/components/ui/Toast";
-import { AdminPagination } from "@/components/admin/AdminPagination";
+import { Pagination } from "@/components/ui/Pagination";
 import { DeleteConfirmModal } from "@/components/admin/DeleteConfirmModal";
 import {
   AddProductDrawer,
@@ -21,6 +21,7 @@ import {
 import { AddMultipleProductsModal } from "@/components/admin/AddMultipleProductsModal";
 import { Select } from "@/components/ui/Select";
 import { ProductPreviewModal } from "@/components/admin/ProductPreviewModal";
+import { TABLE_PAGE_SIZE, TABLE_INITIAL_PAGE } from "@/lib/constants";
 
 const inputClass =
   "h-10 w-full rounded-md border border-neutral-border bg-white px-3 text-[13px] text-neutral-text outline-none placeholder:text-neutral-muted focus:border-[#2563EB]";
@@ -71,7 +72,7 @@ export function ProductsPageClient() {
   const { toast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(TABLE_INITIAL_PAGE);
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -107,6 +108,7 @@ export function ProductsPageClient() {
         categoryId: categoryId || undefined,
         status,
         page,
+        pageSize: TABLE_PAGE_SIZE,
       });
       setProducts(data.products);
       setTotalPages(data.totalPages);
@@ -123,6 +125,7 @@ export function ProductsPageClient() {
       categoryId: categoryId || undefined,
       status,
       page,
+      pageSize: TABLE_PAGE_SIZE,
     })
       .then((data) => {
         setProducts(data.products);
@@ -134,7 +137,7 @@ export function ProductsPageClient() {
       .finally(() => setLoadedKey(queryKey));
   }, [debounced, categoryId, status, page, queryKey, toast]);
 
-  const resetPage = () => setPage(1);
+  const resetPage = () => setPage(TABLE_INITIAL_PAGE);
 
   return (
     <div>
@@ -295,7 +298,7 @@ export function ProductsPageClient() {
         </table>
       </div>
 
-      <AdminPagination page={page} totalPages={totalPages} onChange={setPage} />
+      <Pagination page={page} totalPages={totalPages} onChange={setPage} className="mt-4" />
 
       <ProductPreviewModal
         product={previewProduct}

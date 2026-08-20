@@ -7,6 +7,7 @@ import {
   OrderError,
   updateOrderStatus,
 } from "@/lib/services/orders";
+import { TABLE_PAGE_SIZE, TABLE_INITIAL_PAGE } from "@/lib/constants";
 
 const statusSchema = z.object({
   status: z.enum(["PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"]),
@@ -19,8 +20,8 @@ export async function listAdminOrders(request: Request) {
   const { searchParams } = new URL(request.url);
   const result = await findAdminOrders({
     search: searchParams.get("search") ?? undefined,
-    page: Number(searchParams.get("page") || 1),
-    pageSize: Number(searchParams.get("pageSize") || 8),
+    page: Number(searchParams.get("page") || TABLE_INITIAL_PAGE),
+    pageSize: Number(searchParams.get("pageSize") || TABLE_PAGE_SIZE),
   });
   return { status: 200, body: { success: true, ...result } };
 }

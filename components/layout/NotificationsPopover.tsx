@@ -9,6 +9,7 @@ import {
 } from "@/lib/api/notifications";
 import type { AppNotification } from "@/lib/services/notifications";
 import { cn, formatRelativeTime } from "@/lib/utils";
+import { NOTIFICATION_PAGE_SIZE, NOTIFICATION_INITIAL_PAGE } from "@/lib/constants";
 
 const getNotificationTypeConfig = (title: string, message: string) => {
   const t = title.toLowerCase();
@@ -78,7 +79,7 @@ export function NotificationsPopover() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(NOTIFICATION_INITIAL_PAGE);
   const [totalPages, setTotalPages] = useState(1);
   const rootRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -105,7 +106,7 @@ export function NotificationsPopover() {
 
         const data = await fetchNotifications({
           page: pageNum,
-          pageSize: 8,
+          pageSize: NOTIFICATION_PAGE_SIZE,
           signal: controller.signal,
         });
 

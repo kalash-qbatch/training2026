@@ -11,12 +11,14 @@ export async function fetchAdminProducts(params: {
   categoryId?: string;
   status?: "active" | "inactive" | "";
   page?: number;
+  pageSize?: number;
 }) {
   const q = new URLSearchParams();
   if (params.search) q.set("search", params.search);
   if (params.categoryId) q.set("categoryId", params.categoryId);
   if (params.status) q.set("status", params.status);
   q.set("page", String(params.page ?? 1));
+  if (params.pageSize) q.set("pageSize", String(params.pageSize));
 
   const res = await fetch(`/api/admin/products?${q}`);
   const data = await parseJson<{
