@@ -191,20 +191,74 @@ async function syncSpecifications(
   productId: string,
   variants?: ProductVariantInput[]
 ) {
-  await prisma.product.update({
-    where: { id: productId },
-    data: {
-      specifications: {
-        deleteMany: {},
-        ...(variants?.length
-          ? { create: variantCreates(variants) }
-          : {}),
-      },
-    },
+  // Fetch all current specs for this product
+  const existing = await prisma.specification.findMany({
+    where: { productId },
   });
 
-  if (!variants?.length) return;
+  if (!variants?.length) {
+    // No variants → delete all specs (also clear cart items pointing to them)
+    const existingIds = existing.map((s) => s.id);
+    if (existingIds.length) {
+      await prisma.cartItem.deleteMany({
+        where: { specificationId: { in: existingIds } },
+      });
+      await prisma.specification.deleteMany({ where: { productId } });
+    }
+    return;
+  }
 
+  const incomingKeys = new Set(
+    variants.map((v) => `${(v.color ?? "").toLowerCase()}::${(v.size ?? "").toLowerCase()}`)
+  );
+
+  // Step 1 – Delete specs (and their cart refs) that are no longer in the incoming list
+  const toDelete = existing.filter(
+    (s) =>
+      !incomingKeys.has(
+        `${(s.color ?? "").toLowerCase()}::${(s.size ?? "").toLowerCase()}`
+      )
+  );
+  if (toDelete.length) {
+    const deleteIds = toDelete.map((s) => s.id);
+    await prisma.cartItem.deleteMany({
+      where: { specificationId: { in: deleteIds } },
+    });
+    await prisma.specification.deleteMany({
+      where: { id: { in: deleteIds } },
+    });
+  }
+
+  // Step 2 – Upsert each incoming variant (update qty if same color+size exists, create if new)
+  for (const v of variants) {
+    const colorKey = (v.color ?? "").toLowerCase();
+    const sizeKey = (v.size ?? "").toLowerCase();
+    const match = existing.find(
+      (s) =>
+        (s.color ?? "").toLowerCase() === colorKey &&
+        (s.size ?? "").toLowerCase() === sizeKey
+    );
+
+    if (match) {
+      // Update qty only — spec ID stays the same, cart items remain valid
+      await prisma.specification.update({
+        where: { id: match.id },
+        data: { qty: v.qty },
+      });
+    } else {
+      // Genuinely new variant — create it
+      await prisma.specification.create({
+        data: {
+          productId,
+          color: v.color ?? "",
+          size: v.size ?? "",
+          qty: v.qty,
+        },
+      });
+    }
+  }
+
+  // Step 3 – Sync product.stock to sum of all spec qtys
   const agg = await prisma.specification.aggregate({
     where: { productId },
     _sum: { qty: true },
