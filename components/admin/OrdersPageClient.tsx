@@ -19,6 +19,15 @@ import {
 import { fetchAdminOrders } from "@/lib/api/admin";
 import { useToast } from "@/components/ui/Toast";
 import { Pagination } from "@/components/ui/Pagination";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableEmpty,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/Table";
 import { TABLE_PAGE_SIZE, TABLE_INITIAL_PAGE } from "@/lib/constants";
 
 const inputClass =
@@ -140,74 +149,57 @@ export function OrdersPageClient() {
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full border-collapse text-left text-[13px]">
-          <thead>
-            <tr className="border-b border-[#e5e7eb] text-[12px] font-medium text-neutral-muted">
-              <th className="pb-3 pr-4 font-medium">Date</th>
-              <th className="pb-3 pr-4 font-medium">Order #</th>
-              <th className="pb-3 pr-4 font-medium">User</th>
-              <th className="pb-3 pr-4 font-medium">Product(s)</th>
-              <th className="pb-3 pr-4 font-medium">Amount</th>
-              <th className="pb-3 pr-4 font-medium">Status</th>
-              <th className="pb-3 font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={7} className="py-10 text-center text-neutral-muted">
-                  Loading…
-                </td>
-              </tr>
-            ) : !orders.length ? (
-              <tr>
-                <td colSpan={7} className="py-10 text-center text-neutral-muted">
-                  No orders found
-                </td>
-              </tr>
-            ) : (
-              orders.map((o) => {
-                const productCount = o.items.reduce((sum, i) => sum + i.qty, 0);
-                return (
-                  <tr
-                    key={o.id}
-                    className="border-b border-[#f3f4f6] last:border-0"
-                  >
-                    <td className="py-3.5 pr-4 text-neutral-text">
-                      {formatDate(o.date)}
-                    </td>
-                    <td className="py-3.5 pr-4 font-medium text-neutral-text">
-                      {o.id.slice(0, 8)}
-                    </td>
-                    <td className="py-3.5 pr-4 text-neutral-text">{o.userName}</td>
-                    <td className="py-3.5 pr-4 text-neutral-text">{productCount}</td>
-                    <td className="py-3.5 pr-4 font-medium tabular-nums text-neutral-text">
-                      {formatCurrency(o.amount)}
-                    </td>
-                    <td className="py-3.5 pr-4">
-                      <span
-                        className={`inline-flex rounded px-2.5 py-1 text-[11px] font-semibold ${orderStatusClass(o.status)}`}
-                      >
-                        {orderStatusLabel(o.status)}
-                      </span>
-                    </td>
-                    <td className="py-3.5">
-                      <Link
-                        href={`/admin/orders/${o.id}`}
-                        className="inline-flex rounded p-1.5 text-[#6b7280] transition hover:bg-brand-50 hover:text-[#2563EB]"
-                        aria-label="View order"
-                      >
-                        <ArrowUpRight className="h-4 w-4" />
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+      <Table wrapperClassName="h-[calc(100dvh-320px)] overflow-y-auto">
+        <TableHeader>
+          <TableRow className="border-b border-[#e5e7eb] hover:bg-transparent">
+            <TableHead>Date</TableHead>
+            <TableHead>Order #</TableHead>
+            <TableHead>User</TableHead>
+            <TableHead>Product(s)</TableHead>
+            <TableHead>Amount</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="pr-0">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {loading ? (
+            <TableEmpty colSpan={7}>Loading…</TableEmpty>
+          ) : !orders.length ? (
+            <TableEmpty colSpan={7}>No orders found</TableEmpty>
+          ) : (
+            orders.map((o) => {
+              const productCount = o.items.reduce((sum, i) => sum + i.qty, 0);
+              return (
+                <TableRow key={o.id}>
+                  <TableCell>{formatDate(o.date)}</TableCell>
+                  <TableCell className="font-medium">{o.id.slice(0, 8)}</TableCell>
+                  <TableCell>{o.userName}</TableCell>
+                  <TableCell>{productCount}</TableCell>
+                  <TableCell className="font-medium tabular-nums">
+                    {formatCurrency(o.amount)}
+                  </TableCell>
+                  <TableCell>
+                    <span
+                      className={`inline-flex rounded px-2.5 py-1 text-[11px] font-semibold ${orderStatusClass(o.status)}`}
+                    >
+                      {orderStatusLabel(o.status)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="pr-0">
+                    <Link
+                      href={`/admin/orders/${o.id}`}
+                      className="inline-flex rounded p-1.5 text-[#6b7280] transition hover:bg-brand-50 hover:text-[#2563EB]"
+                      aria-label="View order"
+                    >
+                      <ArrowUpRight className="h-4 w-4" />
+                    </Link>
+                  </TableCell>
+                </TableRow>
+              );
+            })
+          )}
+        </TableBody>
+      </Table>
 
       <Pagination page={page} totalPages={totalPages} onChange={setPage} className="mt-4" />
     </div>

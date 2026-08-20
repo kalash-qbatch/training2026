@@ -13,6 +13,15 @@ import {
 } from "@/lib/api/admin";
 import { useToast } from "@/components/ui/Toast";
 import { Pagination } from "@/components/ui/Pagination";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableEmpty,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/Table";
 import { DeleteConfirmModal } from "@/components/admin/DeleteConfirmModal";
 import {
   AddProductDrawer,
@@ -201,102 +210,87 @@ export function ProductsPageClient() {
         />
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full border-collapse text-left text-[13px]">
-          <thead>
-            <tr className="border-b border-[#e5e7eb] text-[12px] font-medium text-neutral-muted">
-              <th className="pb-3 pr-4 font-medium">Title</th>
-              <th className="pb-3 pr-4 font-medium">Category</th>
-              <th className="pb-3 pr-4 font-medium">Price</th>
-              <th className="pb-3 pr-4 font-medium">Stock</th>
-              <th className="pb-3 pr-4 font-medium">Status</th>
-              <th className="pb-3 font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={6} className="py-10 text-center text-neutral-muted">
-                  Loading…
-                </td>
-              </tr>
-            ) : !products.length ? (
-              <tr>
-                <td colSpan={6} className="py-10 text-center text-neutral-muted">
-                  No products found
-                </td>
-              </tr>
-            ) : (
-              products.map((p) => (
-                <tr
-                  key={p.id}
-                  className="border-b border-[#f3f4f6] last:border-0"
-                >
-                  <td className="py-3.5 pr-4">
-                    <div className="flex items-center gap-3">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={p.imageUrl}
-                        alt=""
-                        className="h-10 w-10 rounded object-cover"
-                      />
-                      <p className="font-medium text-neutral-text">{p.name}</p>
-                    </div>
-                  </td>
-                  <td className="py-3.5 pr-4 text-neutral-text">
-                    {p.category?.name ?? "—"}
-                  </td>
-                  <td className="py-3.5 pr-4 tabular-nums text-neutral-text">
-                    {formatCurrency(p.price)}
-                  </td>
-                  <td className="py-3.5 pr-4">
-                    <StockColorCircles product={p} />
-                  </td>
-                  <td className="py-3.5 pr-4">
-                    <span
-                      className={
-                        p.isActive
-                          ? "rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-700"
-                          : "rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600"
-                      }
+      <Table wrapperClassName="h-[calc(100vh-266px)] overflow-y-auto">
+        <TableHeader>
+          <TableRow className="border-b border-[#e5e7eb] hover:bg-transparent">
+            <TableHead>Title</TableHead>
+            <TableHead>Category</TableHead>
+            <TableHead>Price</TableHead>
+            <TableHead>Stock</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="pr-0">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {loading ? (
+            <TableEmpty colSpan={6}>Loading…</TableEmpty>
+          ) : !products.length ? (
+            <TableEmpty colSpan={6}>No products found</TableEmpty>
+          ) : (
+            products.map((p) => (
+              <TableRow key={p.id}>
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={p.imageUrl}
+                      alt=""
+                      className="h-10 w-10 rounded object-cover"
+                    />
+                    <p className="font-medium text-neutral-text">{p.name}</p>
+                  </div>
+                </TableCell>
+                <TableCell>{p.category?.name ?? "—"}</TableCell>
+                <TableCell className="tabular-nums">
+                  {formatCurrency(p.price)}
+                </TableCell>
+                <TableCell>
+                  <StockColorCircles product={p} />
+                </TableCell>
+                <TableCell>
+                  <span
+                    className={
+                      p.isActive
+                        ? "rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-700"
+                        : "rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600"
+                    }
+                  >
+                    {p.isActive ? "Active" : "Inactive"}
+                  </span>
+                </TableCell>
+                <TableCell className="pr-0">
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewProduct(p)}
+                      className="rounded p-1.5 text-[#6b7280] transition hover:bg-neutral-bg"
+                      aria-label="Preview"
                     >
-                      {p.isActive ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-                  <td className="py-3.5">
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setPreviewProduct(p)}
-                        className="rounded p-1.5 text-[#6b7280] transition hover:bg-neutral-bg"
-                        aria-label="Preview"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditProduct(p)}
-                        className="rounded p-1.5 text-[#2563EB] transition hover:bg-brand-50"
-                        aria-label="Edit"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDeleteId(p.id)}
-                        className="rounded p-1.5 text-[#EF4444] transition hover:bg-red-50"
-                        aria-label="Delete"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+                      <Eye className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditProduct(p)}
+                      className="rounded p-1.5 text-[#2563EB] transition hover:bg-brand-50"
+                      aria-label="Edit"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteId(p.id)}
+                      className="rounded p-1.5 text-[#EF4444] transition hover:bg-red-50"
+                      aria-label="Delete"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
 
       <Pagination page={page} totalPages={totalPages} onChange={setPage} className="mt-4" />
 
