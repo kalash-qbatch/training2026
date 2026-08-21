@@ -84,9 +84,10 @@ export async function createNotification(
 export async function notifyOrderPlaced(
   tx: TxClient | typeof prisma,
   userId: string,
-  orderId: string
+  orderId: string,
+  orderNumber?: string
 ) {
-  const ref = shortOrderId(orderId);
+  const ref = orderNumber || orderId;
   return await createNotification(tx, {
     userId,
     title: "Order placed",
@@ -99,10 +100,11 @@ export async function notifyOrderStatusChange(
   tx: TxClient | typeof prisma,
   userId: string,
   orderId: string,
-  status: OrderStatus
+  status: OrderStatus,
+  orderNumber?: string
 ) {
   const copy = statusNotificationCopy(status);
-  const ref = shortOrderId(orderId);
+  const ref = orderNumber || orderId;
   return createNotification(tx, {
     userId,
     title: copy.title,

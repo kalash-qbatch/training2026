@@ -172,7 +172,7 @@ function OrderDetailsContent({ order }: { order: Order | null | undefined }) {
     <div className="space-y-6">
       <div className="grid gap-4 border-b border-neutral-border pb-5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
         <Meta label="Date" value={formatDate(order.date)} />
-        <Meta label="Order #" value={order.id.slice(0, 8)} />
+        <Meta label="Order #" value={order.orderNumber || order.id} />
         <Meta label="User" value={order.userName} />
         <Meta label="Products" value={String(productCount).padStart(2, "0")} />
         <Meta label="Sub Total" value={formatCurrency(subTotal)} />

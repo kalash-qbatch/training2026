@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowUpRight } from "lucide-react";
+import Link from "next/link";
 
 import {
   Table,
@@ -40,7 +41,9 @@ export function OrdersTable({
               return (
                 <TableRow key={order.id} className="border-b border-neutral-border">
                   <TableCell className="py-4 text-sm">{formatDate(order.date)}</TableCell>
-                  <TableCell className="py-4 text-sm font-medium">{order.id.slice(0, 8)}</TableCell>
+                  <TableCell className="py-4 text-sm font-medium">
+                    {order.orderNumber || order.id}
+                  </TableCell>
                   <TableCell className="py-4 text-sm">{productCount}</TableCell>
                   <TableCell className="py-4 text-sm font-semibold tabular-nums">
                     {formatCurrency(order.amount)}
@@ -53,14 +56,24 @@ export function OrdersTable({
                     </span>
                   </TableCell>
                   <TableCell className="py-4 pr-0 text-right">
-                    <button
-                      type="button"
-                      onClick={() => onViewOrder?.(order.id)}
-                      className="inline-flex cursor-pointer rounded-md p-2 text-neutral-muted hover:bg-brand-50 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-                      aria-label={`View order ${order.id}`}
-                    >
-                      <ArrowUpRight className="h-4 w-4" strokeWidth={2} />
-                    </button>
+                    {onViewOrder ? (
+                      <button
+                        type="button"
+                        onClick={() => onViewOrder(order.id)}
+                        className="inline-flex cursor-pointer rounded-md p-2 text-neutral-muted hover:bg-brand-50 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                        aria-label={`View order ${order.id}`}
+                      >
+                        <ArrowUpRight className="h-4 w-4" strokeWidth={2} />
+                      </button>
+                    ) : (
+                      <Link
+                        href={`/orders/${order.id}`}
+                        className="inline-flex cursor-pointer rounded-md p-2 text-neutral-muted hover:bg-brand-50 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                        aria-label={`View order ${order.id}`}
+                      >
+                        <ArrowUpRight className="h-4 w-4" strokeWidth={2} />
+                      </Link>
+                    )}
                   </TableCell>
                 </TableRow>
               );
@@ -79,7 +92,9 @@ export function OrdersTable({
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-neutral-text">{order.id.slice(0, 8)}</p>
+                  <p className="text-sm font-semibold text-neutral-text">
+                    {order.orderNumber || order.id}
+                  </p>
                   <p className="mt-1 text-xs text-neutral-muted">{formatDate(order.date)}</p>
                   <p className="mt-1 text-xs text-neutral-muted">
                     {productCount} product{productCount === 1 ? "" : "s"}
@@ -93,14 +108,24 @@ export function OrdersTable({
                     {orderStatusLabel(order.status)}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onViewOrder?.(order.id)}
-                  className="rounded-md p-2 text-neutral-muted hover:bg-brand-50 hover:text-brand-600"
-                  aria-label={`View order ${order.id}`}
-                >
-                  <ArrowUpRight className="h-4 w-4" />
-                </button>
+                {onViewOrder ? (
+                  <button
+                    type="button"
+                    onClick={() => onViewOrder(order.id)}
+                    className="rounded-md p-2 text-neutral-muted hover:bg-brand-50 hover:text-brand-600"
+                    aria-label={`View order ${order.id}`}
+                  >
+                    <ArrowUpRight className="h-4 w-4" />
+                  </button>
+                ) : (
+                  <Link
+                    href={`/orders/${order.id}`}
+                    className="rounded-md p-2 text-neutral-muted hover:bg-brand-50 hover:text-brand-600"
+                    aria-label={`View order ${order.id}`}
+                  >
+                    <ArrowUpRight className="h-4 w-4" />
+                  </Link>
+                )}
               </div>
             </li>
           );

@@ -3,6 +3,7 @@ import type { OrderStatus, Prisma } from "@prisma/client";
 import { TAX_RATE } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 import { mapOrder } from "@/lib/mappers";
+import { generateOrderNumber } from "@/lib/order-utils";
 import { notifyOrderPlaced, notifyOrderStatusChange } from "@/lib/services/notifications";
 import type { AdminOrderFilters, Order, PlaceOrderItemInput } from "@/types";
 
@@ -128,9 +129,17 @@ export async function createOrder(userId: string, items: PlaceOrderItemInput[]) 
     const tax = Number((subTotal * TAX_RATE).toFixed(2));
     const total = Number((subTotal + tax).toFixed(2));
 
+    let orderNumber = generateOrderNumber();
+    let exists = await tx.order.findUnique({ where: { orderNumber } });
+    while (exists) {
+      orderNumber = generateOrderNumber();
+      exists = await tx.order.findUnique({ where: { orderNumber } });
+    }
+
     const order = await tx.order.create({
       data: {
         userId,
+        orderNumber,
         status: "PROCESSING",
         subTotal,
         tax,
@@ -152,7 +161,7 @@ export async function createOrder(userId: string, items: PlaceOrderItemInput[]) 
       },
     });
 
-    await notifyOrderPlaced(tx, userId, order.id);
+    await notifyOrderPlaced(tx, userId, order.id, order.orderNumber);
 
     return mapOrder(order);
   });
@@ -189,9 +198,12 @@ export async function findOrders(
   };
 }
 
-export async function findOrderById(id: string, userId?: string): Promise<Order | null> {
+export async function findOrderById(idOrNumber: string, userId?: string): Promise<Order | null> {
   const row = await prisma.order.findFirst({
-    where: { id, ...(userId ? { userId } : {}) },
+    where: {
+      OR: [{ id: idOrNumber }, { orderNumber: idOrNumber }],
+      ...(userId ? { userId } : {}),
+    },
     include: {
       user: { select: { fullName: true, name: true, email: true } },
       items: { include: { product: true } },
@@ -396,7 +408,7 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
       },
     });
 
-    await notifyOrderStatusChange(tx, existing.userId, id, status);
+    await notifyOrderStatusChange(tx, existing.userId, id, status, row.orderNumber);
 
     return mapOrder(row);
   });
@@ -422,6 +434,7 @@ function buildOrderWhere(opts: AdminOrderFilters): Prisma.OrderWhereInput {
         ? {
             OR: [
               { id: { contains: q, mode: "insensitive" } },
+              { orderNumber: { contains: q, mode: "insensitive" } },
               { user: { fullName: { contains: q, mode: "insensitive" } } },
               { user: { email: { contains: q, mode: "insensitive" } } },
               { user: { name: { contains: q, mode: "insensitive" } } },

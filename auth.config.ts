@@ -57,7 +57,10 @@ export default {
 
       // Admins always use the admin app shell
       const isStorefrontRoute =
-        pathname === "/" || pathname === "/products" || pathname.startsWith("/cart");
+        pathname === "/" ||
+        pathname === "/products" ||
+        pathname.startsWith("/cart") ||
+        pathname.startsWith("/orders");
 
       if (isLoggedIn && isAdmin && isStorefrontRoute) {
         return Response.redirect(new URL("/admin/products", nextUrl));

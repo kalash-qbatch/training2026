@@ -44,4 +44,6 @@ next-env.d.ts
 /agents
 AGENTS.md
 CLAUDE.md
+IMPLEMENTATION_PLAN.md
+REPO_DOCUMENTATION.md
 

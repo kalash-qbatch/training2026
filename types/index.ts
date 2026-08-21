@@ -204,6 +204,7 @@ export type OrderItem = {
 
 export type Order = {
   id: string;
+  orderNumber?: string;
   date: string;
   userId: string;
   userName: string;
