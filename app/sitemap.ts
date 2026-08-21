@@ -5,15 +5,24 @@ import { prisma } from "@/lib/db";
 const BASE_URL = process.env.NEXTAUTH_URL || process.env.AUTH_URL || "https://bhaikastore.com";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [categories, products] = await Promise.all([
-    prisma.category.findMany({
-      select: { slug: true, updatedAt: true },
-    }),
-    prisma.product.findMany({
-      where: { isActive: true },
-      select: { id: true, updatedAt: true },
-    }),
-  ]);
+  let categories: { slug: string; updatedAt: Date }[] = [];
+  let products: { id: string; updatedAt: Date }[] = [];
+
+  try {
+    const [fetchedCategories, fetchedProducts] = await Promise.all([
+      prisma.category.findMany({
+        select: { slug: true, updatedAt: true },
+      }),
+      prisma.product.findMany({
+        where: { isActive: true },
+        select: { id: true, updatedAt: true },
+      }),
+    ]);
+    categories = fetchedCategories;
+    products = fetchedProducts;
+  } catch (error) {
+    console.warn("Failed to fetch dynamic sitemap entries from database:", error);
+  }
 
   const staticRoutes = [
     {
