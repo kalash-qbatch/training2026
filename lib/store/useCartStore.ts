@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import type { CartItem, CartState } from "@/types";
+
 import {
   addCartItem,
   fetchCart,
@@ -10,13 +10,10 @@ import {
   updateCartItemApi,
 } from "@/lib/api/cart";
 import { TAX_RATE } from "@/lib/constants";
-
+import type { CartItem, CartState } from "@/types";
 
 function matchesLine(item: CartItem, productId: string, specificationId?: string) {
-  return (
-    item.productId === productId &&
-    (item.specificationId || "") === (specificationId || "")
-  );
+  return item.productId === productId && (item.specificationId || "") === (specificationId || "");
 }
 
 export const useCartStore = create<CartState>()((set, get) => ({
@@ -33,9 +30,7 @@ export const useCartStore = create<CartState>()((set, get) => ({
     }
   },
   getCartQty: (productId, specificationId) => {
-    const item = get().items.find((i) =>
-      matchesLine(i, productId, specificationId)
-    );
+    const item = get().items.find((i) => matchesLine(i, productId, specificationId));
     return item ? item.qty : 0;
   },
   addItem: async (product, qty, opts) => {
@@ -47,8 +42,7 @@ export const useCartStore = create<CartState>()((set, get) => ({
         quantity: qty,
       });
       set({ items, loaded: true });
-      const nextQty =
-        items.find((i) => matchesLine(i, product.id, specId))?.qty ?? qty;
+      const nextQty = items.find((i) => matchesLine(i, product.id, specId))?.qty ?? qty;
       return { ok: true, qty: nextQty };
     } catch (err) {
       return {
@@ -83,8 +77,7 @@ export const useCartStore = create<CartState>()((set, get) => ({
     );
     set({ items, loaded: true });
   },
-  getSubtotal: () =>
-    get().items.reduce((sum, i) => sum + i.price * i.qty, 0),
+  getSubtotal: () => get().items.reduce((sum, i) => sum + i.price * i.qty, 0),
   getTax: () => Number((get().getSubtotal() * TAX_RATE).toFixed(2)),
   getTotal: () => Number((get().getSubtotal() + get().getTax()).toFixed(2)),
 }));

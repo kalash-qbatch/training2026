@@ -1,24 +1,23 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  forgotPasswordSchema,
-  type ForgotPasswordInput,
-} from "@/lib/validations/auth";
-import { forgotPasswordRequest } from "@/lib/api/auth";
-import { resetTokenExpiryLabel } from "@/lib/constants/auth";
-import { useToast } from "@/components/ui/Toast";
-import { Input } from "@/components/ui/Input";
+
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
+import { useToast } from "@/components/ui/Toast";
+import { forgotPasswordRequest } from "@/lib/api/auth";
+import { resetTokenExpiryLabel } from "@/lib/constants/auth";
+import { type ForgotPasswordInput, forgotPasswordSchema } from "@/lib/validations/auth";
 
 export function ForgotPasswordForm() {
   const { toast } = useToast();
   const {
     register,
-  handleSubmit,
+    handleSubmit,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<ForgotPasswordInput>({
     resolver: zodResolver(forgotPasswordSchema),
@@ -30,6 +29,7 @@ export function ForgotPasswordForm() {
       toast.success(
         `Reset link sent. It expires in ${resetTokenExpiryLabel()} and can only be used once.`
       );
+      reset(); // clear the form state on success
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Request failed");
     }
@@ -43,6 +43,7 @@ export function ForgotPasswordForm() {
           <Input
             label="Enter email address"
             type="email"
+            important
             placeholder="Please enter your email"
             error={errors.email?.message}
             {...register("email")}
@@ -57,10 +58,7 @@ export function ForgotPasswordForm() {
         </form>
         <p className="mt-5 text-center text-sm text-neutral-muted">
           No, I remember my password!{" "}
-          <Link
-            href="/login"
-            className="font-medium text-brand-500 hover:text-brand-600"
-          >
+          <Link href="/login" className="font-medium text-brand-500 hover:text-brand-600">
             Login
           </Link>
         </p>

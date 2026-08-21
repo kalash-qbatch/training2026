@@ -1,5 +1,7 @@
 import type { OrderStatus, Prisma } from "@prisma/client";
+
 import { prisma } from "@/lib/db";
+import { emitNotificationToUser, emitUnreadCountToUser } from "@/lib/socket/server";
 import type { AppNotification } from "@/types";
 
 export type { AppNotification };
@@ -52,7 +54,7 @@ export async function createNotification(
     orderId?: string;
   }
 ) {
-  return tx.notification.create({
+  const created = await tx.notification.create({
     data: {
       userId: data.userId,
       title: data.title,
@@ -60,6 +62,23 @@ export async function createNotification(
       orderId: data.orderId,
     },
   });
+
+  const payload: AppNotification = {
+    id: created.id,
+    title: created.title,
+    message: created.message,
+    orderId: created.orderId ?? undefined,
+    read: created.read,
+    createdAt: created.createdAt.toISOString(),
+  };
+
+  try {
+    emitNotificationToUser(data.userId, payload);
+  } catch {
+    // ignore socket emit error
+  }
+
+  return created;
 }
 
 export async function notifyOrderPlaced(
@@ -92,11 +111,7 @@ export async function notifyOrderStatusChange(
   });
 }
 
-export async function listNotifications(
-  userId: string,
-  page = 1,
-  pageSize = 8
-) {
+export async function listNotifications(userId: string, page = 1, pageSize = 8) {
   const [rows, total, unreadCount] = await Promise.all([
     prisma.notification.findMany({
       where: { userId },
@@ -109,16 +124,14 @@ export async function listNotifications(
   ]);
 
   return {
-    notifications: rows.map(
-      (n): AppNotification => ({
-        id: n.id,
-        title: n.title,
-        message: n.message,
-        orderId: n.orderId ?? undefined,
-        read: n.read,
-        createdAt: n.createdAt.toISOString(),
-      })
-    ),
+    notifications: rows.map((n): AppNotification => ({
+      id: n.id,
+      title: n.title,
+      message: n.message,
+      orderId: n.orderId ?? undefined,
+      read: n.read,
+      createdAt: n.createdAt.toISOString(),
+    })),
     total,
     page,
     pageSize,
@@ -132,6 +145,15 @@ export async function markNotificationRead(userId: string, id: string) {
     where: { id, userId },
     data: { read: true },
   });
+
+  try {
+    const unreadCount = await prisma.notification.count({
+      where: { userId, read: false },
+    });
+    emitUnreadCountToUser(userId, unreadCount);
+  } catch {
+    // ignore
+  }
 }
 
 export async function markAllNotificationsRead(userId: string) {
@@ -139,4 +161,10 @@ export async function markAllNotificationsRead(userId: string) {
     where: { userId, read: false },
     data: { read: true },
   });
+
+  try {
+    emitUnreadCountToUser(userId, 0);
+  } catch {
+    // ignore
+  }
 }

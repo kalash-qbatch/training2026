@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  deleteAdminProduct,
-  updateAdminProduct,
-} from "@/lib/controllers/admin-products";
+
+import { deleteAdminProduct, updateAdminProduct } from "@/lib/controllers/admin-products";
 
 type Ctx = { params: Promise<{ id: string }> };
 

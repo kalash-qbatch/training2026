@@ -1,14 +1,12 @@
 import type { OrderStatus, Prisma } from "@prisma/client";
+
+import { TAX_RATE } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 import { mapOrder } from "@/lib/mappers";
+import { notifyOrderPlaced, notifyOrderStatusChange } from "@/lib/services/notifications";
 import type { AdminOrderFilters, Order, PlaceOrderItemInput } from "@/types";
-import { TAX_RATE } from "@/lib/constants";
-import {
-  notifyOrderPlaced,
-  notifyOrderStatusChange,
-} from "@/lib/services/notifications";
 
-export type { PlaceOrderItemInput, AdminOrderFilters };
+export type { AdminOrderFilters, PlaceOrderItemInput };
 
 // Error handling component with status code as well
 export class OrderError extends Error {
@@ -55,14 +53,13 @@ export async function createOrder(userId: string, items: PlaceOrderItemInput[]) 
       const hasSpecs = product.specifications.length > 0;
       let color = item.color?.trim() || undefined;
       let size = item.size?.trim() || undefined;
-      let specificationId: string | undefined =
-        item.specificationId?.trim() || undefined;
+      let specificationId: string | undefined = item.specificationId?.trim() || undefined;
 
       if (hasSpecs) {
         let spec = specificationId
           ? await tx.specification.findUnique({
-            where: { id: specificationId },
-          })
+              where: { id: specificationId },
+            })
           : null;
 
         // Fallback lookup if specificationId wasn't passed directly
@@ -77,9 +74,7 @@ export async function createOrder(userId: string, items: PlaceOrderItemInput[]) 
         }
 
         if (!spec) {
-          throw new OrderError(
-            `A valid variant selection is required for "${product.title}".`
-          );
+          throw new OrderError(`A valid variant selection is required for "${product.title}".`);
         }
 
         specificationId = spec.id;
@@ -93,9 +88,7 @@ export async function createOrder(userId: string, items: PlaceOrderItemInput[]) 
         });
 
         if (decremented.count !== 1) {
-          throw new OrderError(
-            `Not enough stock for "${product.title}". Only ${spec.qty} left.`
-          );
+          throw new OrderError(`Not enough stock for "${product.title}". Only ${spec.qty} left.`);
         }
 
         const agg = await tx.specification.aggregate({
@@ -131,10 +124,7 @@ export async function createOrder(userId: string, items: PlaceOrderItemInput[]) 
       });
     }
 
-    const subTotal = lineData.reduce(
-      (sum, line) => sum + line.price * line.quantity,
-      0
-    );
+    const subTotal = lineData.reduce((sum, line) => sum + line.price * line.quantity, 0);
     const tax = Number((subTotal * TAX_RATE).toFixed(2));
     const total = Number((subTotal + tax).toFixed(2));
 
@@ -199,10 +189,7 @@ export async function findOrders(
   };
 }
 
-export async function findOrderById(
-  id: string,
-  userId?: string
-): Promise<Order | null> {
+export async function findOrderById(id: string, userId?: string): Promise<Order | null> {
   const row = await prisma.order.findFirst({
     where: { id, ...(userId ? { userId } : {}) },
     include: {
@@ -222,10 +209,7 @@ const ALLOWED_STATUS_UPDATES = new Set<OrderStatus>([
 
 type TxClient = Prisma.TransactionClient;
 
-async function syncProductStockFromSpecs(
-  tx: TxClient,
-  productId: string
-) {
+async function syncProductStockFromSpecs(tx: TxClient, productId: string) {
   const agg = await tx.specification.aggregate({
     where: { productId },
     _sum: { qty: true },
@@ -310,9 +294,7 @@ async function consumeStockForOrderItems(
         data: { qty: { decrement: item.quantity } },
       });
       if (decremented.count !== 1) {
-        throw new OrderError(
-          `Not enough stock to reactivate order.`
-        );
+        throw new OrderError(`Not enough stock to reactivate order.`);
       }
       await syncProductStockFromSpecs(tx, item.productId);
       continue;
@@ -344,9 +326,7 @@ async function consumeStockForOrderItems(
         },
       });
       if (!spec) {
-        throw new OrderError(
-          `Cannot reactivate order — variant missing for "${product.title}".`
-        );
+        throw new OrderError(`Cannot reactivate order — variant missing for "${product.title}".`);
       }
       const decremented = await tx.specification.updateMany({
         where: { id: spec.id, qty: { gte: item.quantity } },
@@ -364,9 +344,7 @@ async function consumeStockForOrderItems(
         data: { stock: { decrement: item.quantity } },
       });
       if (decremented.count !== 1) {
-        throw new OrderError(
-          `Not enough stock to reactivate order for "${product.title}".`
-        );
+        throw new OrderError(`Not enough stock to reactivate order for "${product.title}".`);
       }
     }
   }
@@ -435,20 +413,20 @@ function buildOrderWhere(opts: AdminOrderFilters): Prisma.OrderWhereInput {
       opts.dateFrom ? { createdAt: { gte: new Date(opts.dateFrom) } } : {},
       opts.dateTo
         ? {
-          createdAt: {
-            lte: new Date(`${opts.dateTo}T23:59:59.999Z`),
-          },
-        }
+            createdAt: {
+              lte: new Date(`${opts.dateTo}T23:59:59.999Z`),
+            },
+          }
         : {},
       q
         ? {
-          OR: [
-            { id: { contains: q, mode: "insensitive" } },
-            { user: { fullName: { contains: q, mode: "insensitive" } } },
-            { user: { email: { contains: q, mode: "insensitive" } } },
-            { user: { name: { contains: q, mode: "insensitive" } } },
-          ],
-        }
+            OR: [
+              { id: { contains: q, mode: "insensitive" } },
+              { user: { fullName: { contains: q, mode: "insensitive" } } },
+              { user: { email: { contains: q, mode: "insensitive" } } },
+              { user: { name: { contains: q, mode: "insensitive" } } },
+            ],
+          }
         : {},
     ],
   };
@@ -511,4 +489,3 @@ export async function listUsersForAdmin() {
     email: u.email ?? "",
   }));
 }
-

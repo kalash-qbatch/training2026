@@ -1,14 +1,12 @@
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
+
 import { prisma } from "@/lib/db";
-import {
-  duplicateProductError,
-  productNotFoundError,
-} from "@/lib/errors/products";
+import { duplicateProductError, productNotFoundError } from "@/lib/errors/products";
 import { mapProduct } from "@/lib/mappers";
 import { resolveCategoryId } from "@/lib/services/categories";
 import type { ColorFilter, Product, ProductSort, SizeFilter } from "@/types";
 
-export type { ProductSort, SizeFilter, ColorFilter };
+export type { ColorFilter, ProductSort, SizeFilter };
 
 const productInclude = {
   specifications: true,
@@ -66,9 +64,7 @@ export async function findProducts(opts?: {
           }
         : {},
       opts?.categoryId ? { categoryId: opts.categoryId } : {},
-      opts?.categorySlug
-        ? { category: { slug: opts.categorySlug } }
-        : {},
+      opts?.categorySlug ? { category: { slug: opts.categorySlug } } : {},
     ],
   };
 
@@ -187,10 +183,7 @@ function primaryImage(images?: ProductImageInput[], fallback?: string) {
   return fallback || "/products/tee.jpg";
 }
 
-async function syncSpecifications(
-  productId: string,
-  variants?: ProductVariantInput[]
-) {
+async function syncSpecifications(productId: string, variants?: ProductVariantInput[]) {
   // Fetch all current specs for this product
   const existing = await prisma.specification.findMany({
     where: { productId },
@@ -214,10 +207,7 @@ async function syncSpecifications(
 
   // Step 1 – Delete specs (and their cart refs) that are no longer in the incoming list
   const toDelete = existing.filter(
-    (s) =>
-      !incomingKeys.has(
-        `${(s.color ?? "").toLowerCase()}::${(s.size ?? "").toLowerCase()}`
-      )
+    (s) => !incomingKeys.has(`${(s.color ?? "").toLowerCase()}::${(s.size ?? "").toLowerCase()}`)
   );
   if (toDelete.length) {
     const deleteIds = toDelete.map((s) => s.id);
@@ -234,9 +224,7 @@ async function syncSpecifications(
     const colorKey = (v.color ?? "").toLowerCase();
     const sizeKey = (v.size ?? "").toLowerCase();
     const match = existing.find(
-      (s) =>
-        (s.color ?? "").toLowerCase() === colorKey &&
-        (s.size ?? "").toLowerCase() === sizeKey
+      (s) => (s.color ?? "").toLowerCase() === colorKey && (s.size ?? "").toLowerCase() === sizeKey
     );
 
     if (match) {
@@ -283,18 +271,18 @@ async function syncImages(productId: string, images?: ProductImageInput[]) {
 }
 
 /** Keep Product.stock column aligned with Specification qtys (API source of truth). */
-async function reconcileProductStock(productId: string) {
-  const specs = await prisma.specification.findMany({
-    where: { productId },
-    select: { qty: true },
-  });
-  if (!specs.length) return;
-  const sum = specs.reduce((acc, s) => acc + s.qty, 0);
-  await prisma.product.update({
-    where: { id: productId },
-    data: { stock: sum },
-  });
-}
+// async function reconcileProductStock(productId: string) {
+//   const specs = await prisma.specification.findMany({
+//     where: { productId },
+//     select: { qty: true },
+//   });
+//   if (!specs.length) return;
+//   const sum = specs.reduce((acc, s) => acc + s.qty, 0);
+//   await prisma.product.update({
+//     where: { id: productId },
+//     data: { stock: sum },
+//   });
+// }
 
 export async function createProduct(data: {
   title: string;
@@ -313,10 +301,9 @@ export async function createProduct(data: {
   const title = normalizeTitle(data.title);
   await assertTitleAvailable(title);
 
-  const stock =
-    data.variants?.length
-      ? data.variants.reduce((sum, v) => sum + v.qty, 0)
-      : data.stock;
+  const stock = data.variants?.length
+    ? data.variants.reduce((sum, v) => sum + v.qty, 0)
+    : data.stock;
 
   const categoryId = await resolveCategoryId({
     categoryId: data.categoryId,
@@ -331,12 +318,8 @@ export async function createProduct(data: {
       price: data.price,
       stock,
       image,
-      color: data.variants?.length
-        ? data.color || data.variants[0].color || null
-        : null,
-      size: data.variants?.length
-        ? data.size || data.variants[0].size || null
-        : null,
+      color: data.variants?.length ? data.color || data.variants[0].color || null : null,
+      size: data.variants?.length ? data.size || data.variants[0].size || null : null,
       isActive: data.isActive ?? true,
       ...(categoryId ? { categoryId } : {}),
       ...(data.variants?.length
@@ -374,17 +357,15 @@ export async function updateProduct(
     await assertTitleAvailable(normalizeTitle(data.title), id);
   }
 
-  const stock =
-    data.variants?.length
-      ? data.variants.reduce((sum, v) => sum + v.qty, 0)
-      : data.stock;
+  const stock = data.variants?.length
+    ? data.variants.reduce((sum, v) => sum + v.qty, 0)
+    : data.stock;
 
   const categoryId = await resolveCategoryId({
     categoryId: data.categoryId,
     categoryName: data.categoryName,
   });
-  const image =
-    data.images != null ? primaryImage(data.images, data.image) : data.image;
+  const image = data.images != null ? primaryImage(data.images, data.image) : data.image;
 
   const row = await prisma.product.update({
     where: { id },

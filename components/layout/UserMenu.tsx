@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+
+import { ChevronDown, History, LayoutDashboard, LogOut, User } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
-import { ChevronDown, History, LayoutDashboard, LogOut, User } from "lucide-react";
+
+import { OrdersDrawer } from "@/components/features/orders/OrdersDrawer";
 import { useAuthStore } from "@/lib/store/useAuthStore";
 import { cn } from "@/lib/utils";
-import { OrdersDrawer } from "@/components/features/orders/OrdersDrawer";
 
 function initials(name: string) {
   return name
@@ -18,15 +20,7 @@ function initials(name: string) {
     .join("");
 }
 
-function Avatar({
-  name,
-  image,
-  size = 32,
-}: {
-  name: string;
-  image?: string;
-  size?: number;
-}) {
+function Avatar({ name, image, size = 32 }: { name: string; image?: string; size?: number }) {
   const label = initials(name);
 
   if (image) {
@@ -105,12 +99,8 @@ export function UserMenu() {
           <div className="flex items-center gap-3 border-b border-neutral-border px-3 py-3">
             <Avatar name={user.fullName} image={user.image} size={40} />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-neutral-text">
-                {user.fullName}
-              </p>
-              <p className="mt-0.5 truncate text-xs text-neutral-muted">
-                {user.email}
-              </p>
+              <p className="truncate text-sm font-semibold text-neutral-text">{user.fullName}</p>
+              <p className="mt-0.5 truncate text-xs text-neutral-muted">{user.email}</p>
             </div>
           </div>
 

@@ -1,15 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bell, X, Package, ShoppingBag, Truck, CheckCircle2, XCircle } from "lucide-react";
+
+import { Bell, CheckCircle2, Package, ShoppingBag, Truck, X, XCircle } from "lucide-react";
+
+import { useSocketNotifications } from "@/hooks/useSocketNotifications";
 import {
   fetchNotifications,
   markAllNotificationsRead,
   markNotificationRead,
 } from "@/lib/api/notifications";
+import { NOTIFICATION_INITIAL_PAGE, NOTIFICATION_PAGE_SIZE } from "@/lib/constants";
 import type { AppNotification } from "@/lib/services/notifications";
 import { cn, formatRelativeTime } from "@/lib/utils";
-import { NOTIFICATION_PAGE_SIZE, NOTIFICATION_INITIAL_PAGE } from "@/lib/constants";
 
 const getNotificationTypeConfig = (title: string, message: string) => {
   const t = title.toLowerCase();
@@ -135,26 +138,38 @@ export function NotificationsPopover() {
     []
   );
 
-  // Background poll: no delay so it never blocks the UI
-  const pollInBackground = useCallback(() => {
-    void fetchPage(1, true, false);
-  }, [fetchPage]);
-
   // User-triggered load: with delay for skeleton visibility
   const loadInitial = useCallback(() => {
     setPage(1);
     void fetchPage(1, true, true);
   }, [fetchPage]);
 
+  // Initial load on component mount
   useEffect(() => {
-    pollInBackground();
-    const id = window.setInterval(pollInBackground, 10000);
-    return () => window.clearInterval(id);
-  }, [pollInBackground]);
+    const timer = setTimeout(() => {
+      void fetchPage(1, true, false);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchPage]);
+
+  // Real-time socket event subscription
+  useSocketNotifications({
+    onNewNotification: (newNotif) => {
+      setNotifications((prev) => {
+        // Prevent duplicates
+        if (prev.some((item) => item.id === newNotif.id)) return prev;
+        return [newNotif, ...prev];
+      });
+      setUnreadCount((c) => c + 1);
+    },
+    onUnreadCountChange: (count) => {
+      setUnreadCount(count);
+    },
+  });
 
   useEffect(() => {
     if (!open) return;
-    loadInitial();
+    const startId = window.setTimeout(loadInitial, 0);
 
     function onPointerDown(e: PointerEvent) {
       if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
@@ -165,6 +180,7 @@ export function NotificationsPopover() {
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
     return () => {
+      window.clearTimeout(startId);
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
@@ -209,9 +225,8 @@ export function NotificationsPopover() {
     }
   }
 
-  const filteredNotifications = activeTab === "unread"
-    ? notifications.filter((n) => !n.read)
-    : notifications;
+  const filteredNotifications =
+    activeTab === "unread" ? notifications.filter((n) => !n.read) : notifications;
 
   return (
     <div ref={rootRef} className="relative flex items-center">
@@ -254,9 +269,7 @@ export function NotificationsPopover() {
           >
             {/* Header */}
             <div className="flex items-center justify-between gap-3 border-b border-[#e5e7eb] px-4 py-3.5">
-              <p className="text-[15px] font-bold text-neutral-900">
-                Notifications
-              </p>
+              <p className="text-[15px] font-bold text-neutral-900">Notifications</p>
               <div className="flex items-center gap-2">
                 {unreadCount > 0 ? (
                   <button
@@ -285,9 +298,7 @@ export function NotificationsPopover() {
                 onClick={() => setActiveTab("unread")}
                 className={cn(
                   "flex-1 py-3 text-center text-sm font-semibold transition-all relative",
-                  activeTab === "unread"
-                    ? "text-brand-500"
-                    : "text-gray-400 hover:text-gray-600"
+                  activeTab === "unread" ? "text-brand-500" : "text-gray-400 hover:text-gray-600"
                 )}
               >
                 Unread
@@ -300,9 +311,7 @@ export function NotificationsPopover() {
                 onClick={() => setActiveTab("all")}
                 className={cn(
                   "flex-1 py-3 text-center text-sm font-semibold transition-all relative",
-                  activeTab === "all"
-                    ? "text-brand-500"
-                    : "text-gray-400 hover:text-gray-600"
+                  activeTab === "all" ? "text-brand-500" : "text-gray-400 hover:text-gray-600"
                 )}
               >
                 All
@@ -321,25 +330,17 @@ export function NotificationsPopover() {
               {loading && !notifications.length ? (
                 <div className="space-y-3 p-4">
                   {Array.from({ length: 3 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-16 animate-pulse rounded-lg bg-[#f3f4f6]"
-                    />
+                    <div key={i} className="h-16 animate-pulse rounded-lg bg-[#f3f4f6]" />
                   ))}
                 </div>
               ) : !filteredNotifications.length ? (
                 <p className="px-4 py-12 text-center text-[13px] font-medium text-neutral-muted">
-                  {activeTab === "unread"
-                    ? "No unread notifications"
-                    : "No notifications yet"}
+                  {activeTab === "unread" ? "No unread notifications" : "No notifications yet"}
                 </p>
               ) : (
                 <ul className="divide-y divide-gray-100">
                   {filteredNotifications.map((n) => {
-                    const { Icon, bgClass } = getNotificationTypeConfig(
-                      n.title,
-                      n.message
-                    );
+                    const { Icon, bgClass } = getNotificationTypeConfig(n.title, n.message);
                     return (
                       <li key={n.id}>
                         <button
@@ -347,9 +348,7 @@ export function NotificationsPopover() {
                           onClick={() => void onSelect(n)}
                           className={cn(
                             "flex w-full items-start gap-3.5 px-4 py-4 text-left transition-colors duration-150",
-                            !n.read
-                              ? "bg-slate-50/60"
-                              : "bg-white hover:bg-slate-50/40"
+                            !n.read ? "bg-slate-50/60" : "bg-white hover:bg-slate-50/40"
                           )}
                         >
                           {/* Circular Icon Container */}

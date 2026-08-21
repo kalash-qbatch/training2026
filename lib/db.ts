@@ -1,7 +1,7 @@
 import "dotenv/config";
-import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
 
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 
 /** Bump when schema models/relations change so the cached client is recreated. */
@@ -24,7 +24,7 @@ function createPrismaClient() {
 }
 
 if (globalForPrisma.prismaVersion !== PRISMA_CLIENT_VERSION) {
-  void globalForPrisma.prisma?.$disconnect().catch(() => { });
+  void globalForPrisma.prisma?.$disconnect().catch(() => {});
   globalForPrisma.prisma = undefined;
   globalForPrisma.prismaVersion = PRISMA_CLIENT_VERSION;
 }

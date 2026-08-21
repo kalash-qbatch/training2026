@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+
 import { Loader2, Plus, Trash2, Upload, X } from "lucide-react";
-import type { Category, Product, ProductSavePayload, ProductVariant } from "@/types";
-import { fetchAdminCategories } from "@/lib/api/admin";
+
 import { Drawer } from "@/components/ui/Drawer";
 import { Select } from "@/components/ui/Select";
+import { fetchAdminCategories } from "@/lib/api/admin";
+import type { Category, Product, ProductSavePayload, ProductVariant } from "@/types";
 
 const COLOR_OPTIONS = [
   "Black",
@@ -175,9 +177,7 @@ function ProductFormFields({
   function updateVariantQty(index: number, raw: string) {
     const qty = Number(raw);
     if (!Number.isFinite(qty) || qty < 0) return;
-    const next = variants.map((v, i) =>
-      i === index ? { ...v, qty: Math.floor(qty) } : v
-    );
+    const next = variants.map((v, i) => (i === index ? { ...v, qty: Math.floor(qty) } : v));
     setVariants(next);
     setForm((f) => ({
       ...f,
@@ -218,8 +218,7 @@ function ProductFormFields({
               <>
                 <Loader2 className="mb-2 h-6 w-6 animate-spin text-[#2563EB]" />
                 <span className="text-[12px] text-[#2563EB]">
-                  Uploading {uploadingCount}{" "}
-                  {uploadingCount === 1 ? "image" : "images"}…
+                  Uploading {uploadingCount} {uploadingCount === 1 ? "image" : "images"}…
                 </span>
               </>
             ) : (
@@ -265,9 +264,7 @@ function ProductFormFields({
                     value={img.color}
                     onChange={(v) =>
                       setImages((prev) =>
-                        prev.map((item, i) =>
-                          i === index ? { ...item, color: v } : item
-                        )
+                        prev.map((item, i) => (i === index ? { ...item, color: v } : item))
                       )
                     }
                     options={[
@@ -353,8 +350,7 @@ function ProductFormFields({
                       value: NEW_CATEGORY,
                       label: "+ Create New Category",
                       accent: true,
-                      className:
-                        "sticky -bottom-0 w-full z-30 bg-white border-t border-[#e5e7eb]",
+                      className: "sticky -bottom-0 w-full z-30 bg-white border-t border-[#e5e7eb]",
                     },
                   ]}
                   placeholder="Select Category"
@@ -367,9 +363,7 @@ function ProductFormFields({
               <div className="mt-1.5">
                 <Select
                   value={form.isActive ? "active" : "inactive"}
-                  onChange={(v) =>
-                    setForm((f) => ({ ...f, isActive: v === "active" }))
-                  }
+                  onChange={(v) => setForm((f) => ({ ...f, isActive: v === "active" }))}
                   options={[
                     { value: "active", label: "Active" },
                     { value: "inactive", label: "Inactive" },
@@ -398,9 +392,7 @@ function ProductFormFields({
           ) : null}
 
           <div className="pt-2">
-            <p className="mb-2 text-[12px] font-medium text-[#6b7280]">
-              Add Product Variants
-            </p>
+            <p className="mb-2 text-[12px] font-medium text-[#6b7280]">Add Product Variants</p>
             <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2">
               <Select
                 value={draft.color}
@@ -503,9 +495,7 @@ function buildSavePayload(
   newCategoryName: string
 ): ProductSavePayload {
   const stock =
-    variants.length > 0
-      ? variants.reduce((sum, v) => sum + v.qty, 0)
-      : Number(form.stock);
+    variants.length > 0 ? variants.reduce((sum, v) => sum + v.qty, 0) : Number(form.stock);
   const isNewCategory = form.categoryId === NEW_CATEGORY;
   return {
     title: form.title,
@@ -553,8 +543,7 @@ export function AddProductDrawer({
   const [uploadingCount, setUploadingCount] = useState(0);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
-  const { categories, newCategoryName, setNewCategoryName } =
-    useCategoryLoader(open);
+  const { categories, newCategoryName, setNewCategoryName } = useCategoryLoader(open);
 
   // Reset the form whenever the drawer opens (state adjustment during render).
   const [prevOpen, setPrevOpen] = useState(false);
@@ -584,12 +573,7 @@ export function AddProductDrawer({
   }
 
   return (
-    <Drawer
-      open={open}
-      onClose={onClose}
-      title="Add a Single Product"
-      widthClassName="max-w-225"
-    >
+    <Drawer open={open} onClose={onClose} title="Add a Single Product" widthClassName="max-w-225">
       <ProductFormFields
         form={form}
         setForm={setForm}
@@ -610,10 +594,7 @@ export function AddProductDrawer({
         onUpload={onUpload}
         uploadingCount={uploadingCount}
         onSubmit={async () => {
-          if (
-            !form.categoryId ||
-            (form.categoryId === NEW_CATEGORY && !newCategoryName.trim())
-          ) {
+          if (!form.categoryId || (form.categoryId === NEW_CATEGORY && !newCategoryName.trim())) {
             setError("Select or create a category first");
             return;
           }
@@ -624,9 +605,7 @@ export function AddProductDrawer({
           setLoading(true);
           setError("");
           try {
-            await onSave(
-              buildSavePayload(form, variants, images, newCategoryName)
-            );
+            await onSave(buildSavePayload(form, variants, images, newCategoryName));
             onClose();
           } catch (err) {
             setError(err instanceof Error ? err.message : "Save failed");
@@ -658,8 +637,7 @@ export function EditProductDrawer({
   const [uploadingCount, setUploadingCount] = useState(0);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
-  const { categories, newCategoryName, setNewCategoryName } =
-    useCategoryLoader(open);
+  const { categories, newCategoryName, setNewCategoryName } = useCategoryLoader(open);
 
   // Repopulate the form when the drawer opens or the product changes
   // (state adjustment during render).
@@ -673,9 +651,9 @@ export function EditProductDrawer({
       const nextVariants = variantsFromProduct(product);
       const nextImages = product.images?.length
         ? product.images.map((img) => ({
-          url: img.url,
-          color: img.color ?? "",
-        }))
+            url: img.url,
+            color: img.color ?? "",
+          }))
         : product.imageUrl
           ? [{ url: product.imageUrl, color: "" }]
           : [];
@@ -735,10 +713,7 @@ export function EditProductDrawer({
         onUpload={onUpload}
         uploadingCount={uploadingCount}
         onSubmit={async () => {
-          if (
-            !form.categoryId ||
-            (form.categoryId === NEW_CATEGORY && !newCategoryName.trim())
-          ) {
+          if (!form.categoryId || (form.categoryId === NEW_CATEGORY && !newCategoryName.trim())) {
             setError("Select or create a category first");
             return;
           }
@@ -749,9 +724,7 @@ export function EditProductDrawer({
           setLoading(true);
           setError("");
           try {
-            await onSave(
-              buildSavePayload(form, variants, images, newCategoryName)
-            );
+            await onSave(buildSavePayload(form, variants, images, newCategoryName));
             onClose();
           } catch (err) {
             setError(err instanceof Error ? err.message : "Update failed");

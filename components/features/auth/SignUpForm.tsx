@@ -1,16 +1,17 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { signUpSchema, type SignUpInput } from "@/lib/validations/auth";
-import { signUpRequest } from "@/lib/api/auth";
-import { useToast } from "@/components/ui/Toast";
-import { Input } from "@/components/ui/Input";
+
+import { SocialAuthButtons } from "@/components/features/auth/SocialAuthButtons";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { SocialAuthButtons } from "@/components/features/auth/SocialAuthButtons";
+import { Input } from "@/components/ui/Input";
+import { useToast } from "@/components/ui/Toast";
+import { signUpRequest } from "@/lib/api/auth";
+import { type SignUpInput, signUpSchema } from "@/lib/validations/auth";
 
 export function SignUpForm() {
   const router = useRouter();
@@ -26,9 +27,7 @@ export function SignUpForm() {
   const onSubmit = handleSubmit(async (values) => {
     try {
       await signUpRequest(values);
-      toast.success(
-        "Your account has been created."
-      );
+      toast.success("Your account has been created.");
       router.push("/login");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Sign up failed");
@@ -44,11 +43,13 @@ export function SignUpForm() {
             label="Fullname"
             placeholder="Please enter your full name"
             error={errors.fullName?.message}
+            important
             {...register("fullName")}
           />
           <Input
             label="Email address"
             type="email"
+            important
             placeholder="Please enter your email"
             error={errors.email?.message}
             {...register("email")}
@@ -63,6 +64,7 @@ export function SignUpForm() {
           <Input
             label="Password"
             type="password"
+            important
             placeholder="Please enter your password"
             error={errors.password?.message}
             {...register("password")}
@@ -70,6 +72,7 @@ export function SignUpForm() {
           <Input
             label="Confirm Password"
             type="password"
+            important
             placeholder="Please confirm your password"
             error={errors.confirmPassword?.message}
             {...register("confirmPassword")}
@@ -85,10 +88,7 @@ export function SignUpForm() {
         <SocialAuthButtons context="signup" />
         <p className="mt-5 text-center text-sm text-neutral-muted">
           Already have an account!{" "}
-          <Link
-            href="/login"
-            className="font-medium text-brand-500 hover:text-brand-600"
-          >
+          <Link href="/login" className="font-medium text-brand-500 hover:text-brand-600">
             Login
           </Link>
         </p>

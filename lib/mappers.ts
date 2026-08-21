@@ -1,18 +1,12 @@
 import type {
-  Product as DbProduct,
   Category as DbCategory,
   Order as DbOrder,
   OrderItem as DbOrderItem,
   OrderStatus as DbOrderStatus,
+  Product as DbProduct,
 } from "@prisma/client";
-import type {
-  Category,
-  Order,
-  OrderItem,
-  OrderStatus,
-  Product,
-  ProductVariant,
-} from "@/types";
+
+import type { Category, Order, OrderItem, OrderStatus, Product, ProductVariant } from "@/types";
 
 type DbSpecification = {
   id?: string;
@@ -48,24 +42,16 @@ function mapVariants(row: DbProductRow): ProductVariant[] {
   }));
 }
 
-export function mapCategory(
-  row: Pick<DbCategory, "id" | "name" | "slug">
-): Category {
+export function mapCategory(row: Pick<DbCategory, "id" | "name" | "slug">): Category {
   return { id: row.id, name: row.name, slug: row.slug };
 }
 
 export function mapProduct(row: DbProductRow): Product {
   const variants = mapVariants(row);
-  const colors = variants.length
-    ? [...new Set(variants.map((v) => v.color).filter(Boolean))]
-    : [];
-  const sizes = variants.length
-    ? [...new Set(variants.map((v) => v.size).filter(Boolean))]
-    : [];
+  const colors = variants.length ? [...new Set(variants.map((v) => v.color).filter(Boolean))] : [];
+  const sizes = variants.length ? [...new Set(variants.map((v) => v.size).filter(Boolean))] : [];
 
-  const stock = variants.length
-    ? variants.reduce((sum, v) => sum + v.qty, 0)
-    : row.stock;
+  const stock = variants.length ? variants.reduce((sum, v) => sum + v.qty, 0) : row.stock;
 
   const images = (row.images ?? [])
     .slice()
@@ -74,8 +60,7 @@ export function mapProduct(row: DbProductRow): Product {
       url: img.url,
       color: img.color || undefined,
     }));
-  const imageUrl =
-    images.find((img) => !img.color)?.url ?? images[0]?.url ?? row.image;
+  const imageUrl = images.find((img) => !img.color)?.url ?? images[0]?.url ?? row.image;
 
   return {
     id: row.id,
@@ -121,19 +106,17 @@ export function mapOrder(row: DbOrderWithRelations): Order {
     tax,
     status: mapStatus(row.status),
     paymentMethod: "Card",
-    items: row.items.map(
-      (item): OrderItem => ({
-        productId: item.productId,
-        specificationId: item.specificationId ?? undefined,
-        title: item.product.title,
-        description: item.product.description,
-        imageUrl: item.product.image,
-        price: Number(item.price),
-        qty: item.quantity,
-        color: item.color || undefined,
-        size: item.size || undefined,
-        stock: item.product.stock,
-      })
-    ),
+    items: row.items.map((item): OrderItem => ({
+      productId: item.productId,
+      specificationId: item.specificationId ?? undefined,
+      title: item.product.title,
+      description: item.product.description,
+      imageUrl: item.product.image,
+      price: Number(item.price),
+      qty: item.quantity,
+      color: item.color || undefined,
+      size: item.size || undefined,
+      stock: item.product.stock,
+    })),
   };
 }

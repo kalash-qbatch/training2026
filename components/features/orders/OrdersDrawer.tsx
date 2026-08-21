@@ -1,16 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
 import Image from "next/image";
-import { getOrderById, getOrders } from "@/lib/api/orders";
-import type { Order } from "@/types";
-import { formatCurrency, formatDate } from "@/lib/utils";
-import { formatLineColor, formatLineSize } from "@/lib/product";
-import { TABLE_PAGE_SIZE, TABLE_INITIAL_PAGE, TAX_RATE } from "@/lib/constants";
+
 import { Drawer } from "@/components/ui/Drawer";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { OrdersTable } from "./OrdersTable";
 import { Pagination } from "@/components/ui/Pagination";
+import { getOrderById, getOrders } from "@/lib/api/orders";
+import { TABLE_INITIAL_PAGE, TABLE_PAGE_SIZE, TAX_RATE } from "@/lib/constants";
+import { formatLineColor, formatLineSize } from "@/lib/product";
+import { formatCurrency, formatDate } from "@/lib/utils";
+import type { Order } from "@/types";
+
+import { OrdersTable } from "./OrdersTable";
 
 export function OrdersDrawer({
   open,
@@ -29,6 +32,7 @@ export function OrdersDrawer({
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [detail, setDetail] = useState<Order | null | undefined>(undefined);
   const [prevOpen, setPrevOpen] = useState(open);
+  const [prevPage, setPrevPage] = useState(page);
   const [prevInitialOrderId, setPrevInitialOrderId] = useState(initialOrderId);
   const [prevSelectedOrderId, setPrevSelectedOrderId] = useState(selectedOrderId);
 
@@ -52,11 +56,17 @@ export function OrdersDrawer({
     setPrevSelectedOrderId(selectedOrderId);
     setDetail(undefined);
   }
+  if (page !== prevPage) {
+    setPrevPage(page);
+    if (open) {
+      setLoading(true);
+      setError(null);
+    }
+  }
 
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    setLoading(true);
     getOrders(page, TABLE_PAGE_SIZE)
       .then((res) => {
         if (!cancelled) {
@@ -108,10 +118,7 @@ export function OrdersDrawer({
       ) : loading ? (
         <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-14 animate-pulse rounded-md bg-neutral-border/50"
-            />
+            <div key={i} className="h-14 animate-pulse rounded-md bg-neutral-border/50" />
           ))}
         </div>
       ) : error ? (
@@ -125,19 +132,10 @@ export function OrdersDrawer({
         />
       ) : (
         <div className="space-y-4">
-          <OrdersTable
-            orders={orders}
-            onViewOrder={(id) => setSelectedOrderId(id)}
-          />
+          <OrdersTable orders={orders} onViewOrder={(id) => setSelectedOrderId(id)} />
           <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-neutral-muted">
-              {totalCount} Total Count
-            </p>
-            <Pagination
-              page={page}
-              totalPages={totalPages}
-              onChange={setPage}
-            />
+            <p className="text-sm text-neutral-muted">{totalCount} Total Count</p>
+            <Pagination page={page} totalPages={totalPages} onChange={setPage} />
           </div>
         </div>
       )}
@@ -145,11 +143,7 @@ export function OrdersDrawer({
   );
 }
 
-function OrderDetailsContent({
-  order,
-}: {
-  order: Order | null | undefined;
-}) {
+function OrderDetailsContent({ order }: { order: Order | null | undefined }) {
   if (order === undefined) {
     return (
       <div className="space-y-4">
@@ -180,19 +174,14 @@ function OrderDetailsContent({
         <Meta label="Date" value={formatDate(order.date)} />
         <Meta label="Order #" value={order.id.slice(0, 8)} />
         <Meta label="User" value={order.userName} />
-        <Meta
-          label="Products"
-          value={String(productCount).padStart(2, "0")}
-        />
+        <Meta label="Products" value={String(productCount).padStart(2, "0")} />
         <Meta label="Sub Total" value={formatCurrency(subTotal)} />
         <Meta label="Tax" value={formatCurrency(tax)} />
         <Meta label="Total" value={formatCurrency(total)} />
       </div>
 
       <div>
-        <h2 className="mb-4 text-[15px] font-semibold text-brand-600">
-          Product Information
-        </h2>
+        <h2 className="mb-4 text-[15px] font-semibold text-brand-600">Product Information</h2>
         <div className="overflow-x-auto">
           <table className="w-full min-w-140 border-collapse">
             <thead>
@@ -226,12 +215,8 @@ function OrderDetailsContent({
                       </p>
                     </div>
                   </td>
-                  <td className="py-4 text-sm text-neutral-text">
-                    {formatLineColor(item.color)}
-                  </td>
-                  <td className="py-4 text-sm text-neutral-text">
-                    {formatLineSize(item.size)}
-                  </td>
+                  <td className="py-4 text-sm text-neutral-text">{formatLineColor(item.color)}</td>
+                  <td className="py-4 text-sm text-neutral-text">{formatLineSize(item.size)}</td>
                   <td className="py-4 text-sm tabular-nums text-neutral-text">
                     {formatCurrency(item.price)}
                   </td>

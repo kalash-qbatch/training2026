@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  getNotifications,
-  markNotificationsRead,
-} from "@/lib/controllers/notifications";
+
+import { getNotifications, markNotificationsRead } from "@/lib/controllers/notifications";
 
 export const dynamic = "force-dynamic";
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+
 import { forgotPassword } from "@/lib/controllers/forgot-password";
 
 export async function POST(request: Request) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { Check } from "lucide-react";
+
 import { Modal } from "@/components/ui/Modal";
 
 export function OrderPlacedModal({

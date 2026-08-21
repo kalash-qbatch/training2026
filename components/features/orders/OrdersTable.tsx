@@ -1,13 +1,7 @@
 "use client";
 
 import { ArrowUpRight } from "lucide-react";
-import type { Order } from "@/types";
-import {
-  formatCurrency,
-  formatDate,
-  orderStatusClass,
-  orderStatusLabel,
-} from "@/lib/utils";
+
 import {
   Table,
   TableBody,
@@ -16,6 +10,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/Table";
+import { formatCurrency, formatDate, orderStatusClass, orderStatusLabel } from "@/lib/utils";
+import type { Order } from "@/types";
 
 export function OrdersTable({
   orders,
@@ -44,9 +40,7 @@ export function OrdersTable({
               return (
                 <TableRow key={order.id} className="border-b border-neutral-border">
                   <TableCell className="py-4 text-sm">{formatDate(order.date)}</TableCell>
-                  <TableCell className="py-4 text-sm font-medium">
-                    {order.id.slice(0, 8)}
-                  </TableCell>
+                  <TableCell className="py-4 text-sm font-medium">{order.id.slice(0, 8)}</TableCell>
                   <TableCell className="py-4 text-sm">{productCount}</TableCell>
                   <TableCell className="py-4 text-sm font-semibold tabular-nums">
                     {formatCurrency(order.amount)}
@@ -86,9 +80,7 @@ export function OrdersTable({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-neutral-text">{order.id.slice(0, 8)}</p>
-                  <p className="mt-1 text-xs text-neutral-muted">
-                    {formatDate(order.date)}
-                  </p>
+                  <p className="mt-1 text-xs text-neutral-muted">{formatDate(order.date)}</p>
                   <p className="mt-1 text-xs text-neutral-muted">
                     {productCount} product{productCount === 1 ? "" : "s"}
                   </p>

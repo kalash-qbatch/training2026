@@ -1,4 +1,4 @@
-import type { AdminOrderStats, AdminOrderStatusUpdate, Category, Product, Order } from "@/types";
+import type { AdminOrderStats, AdminOrderStatusUpdate, Category, Order, Product } from "@/types";
 
 export type { AdminOrderStatusUpdate };
 
@@ -178,10 +178,7 @@ export async function fetchAdminOrder(id: string) {
   return data.order;
 }
 
-export async function updateAdminOrderStatus(
-  id: string,
-  status: AdminOrderStatusUpdate
-) {
+export async function updateAdminOrderStatus(id: string, status: AdminOrderStatusUpdate) {
   const res = await fetch(`/api/admin/orders/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },

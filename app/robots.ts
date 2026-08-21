@@ -1,9 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const BASE_URL =
-  process.env.NEXTAUTH_URL ||
-  process.env.AUTH_URL ||
-  "https://bhaikastore.com";
+const BASE_URL = process.env.NEXTAUTH_URL || process.env.AUTH_URL || "https://bhaikastore.com";
 
 export default function robots(): MetadataRoute.Robots {
   return {

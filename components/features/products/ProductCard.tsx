@@ -1,29 +1,22 @@
 "use client";
 
 import { useMemo, useState } from "react";
+
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import type { Product, ProductVariant } from "@/types";
-import { cn, colorSwatch, formatCurrency } from "@/lib/utils";
-import {
-  FREE_SIZE_LABEL,
-  getColorSlideIndex,
-  isFreeSizeProduct,
-} from "@/lib/product";
-import { useCartStore } from "@/lib/store/useCartStore";
-import { useAuthStore } from "@/lib/store/useAuthStore";
-import { useToast } from "@/components/ui/Toast";
-import { QtyStepper } from "@/components/ui/QtyStepper";
 
-function findVariant(
-  variants: ProductVariant[] | undefined,
-  color: string,
-  size: string
-) {
+import { QtyStepper } from "@/components/ui/QtyStepper";
+import { useToast } from "@/components/ui/Toast";
+import { FREE_SIZE_LABEL, getColorSlideIndex, isFreeSizeProduct } from "@/lib/product";
+import { useAuthStore } from "@/lib/store/useAuthStore";
+import { useCartStore } from "@/lib/store/useCartStore";
+import { cn, colorSwatch, formatCurrency } from "@/lib/utils";
+import type { Product, ProductVariant } from "@/types";
+
+function findVariant(variants: ProductVariant[] | undefined, color: string, size: string) {
   return variants?.find(
     (v) =>
-      v.color.toLowerCase() === color.toLowerCase() &&
-      v.size.toLowerCase() === size.toLowerCase()
+      v.color.toLowerCase() === color.toLowerCase() && v.size.toLowerCase() === size.toLowerCase()
   );
 }
 
@@ -60,7 +53,6 @@ export function ProductCard({ product }: { product: Product }) {
   const hasVariants = Boolean(product.variants?.length);
   const freeSize = isFreeSizeProduct(product);
 
-
   // function getDefaultInStockVariant(product: Product) {
   //   const inStock = product.variants?.find((v) => v.qty > 0);
 
@@ -89,15 +81,12 @@ export function ProductCard({ product }: { product: Product }) {
   const totalStock = hasVariants
     ? (product.variants?.reduce((sum, v) => sum + v.qty, 0) ?? 0)
     : (product.stock ?? 0);
-  const stock = hasVariants
-    ? (selectedVariant?.qty ?? 0)
-    : (product.stock ?? 0);
+  const stock = hasVariants ? (selectedVariant?.qty ?? 0) : (product.stock ?? 0);
   const outOfStock = stock <= 0;
   const productFullyOut = totalStock <= 0;
   const invalidCombo = hasVariants && !selectedVariant;
   const needsSelection =
-    hasVariants &&
-    ((colors.length > 0 && !color) || (sizes.length > 0 && !size));
+    hasVariants && ((colors.length > 0 && !color) || (sizes.length > 0 && !size));
 
   const [qty, setQty] = useState(outOfStock ? 0 : 1);
   const selectedQty = outOfStock ? 0 : Math.min(Math.max(1, qty), stock);
@@ -122,7 +111,10 @@ export function ProductCard({ product }: { product: Product }) {
           style={{ transform: `translateX(-${slideIndex * 100}%)` }}
         >
           {slides.map((img, i) => (
-            <div key={`${img.url}-${img.color ?? "global"}-${i}`} className="relative h-full w-full shrink-0">
+            <div
+              key={`${img.url}-${img.color ?? "global"}-${i}`}
+              className="relative h-full w-full shrink-0"
+            >
               <Image
                 src={img.url}
                 alt={product.name}
@@ -133,7 +125,7 @@ export function ProductCard({ product }: { product: Product }) {
             </div>
           ))}
         </div>
-        {(productFullyOut || outOfStock || invalidCombo) ? (
+        {productFullyOut || outOfStock || invalidCombo ? (
           <span className="absolute right-2 top-2 z-10 rounded-xs bg-status-error-fg px-2 py-1 text-[11px] font-semibold text-white">
             Out Of Stock
           </span>
@@ -206,7 +198,6 @@ export function ProductCard({ product }: { product: Product }) {
           </>
         )}
 
-
         <div className="mt-3 flex items-center flex-wrap justify-center sm:justify-between gap-2">
           <QtyStepper
             value={selectedQty}
@@ -241,11 +232,9 @@ export function ProductCard({ product }: { product: Product }) {
                 );
                 return;
               }
-              const result = await addItem(
-                product,
-                selectedQty,
-                { specificationId: selectedVariant?.id }
-              );
+              const result = await addItem(product, selectedQty, {
+                specificationId: selectedVariant?.id,
+              });
               if (!result.ok) {
                 toast.error(result.error);
                 return;

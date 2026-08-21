@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+
 import { resetTokenExpiryLabel } from "@/lib/constants/auth";
 
 function getTransporter() {
@@ -8,9 +9,7 @@ function getTransporter() {
   const pass = process.env.SMTP_PASS;
 
   if (!host || !user || !pass) {
-    throw new Error(
-      "SMTP is not configured. Check SMTP_HOST, SMTP_USER, SMTP_PASS in .env"
-    );
+    throw new Error("SMTP is not configured. Check SMTP_HOST, SMTP_USER, SMTP_PASS in .env");
   }
 
   return nodemailer.createTransport({

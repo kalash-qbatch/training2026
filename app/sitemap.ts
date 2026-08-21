@@ -1,10 +1,8 @@
 import type { MetadataRoute } from "next";
+
 import { prisma } from "@/lib/db";
 
-const BASE_URL =
-  process.env.NEXTAUTH_URL ||
-  process.env.AUTH_URL ||
-  "https://bhaikastore.com";
+const BASE_URL = process.env.NEXTAUTH_URL || process.env.AUTH_URL || "https://bhaikastore.com";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [categories, products] = await Promise.all([

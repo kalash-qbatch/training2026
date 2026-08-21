@@ -1,7 +1,7 @@
 "use client";
 
-import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
+import { formatCurrency } from "@/lib/utils";
 
 export function CartSummary({
   subtotal,
@@ -23,21 +23,15 @@ export function CartSummary({
       <dl className="space-y-2.5 text-[13px]">
         <div className="flex justify-between gap-6">
           <dt className="text-neutral-muted">Sub Total</dt>
-          <dd className="font-medium tabular-nums text-neutral-text">
-            {formatCurrency(subtotal)}
-          </dd>
+          <dd className="font-medium tabular-nums text-neutral-text">{formatCurrency(subtotal)}</dd>
         </div>
         <div className="flex justify-between gap-6">
           <dt className="text-neutral-muted">Tax</dt>
-          <dd className="font-medium tabular-nums text-neutral-text">
-            {formatCurrency(tax)}
-          </dd>
+          <dd className="font-medium tabular-nums text-neutral-text">{formatCurrency(tax)}</dd>
         </div>
         <div className="flex justify-between gap-6 pt-1">
           <dt className="font-semibold text-neutral-text">Total</dt>
-          <dd className="font-semibold tabular-nums text-neutral-text">
-            {formatCurrency(total)}
-          </dd>
+          <dd className="font-semibold tabular-nums text-neutral-text">{formatCurrency(total)}</dd>
         </div>
       </dl>
       <Button

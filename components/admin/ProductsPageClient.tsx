@@ -1,18 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Eye, Pencil, Trash2, Search } from "lucide-react";
-import { colorSwatch, formatCurrency, isLightSwatch } from "@/lib/utils";
-import type { Category, Product, ProductVariant } from "@/types";
-import {
-  createAdminProduct,
-  deleteAdminProduct,
-  fetchAdminCategories,
-  fetchAdminProducts,
-  updateAdminProduct,
-} from "@/lib/api/admin";
-import { useToast } from "@/components/ui/Toast";
+
+import { Eye, Pencil, Search, Trash2 } from "lucide-react";
+
+import { AddMultipleProductsModal } from "@/components/admin/AddMultipleProductsModal";
+import { DeleteConfirmModal } from "@/components/admin/DeleteConfirmModal";
+import { AddProductDrawer, EditProductDrawer } from "@/components/admin/ProductDrawers";
+import { ProductPreviewModal } from "@/components/admin/ProductPreviewModal";
 import { Pagination } from "@/components/ui/Pagination";
+import { Select } from "@/components/ui/Select";
 import {
   Table,
   TableBody,
@@ -22,15 +19,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/Table";
-import { DeleteConfirmModal } from "@/components/admin/DeleteConfirmModal";
+import { useToast } from "@/components/ui/Toast";
 import {
-  AddProductDrawer,
-  EditProductDrawer,
-} from "@/components/admin/ProductDrawers";
-import { AddMultipleProductsModal } from "@/components/admin/AddMultipleProductsModal";
-import { Select } from "@/components/ui/Select";
-import { ProductPreviewModal } from "@/components/admin/ProductPreviewModal";
-import { TABLE_PAGE_SIZE, TABLE_INITIAL_PAGE } from "@/lib/constants";
+  createAdminProduct,
+  deleteAdminProduct,
+  fetchAdminCategories,
+  fetchAdminProducts,
+  updateAdminProduct,
+} from "@/lib/api/admin";
+import { TABLE_INITIAL_PAGE, TABLE_PAGE_SIZE } from "@/lib/constants";
+import { colorSwatch, formatCurrency, isLightSwatch } from "@/lib/utils";
+import type { Category, Product, ProductVariant } from "@/types";
 
 const inputClass =
   "h-10 w-full rounded-md border border-neutral-border bg-white px-3 text-[13px] text-neutral-text outline-none placeholder:text-neutral-muted focus:border-[#2563EB]";
@@ -232,18 +231,12 @@ export function ProductsPageClient() {
                 <TableCell>
                   <div className="flex items-center gap-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={p.imageUrl}
-                      alt=""
-                      className="h-10 w-10 rounded object-cover"
-                    />
+                    <img src={p.imageUrl} alt="" className="h-10 w-10 rounded object-cover" />
                     <p className="font-medium text-neutral-text">{p.name}</p>
                   </div>
                 </TableCell>
                 <TableCell>{p.category?.name ?? "—"}</TableCell>
-                <TableCell className="tabular-nums">
-                  {formatCurrency(p.price)}
-                </TableCell>
+                <TableCell className="tabular-nums">{formatCurrency(p.price)}</TableCell>
                 <TableCell>
                   <StockColorCircles product={p} />
                 </TableCell>
@@ -294,10 +287,7 @@ export function ProductsPageClient() {
 
       <Pagination page={page} totalPages={totalPages} onChange={setPage} className="mt-4" />
 
-      <ProductPreviewModal
-        product={previewProduct}
-        onClose={() => setPreviewProduct(null)}
-      />
+      <ProductPreviewModal product={previewProduct} onClose={() => setPreviewProduct(null)} />
       <AddProductDrawer
         open={addOpen}
         onClose={() => setAddOpen(false)}

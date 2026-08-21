@@ -1,4 +1,5 @@
 import * as React from "react";
+
 import { cn } from "@/lib/utils";
 
 export type TableProps = React.HTMLAttributes<HTMLTableElement> & {
@@ -26,11 +27,7 @@ export const TableHeader = React.forwardRef<
 >(({ className, sticky = true, ...props }, ref) => (
   <thead
     ref={ref}
-    className={cn(
-      "border-b border-[#e5e7eb]",
-      sticky && "sticky top-0 z-10 bg-white",
-      className
-    )}
+    className={cn("border-b border-[#e5e7eb]", sticky && "sticky top-0 z-10 bg-white", className)}
     {...props}
   />
 ));
@@ -39,9 +36,7 @@ TableHeader.displayName = "TableHeader";
 export const TableBody = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
->(({ className, ...props }, ref) => (
-  <tbody ref={ref} className={cn(className)} {...props} />
-));
+>(({ className, ...props }, ref) => <tbody ref={ref} className={cn(className)} {...props} />);
 TableBody.displayName = "TableBody";
 
 export const TableRow = React.forwardRef<

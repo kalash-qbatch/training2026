@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
-import { useSession, signOut } from "next-auth/react";
+
 import { ChevronDown, LogOut, User } from "lucide-react";
+import Image from "next/image";
+import { signOut, useSession } from "next-auth/react";
+
 import { useAuthStore } from "@/lib/store/useAuthStore";
 import { cn } from "@/lib/utils";
 
@@ -23,11 +25,7 @@ export function AdminTopBar() {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const name =
-    session?.user?.name ||
-    storeUser?.fullName ||
-    session?.user?.email ||
-    "Admin User";
+  const name = session?.user?.name || storeUser?.fullName || session?.user?.email || "Admin User";
   const image = session?.user?.image || storeUser?.image;
 
   useEffect(() => {
@@ -71,10 +69,7 @@ export function AdminTopBar() {
         )}
         <span className="hidden text-[13px] font-medium sm:inline">{name}</span>
         <ChevronDown
-          className={cn(
-            "h-4 w-4 text-[#6b7280] transition-transform",
-            open && "rotate-180"
-          )}
+          className={cn("h-4 w-4 text-[#6b7280] transition-transform", open && "rotate-180")}
           strokeWidth={1.75}
         />
       </button>

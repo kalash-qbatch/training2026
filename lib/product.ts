@@ -23,9 +23,7 @@ export function getColorSlideIndex(
 ) {
   const norm = selectedColor.trim().toLowerCase();
   if (norm) {
-    const byColor = slides.findIndex(
-      (img) => img.color && img.color.toLowerCase() === norm
-    );
+    const byColor = slides.findIndex((img) => img.color && img.color.toLowerCase() === norm);
     if (byColor >= 0) return byColor;
 
     const anyAssigned = slides.some((img) => img.color);

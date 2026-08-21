@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useId, useRef } from "react";
+
 import { X } from "lucide-react";
-import { cn } from "@/lib/utils";
+
 import { useOverlayTransition } from "@/hooks/useOverlayTransition";
+import { cn } from "@/lib/utils";
+
 import { Button } from "./Button";
 
 type ModalProps = {
@@ -15,14 +18,7 @@ type ModalProps = {
   hideHeader?: boolean;
 };
 
-export function Modal({
-  open,
-  onClose,
-  title,
-  children,
-  className,
-  hideHeader,
-}: ModalProps) {
+export function Modal({ open, onClose, title, children, className, hideHeader }: ModalProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const { present, visible } = useOverlayTransition(open);
@@ -32,7 +28,6 @@ export function Modal({
     const previous = document.activeElement as HTMLElement | null;
     if (visible) panelRef.current?.focus();
 
-    const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -83,9 +78,7 @@ export function Modal({
         tabIndex={-1}
         className={cn(
           "w-full max-w-sm rounded-lg bg-neutral-surface p-6 shadow-lg focus:outline-none transition duration-200 ease-out",
-          visible
-            ? "translate-y-0 scale-100 opacity-100"
-            : "translate-y-2 scale-[0.97] opacity-0",
+          visible ? "translate-y-0 scale-100 opacity-100" : "translate-y-2 scale-[0.97] opacity-0",
           className
         )}
       >

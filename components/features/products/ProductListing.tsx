@@ -1,18 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { Search, Loader2 } from "lucide-react";
-import {
-  getCategories,
-  getProducts,
-  type ProductSort,
-} from "@/lib/api/products";
-import type { Category, Product } from "@/types";
-import { ProductCard } from "./ProductCard";
-import { ProductGridSkeleton } from "./ProductGridSkeleton";
+
+import { Loader2, Search } from "lucide-react";
+
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Select } from "@/components/ui/Select";
-import { CARD_PAGE_SIZE, CARD_INITIAL_PAGE } from "@/lib/constants";
+import { getCategories, getProducts, type ProductSort } from "@/lib/api/products";
+import { CARD_INITIAL_PAGE, CARD_PAGE_SIZE } from "@/lib/constants";
+import type { Category, Product } from "@/types";
+
+import { ProductCard } from "./ProductCard";
+import { ProductGridSkeleton } from "./ProductGridSkeleton";
 
 export function ProductListing() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -84,17 +83,13 @@ export function ProductListing() {
         // its result entirely.
         if (controller.signal.aborted) return;
 
-        setProducts((prev) =>
-          isFirstPage ? data.products : [...prev, ...data.products]
-        );
+        setProducts((prev) => (isFirstPage ? data.products : [...prev, ...data.products]));
         setTotalPages(data.totalPages);
         setPage(pageNum);
       } catch (err: unknown) {
         if (controller.signal.aborted) return;
         if (isFirstPage) {
-          setError(
-            err instanceof Error ? err.message : "Failed to load products"
-          );
+          setError(err instanceof Error ? err.message : "Failed to load products");
           setProducts([]);
         }
       } finally {
@@ -106,11 +101,20 @@ export function ProductListing() {
     },
     [debounced, sort, categoryId]
   );
+  const filterKey = `${debounced}|${sort}|${categoryId}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setPage(CARD_INITIAL_PAGE);
+  }
 
   // When filters change: trigger fetch for first page and reset page state
   useEffect(() => {
-    setPage(CARD_INITIAL_PAGE);
-    void fetchPage(CARD_INITIAL_PAGE, true);
+    const id = window.setTimeout(() => {
+      void fetchPage(CARD_INITIAL_PAGE, true);
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [debounced, sort, categoryId, fetchPage]);
 
   // When user clicks pagination or scrolls (page state increases)
@@ -151,12 +155,7 @@ export function ProductListing() {
     const observer = new IntersectionObserver(
       (entries) => {
         startTransition(() => {
-          if (
-            entries[0]?.isIntersecting &&
-            !loadingMore &&
-            !initialLoading &&
-            page < totalPages
-          ) {
+          if (entries[0]?.isIntersecting && !loadingMore && !initialLoading && page < totalPages) {
             setPage((prev) => prev + 1);
           }
         });
@@ -172,9 +171,7 @@ export function ProductListing() {
     <section className="bg-white">
       {/* Header + Filters */}
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <h1 className="text-[22px] font-semibold leading-none text-brand-500">
-          Our Products
-        </h1>
+        <h1 className="text-[22px] font-semibold leading-none text-brand-500">Our Products</h1>
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-end">
           {/* Search */}
@@ -254,9 +251,7 @@ export function ProductListing() {
               />
             )}
             {!loadingMore && page >= totalPages && products.length > 0 && (
-              <p className="text-sm text-neutral-muted">
-                All products loaded
-              </p>
+              <p className="text-sm text-neutral-muted">All products loaded</p>
             )}
           </div>
         </>

@@ -1,11 +1,12 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { getToken } from 'next-auth/jwt';
-import type { JWT } from 'next-auth/jwt';
-import type { Session } from 'next-auth';
-import authConfig from './auth.config';
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
+import type { Session } from "next-auth";
+import type { JWT } from "next-auth/jwt";
+import { getToken } from "next-auth/jwt";
 
-const SESSION_COOKIE_SUFFIX = 'authjs.session-token';
+import authConfig from "./auth.config";
+
+const SESSION_COOKIE_SUFFIX = "authjs.session-token";
 
 type SessionToken = JWT & {
   id?: string;
@@ -15,8 +16,8 @@ type SessionToken = JWT & {
 };
 
 function getSessionCookieName(request: Request) {
-  const secureCookie = request.url.startsWith('https://');
-  return `${secureCookie ? '__Secure-' : ''}${SESSION_COOKIE_SUFFIX}`;
+  const secureCookie = request.url.startsWith("https://");
+  return `${secureCookie ? "__Secure-" : ""}${SESSION_COOKIE_SUFFIX}`;
 }
 
 function getSessionCookieChunks(req: NextRequest, cookieName: string) {
@@ -34,7 +35,7 @@ function toMutableResponse(response: Response) {
 }
 
 function toClientSession(session: SessionToken | null) {
-  if (!session || typeof session.exp !== 'number') return null;
+  if (!session || typeof session.exp !== "number") return null;
 
   return {
     user: {
@@ -50,8 +51,12 @@ function toClientSession(session: SessionToken | null) {
   };
 }
 
-function applyFixedSessionCookie(req: NextRequest, response: Response, session: SessionToken | null) {
-  if (!session || typeof session.exp !== 'number') return;
+function applyFixedSessionCookie(
+  req: NextRequest,
+  response: Response,
+  session: SessionToken | null
+) {
+  if (!session || typeof session.exp !== "number") return;
 
   const cookieName = getSessionCookieName(req);
   const cookieChunks = getSessionCookieChunks(req, cookieName);
@@ -61,29 +66,29 @@ function applyFixedSessionCookie(req: NextRequest, response: Response, session: 
   const expiresAt = session.exp;
   const maxAge = Math.max(expiresAt - Math.floor(Date.now() / 1000), 0);
   const expires = new Date(expiresAt * 1000).toUTCString();
-  const secure = cookieName.startsWith('__Secure-') ? '; Secure' : '';
+  const secure = cookieName.startsWith("__Secure-") ? "; Secure" : "";
 
   for (const cookie of cookieChunks) {
     response.headers.append(
-      'Set-Cookie',
+      "Set-Cookie",
       `${cookie.name}=${cookie.value}; Path=/; Max-Age=${maxAge}; Expires=${expires}; HttpOnly; SameSite=Lax${secure}`
     );
   }
 }
 
 export default async function proxy(req: NextRequest) {
-  const session = await getToken({
+  const session = (await getToken({
     req,
     secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
-    secureCookie: req.nextUrl.protocol === 'https:',
-  }) as SessionToken | null;
+    secureCookie: req.nextUrl.protocol === "https:",
+  })) as SessionToken | null;
 
-  if (req.nextUrl.pathname === '/api/auth/session') {
+  if (req.nextUrl.pathname === "/api/auth/session") {
     const response = NextResponse.json(toClientSession(session), {
       headers: {
-        'Cache-Control': 'private, no-cache, no-store',
-        Expires: '0',
-        Pragma: 'no-cache',
+        "Cache-Control": "private, no-cache, no-store",
+        Expires: "0",
+        Pragma: "no-cache",
       },
     });
     applyFixedSessionCookie(req, response, session);
@@ -93,7 +98,7 @@ export default async function proxy(req: NextRequest) {
   const authSession: Session | null = session
     ? {
         user: {
-          id: session.id ?? '',
+          id: session.id ?? "",
           name: session.name,
           email: session.email,
           role: session.role,
@@ -101,7 +106,7 @@ export default async function proxy(req: NextRequest) {
           rememberMe: session.rememberMe,
         },
         expires:
-          typeof session.exp === 'number'
+          typeof session.exp === "number"
             ? new Date(session.exp * 1000).toISOString()
             : new Date().toISOString(),
       }
@@ -132,5 +137,5 @@ export default async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/auth/session', '/((?!api|_next/static|_next/image|favicon\\.ico|images).*)'],
+  matcher: ["/api/auth/session", "/((?!api|_next/static|_next/image|favicon\\.ico|images).*)"],
 };

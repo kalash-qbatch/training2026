@@ -21,11 +21,7 @@ export async function createUser(data: {
   });
 }
 
-export async function setUserResetToken(
-  userId: string,
-  resetToken: string,
-  resetTokenExp: Date
-) {
+export async function setUserResetToken(userId: string, resetToken: string, resetTokenExp: Date) {
   return prisma.user.update({
     where: { id: userId },
     data: { resetToken, resetTokenExp },
@@ -48,10 +44,7 @@ export async function clearResetToken(token: string) {
   });
 }
 
-export async function updatePasswordAndClearResetToken(
-  userId: string,
-  passwordHash: string
-) {
+export async function updatePasswordAndClearResetToken(userId: string, passwordHash: string) {
   return prisma.user.update({
     where: { id: userId },
     data: {

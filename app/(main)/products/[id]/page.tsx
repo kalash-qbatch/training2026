@@ -1,20 +1,18 @@
+import { ArrowLeft, ChevronRight } from "lucide-react";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronRight, ArrowLeft } from "lucide-react";
+import { notFound } from "next/navigation";
+
+import { ProductCard } from "@/components/features/products/ProductCard";
 import { findProductById } from "@/lib/services/products";
 import { formatCurrency } from "@/lib/utils";
-import { ProductCard } from "@/components/features/products/ProductCard";
 
 type Props = {
   params: Promise<{ id: string }>;
 };
 
-const BASE_URL =
-  process.env.NEXTAUTH_URL ||
-  process.env.AUTH_URL ||
-  "https://bhaikastore.com";
+const BASE_URL = process.env.NEXTAUTH_URL || process.env.AUTH_URL || "https://bhaikastore.com";
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
@@ -29,8 +27,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const title = `${product.name} | Bhai ka Store`;
   const description =
-    product.description ||
-    `Shop ${product.name} at Bhai ka Store. In stock and ready to ship.`;
+    product.description || `Shop ${product.name} at Bhai ka Store. In stock and ready to ship.`;
   const canonicalUrl = `${BASE_URL}/products/${product.id}`;
 
   return {
@@ -75,9 +72,7 @@ export default async function ProductDetailPage({ params }: Props) {
       "@type": "Offer",
       price: product.price,
       priceCurrency: "USD",
-      availability: inStock
-        ? "https://schema.org/InStock"
-        : "https://schema.org/OutOfStock",
+      availability: inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
       url: `${BASE_URL}/products/${product.id}`,
     },
   };
@@ -91,7 +86,10 @@ export default async function ProductDetailPage({ params }: Props) {
       />
 
       {/* Breadcrumbs */}
-      <nav aria-label="Breadcrumb" className="mb-6 flex items-center space-x-2 text-sm text-gray-500">
+      <nav
+        aria-label="Breadcrumb"
+        className="mb-6 flex items-center space-x-2 text-sm text-gray-500"
+      >
         <Link href="/" className="hover:text-gray-900 transition-colors">
           Home
         </Link>
@@ -150,9 +148,7 @@ export default async function ProductDetailPage({ params }: Props) {
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">
               {product.name}
             </h1>
-            <p className="mt-4 text-2xl font-bold text-gray-900">
-              {formatCurrency(product.price)}
-            </p>
+            <p className="mt-4 text-2xl font-bold text-gray-900">{formatCurrency(product.price)}</p>
 
             <div className="mt-4 prose prose-sm text-gray-600">
               <p>{product.description || "No description provided for this product."}</p>

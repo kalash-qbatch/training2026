@@ -1,11 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import { Trash2 } from "lucide-react";
-import type { CartItem } from "@/types";
-import { colorSwatch, formatCurrency } from "@/lib/utils";
-import { formatLineColor, formatLineSize } from "@/lib/product";
+import Image from "next/image";
+
 import { QtyStepper } from "@/components/ui/QtyStepper";
+import { formatLineColor, formatLineSize } from "@/lib/product";
+import { colorSwatch, formatCurrency } from "@/lib/utils";
+import type { CartItem } from "@/types";
 
 type Props = {
   item: CartItem;
@@ -16,22 +17,13 @@ type Props = {
   variant: "table" | "card";
 };
 
-export function CartLineItem({
-  item,
-  selected,
-  onSelect,
-  onQtyChange,
-  onRemove,
-  variant,
-}: Props) {
+export function CartLineItem({ item, selected, onSelect, onQtyChange, onRemove, variant }: Props) {
   const lineTotal = item.price * item.qty;
 
   /** Pick the image that matches the selected color; fall back to imageUrl. */
   const resolvedImage = (() => {
     if (!item.color || !item.images?.length) return item.imageUrl;
-    const match = item.images.find(
-      (img) => img.color?.toLowerCase() === item.color?.toLowerCase()
-    );
+    const match = item.images.find((img) => img.color?.toLowerCase() === item.color?.toLowerCase());
     return match?.url ?? item.imageUrl;
   })();
 
@@ -61,9 +53,7 @@ export function CartLineItem({
                   {item.color}
                 </span>
               ) : null}
-              <span>
-                {item.size ? `Size ${item.size}` : formatLineSize(item.size)}
-              </span>
+              <span>{item.size ? `Size ${item.size}` : formatLineSize(item.size)}</span>
             </div>
             <p className="mt-2 text-sm font-semibold tabular-nums text-brand-600">
               {formatCurrency(lineTotal)}
@@ -80,9 +70,7 @@ export function CartLineItem({
         </div>
         <div className="mt-3 flex items-center justify-between gap-3 pl-7">
           <QtyStepper value={item.qty} onChange={onQtyChange} max={item.stock} />
-          <p className="text-xs text-neutral-muted">
-            {formatCurrency(item.price)} each
-          </p>
+          <p className="text-xs text-neutral-muted">{formatCurrency(item.price)} each</p>
         </div>
       </li>
     );
@@ -104,9 +92,7 @@ export function CartLineItem({
           <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md bg-neutral-bg">
             <Image src={resolvedImage} alt={item.name} fill className="object-cover" sizes="56px" />
           </div>
-          <p className="line-clamp-2 max-w-70 text-sm font-medium text-neutral-text">
-            {item.name}
-          </p>
+          <p className="line-clamp-2 max-w-70 text-sm font-medium text-neutral-text">{item.name}</p>
         </div>
       </td>
       <td className="py-4">
@@ -119,20 +105,14 @@ export function CartLineItem({
             {item.color}
           </span>
         ) : (
-          <span className="text-sm text-neutral-muted">
-            {formatLineColor(item.color)}
-          </span>
+          <span className="text-sm text-neutral-muted">{formatLineColor(item.color)}</span>
         )}
       </td>
-      <td className="py-4 text-sm text-neutral-text">
-        {formatLineSize(item.size)}
-      </td>
+      <td className="py-4 text-sm text-neutral-text">{formatLineSize(item.size)}</td>
       <td className="py-4">
         <QtyStepper value={item.qty} onChange={onQtyChange} max={item.stock} />
       </td>
-      <td className="py-4 text-sm tabular-nums text-neutral-text">
-        {formatCurrency(item.price)}
-      </td>
+      <td className="py-4 text-sm tabular-nums text-neutral-text">{formatCurrency(item.price)}</td>
       <td className="py-4 text-sm font-semibold tabular-nums text-neutral-text">
         {formatCurrency(lineTotal)}
       </td>

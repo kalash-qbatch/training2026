@@ -1,23 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+
+import { ArrowUpRight, Boxes, DollarSign, Package, Search } from "lucide-react";
 import Link from "next/link";
-import {
-  ArrowUpRight,
-  Package,
-  Boxes,
-  DollarSign,
-  Search,
-} from "lucide-react";
-import type { AdminOrderStats, Order } from "@/types";
-import {
-  formatCurrency,
-  formatDate,
-  orderStatusClass,
-  orderStatusLabel,
-} from "@/lib/utils";
-import { fetchAdminOrders } from "@/lib/api/admin";
-import { useToast } from "@/components/ui/Toast";
+
 import { Pagination } from "@/components/ui/Pagination";
 import {
   Table,
@@ -28,7 +15,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/Table";
-import { TABLE_PAGE_SIZE, TABLE_INITIAL_PAGE } from "@/lib/constants";
+import { useToast } from "@/components/ui/Toast";
+import { fetchAdminOrders } from "@/lib/api/admin";
+import { TABLE_INITIAL_PAGE, TABLE_PAGE_SIZE } from "@/lib/constants";
+import { formatCurrency, formatDate, orderStatusClass, orderStatusLabel } from "@/lib/utils";
+import type { AdminOrderStats, Order } from "@/types";
 
 const inputClass =
   "h-10 w-full rounded-md border border-[#d0d5dd] bg-white px-3 text-[13px] text-neutral-text outline-none placeholder:text-neutral-muted focus:border-[#2563EB]";
@@ -48,11 +39,7 @@ function StatCard({
     <div className="flex items-center justify-between rounded-lg border border-[#e5e7eb] bg-white p-5">
       <div>
         <p className="text-[12px] text-neutral-muted">{label}</p>
-        <p
-          className={`mt-1 text-xl font-bold text-neutral-900 ${valueClassName ?? ""}`}
-        >
-          {value}
-        </p>
+        <p className={`mt-1 text-xl font-bold text-neutral-900 ${valueClassName ?? ""}`}>{value}</p>
       </div>
       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-[#2563EB]">
         <Icon className="h-5 w-5" />
@@ -118,16 +105,8 @@ export function OrdersPageClient() {
   return (
     <div>
       <div className="mb-5 grid gap-4 sm:grid-cols-3">
-        <StatCard
-          label="Total Orders"
-          value={String(stats.totalOrders)}
-          icon={Package}
-        />
-        <StatCard
-          label="Total Units"
-          value={String(stats.totalUnits)}
-          icon={Boxes}
-        />
+        <StatCard label="Total Orders" value={String(stats.totalOrders)} icon={Package} />
+        <StatCard label="Total Units" value={String(stats.totalUnits)} icon={Boxes} />
         <StatCard
           label="Total Amount"
           value={formatCurrency(stats.totalAmount)}
@@ -155,7 +134,7 @@ export function OrdersPageClient() {
             <TableHead>Date</TableHead>
             <TableHead>Order #</TableHead>
             <TableHead>User</TableHead>
-            <TableHead>Product(s)</TableHead>
+            <TableHead>Number of Product(s)</TableHead>
             <TableHead>Amount</TableHead>
             <TableHead>Status</TableHead>
             <TableHead className="pr-0">Actions</TableHead>
@@ -172,7 +151,9 @@ export function OrdersPageClient() {
               return (
                 <TableRow key={o.id}>
                   <TableCell>{formatDate(o.date)}</TableCell>
-                  <TableCell className="font-medium">{o.id.slice(0, 8)}</TableCell>
+                  {/* will uncomment after short id creation */}
+                  {/* <TableCell className="font-medium">{o.id.slice(0, 8)}</TableCell> */}
+                  <TableCell className="font-medium">{o.id}</TableCell>
                   <TableCell>{o.userName}</TableCell>
                   <TableCell>{productCount}</TableCell>
                   <TableCell className="font-medium tabular-nums">

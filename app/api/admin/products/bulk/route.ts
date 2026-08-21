@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+
 import { bulkCreateAdminProducts } from "@/lib/controllers/admin-products";
 
 export async function POST(request: Request) {

@@ -1,5 +1,6 @@
-import Link from "next/link";
 import { PackageOpen } from "lucide-react";
+import Link from "next/link";
+
 import { Button } from "./Button";
 
 export function EmptyState({

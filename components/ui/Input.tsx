@@ -1,5 +1,8 @@
-import { InputHTMLAttributes, forwardRef, useState } from "react";
+import { forwardRef, useState } from "react";
+
 import { Eye, EyeOff } from "lucide-react";
+import type { InputHTMLAttributes } from "react";
+
 import { cn } from "@/lib/utils";
 
 type InputProps = InputHTMLAttributes<HTMLInputElement> & {
@@ -7,34 +10,23 @@ type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   error?: string;
   /** Show eye toggle for password fields (default: true when type is password). */
   showPasswordToggle?: boolean;
+  important?: boolean;
 };
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  (
-    {
-      className,
-      label,
-      error,
-      id,
-      type,
-      showPasswordToggle,
-      ...props
-    },
-    ref
-  ) => {
+  ({ className, label, error, id, type, showPasswordToggle, important, ...props }, ref) => {
     const [visible, setVisible] = useState(false);
     const inputId = id ?? props.name;
     const isPassword = type === "password";
     const toggleEnabled = isPassword && (showPasswordToggle ?? true);
     const inputType = toggleEnabled && visible ? "text" : type;
+    const showStar = important ? true : false;
 
     return (
       <div className="w-full space-y-2">
-        <label
-          htmlFor={inputId}
-          className="block text-sm font-normal text-neutral-text"
-        >
+        <label htmlFor={inputId} className="block text-sm font-normal text-neutral-text">
           {label}
+          {showStar ? <span className="text-red-500">*</span> : null}
         </label>
         <div className="relative">
           <input
@@ -68,11 +60,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           ) : null}
         </div>
         {error ? (
-          <p
-            id={`${inputId}-error`}
-            className="text-xs text-status-error-fg"
-            role="alert"
-          >
+          <p id={`${inputId}-error`} className="text-xs text-status-error-fg" role="alert">
             {error}
           </p>
         ) : null}

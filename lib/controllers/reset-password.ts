@@ -1,6 +1,7 @@
-import { createHash } from "crypto";
 import bcrypt from "bcryptjs";
+import { createHash } from "crypto";
 import { z } from "zod";
+
 import {
   clearResetToken,
   findUserByValidResetToken,
@@ -96,8 +97,7 @@ export async function resetPassword(body: unknown) {
     status: 200,
     body: {
       success: true,
-      message:
-        "Your password has been updated. Please login with your new password.",
+      message: "Your password has been updated. Please login with your new password.",
     },
   };
 }

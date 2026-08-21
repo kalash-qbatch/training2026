@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  resetPassword,
-  validateResetToken,
-} from "@/lib/controllers/reset-password";
+
+import { resetPassword, validateResetToken } from "@/lib/controllers/reset-password";
 
 export async function GET(request: Request) {
   try {

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+
 import { markOneNotificationRead } from "@/lib/controllers/notifications";
 
 type Ctx = { params: Promise<{ id: string }> };

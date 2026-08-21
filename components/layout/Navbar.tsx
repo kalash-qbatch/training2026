@@ -1,11 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { ShoppingBag } from "lucide-react";
+import Link from "next/link";
+
+import { NotificationsPopover } from "@/components/layout/NotificationsPopover";
+import { UserMenu } from "@/components/layout/UserMenu";
 import { useAuthStore } from "@/lib/store/useAuthStore";
 import { useCartStore } from "@/lib/store/useCartStore";
-import { UserMenu } from "@/components/layout/UserMenu";
-import { NotificationsPopover } from "@/components/layout/NotificationsPopover";
 
 export function Navbar() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -16,10 +17,7 @@ export function Navbar() {
       <div
         className={`mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8 ${isAuthenticated ? "py-1" : "py-3.25"}`}
       >
-        <Link
-          href="/products"
-          className="text-[15px] font-semibold tracking-tight text-[#333333]"
-        >
+        <Link href="/products" className="text-[15px] font-semibold tracking-tight text-[#333333]">
           Bhai ka Store
         </Link>
 

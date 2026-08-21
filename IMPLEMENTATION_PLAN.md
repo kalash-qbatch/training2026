@@ -25,15 +25,15 @@
 
 The UI must closely match the provided Figma/design screenshots:
 
-| Screen | Key Elements |
-|---|---|
-| **SignUp** | Full name, email, mobile, password, confirm password fields. Blue "SignUp" button. "Already have an account! Login" link. |
-| **Login** | Email, password fields. "Remember me" checkbox. Blue "Login" button. "Forgot Password! Reset" link. "I don't have an account! SignUp" link. Inline validation (red error text). |
-| **Forgot Password** | Email field. Blue "Forgot Password" button. "No, I remember my password! Login" link. |
-| **Reset Password** | New password, confirm password fields. Password strength hint (red). Blue "Reset Password" button. |
-| **Products** | Navbar ("E-commerce" logo, home/bell/cart icons, "Login" link). "Our Products" heading. Search bar + Sort dropdown. 4-column responsive product grid (image, title, price, qty selector ±, "Add to Cart" button). |
-| **Cart** | "← Your Shopping Bag" heading. Table with columns: checkbox, Product (image + title), Color, Size, Qty (± controls), Price, Actions (delete icon). Sub Total / Tax / Total summary. "Place Order" button. Green success toast. Remove confirmation modal (warning icon, Yes/No). |
-| **User Menu** | Dropdown from user avatar: "Orders", "Logout". |
+| Screen              | Key Elements                                                                                                                                                                                                                                                                     |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SignUp**          | Full name, email, mobile, password, confirm password fields. Blue "SignUp" button. "Already have an account! Login" link.                                                                                                                                                        |
+| **Login**           | Email, password fields. "Remember me" checkbox. Blue "Login" button. "Forgot Password! Reset" link. "I don't have an account! SignUp" link. Inline validation (red error text).                                                                                                  |
+| **Forgot Password** | Email field. Blue "Forgot Password" button. "No, I remember my password! Login" link.                                                                                                                                                                                            |
+| **Reset Password**  | New password, confirm password fields. Password strength hint (red). Blue "Reset Password" button.                                                                                                                                                                               |
+| **Products**        | Navbar ("E-commerce" logo, home/bell/cart icons, "Login" link). "Our Products" heading. Search bar + Sort dropdown. 4-column responsive product grid (image, title, price, qty selector ±, "Add to Cart" button).                                                                |
+| **Cart**            | "← Your Shopping Bag" heading. Table with columns: checkbox, Product (image + title), Color, Size, Qty (± controls), Price, Actions (delete icon). Sub Total / Tax / Total summary. "Place Order" button. Green success toast. Remove confirmation modal (warning icon, Yes/No). |
+| **User Menu**       | Dropdown from user avatar: "Orders", "Logout".                                                                                                                                                                                                                                   |
 
 ---
 
@@ -131,12 +131,12 @@ All API routes return a consistent shape:
 
 All UI implementations **must** target and verify these four breakpoints extracted from the design screenshots:
 
-| Breakpoint | Viewport | Grid Cols | Tailwind Prefix | Layout Notes |
-|---|---|---|---|---|
-| **Mobile** | 428×926 | 2 | `default` / `sm:` | Search/sort stacked below heading. Full-width controls. |
-| **Tablet** | 1080×800 | 3 | `md:` | Search/sort right-aligned on same row as heading. |
-| **Small Desktop** | 1280×800 | 4 | `lg:` | Same as desktop layout. |
-| **Desktop** | 1366×1132 | 4 | `lg:` / `xl:` | Full 4-column grid. Maximum content width. |
+| Breakpoint        | Viewport  | Grid Cols | Tailwind Prefix   | Layout Notes                                            |
+| ----------------- | --------- | --------- | ----------------- | ------------------------------------------------------- |
+| **Mobile**        | 428×926   | 2         | `default` / `sm:` | Search/sort stacked below heading. Full-width controls. |
+| **Tablet**        | 1080×800  | 3         | `md:`             | Search/sort right-aligned on same row as heading.       |
+| **Small Desktop** | 1280×800  | 4         | `lg:`             | Same as desktop layout.                                 |
+| **Desktop**       | 1366×1132 | 4         | `lg:` / `xl:`     | Full 4-column grid. Maximum content width.              |
 
 **Mandatory rules for all UI work:**
 
@@ -299,13 +299,13 @@ All UI implementations **must** target and verify these four breakpoints extract
 - [ ] **2.3 — Prisma Client Singleton**
   - Create `lib/db.ts`:
     ```typescript
-    import { PrismaClient } from '@prisma/client';
+    import { PrismaClient } from "@prisma/client";
 
     const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 
     export const prisma = globalForPrisma.prisma || new PrismaClient();
 
-    if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+    if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
     ```
 
 - [ ] **2.4 — Seed Script**
@@ -315,8 +315,22 @@ All UI implementations **must** target and verify these four breakpoints extract
   - Example product objects:
     ```typescript
     const products = [
-      { title: "Wireless Noise-Cancelling Headphones", description: "...", price: 79.99, image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop", color: "Black", size: null },
-      { title: "Classic Leather Sneakers", description: "...", price: 129.99, image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&h=400&fit=crop", color: "Red", size: "10" },
+      {
+        title: "Wireless Noise-Cancelling Headphones",
+        description: "...",
+        price: 79.99,
+        image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop",
+        color: "Black",
+        size: null,
+      },
+      {
+        title: "Classic Leather Sneakers",
+        description: "...",
+        price: 129.99,
+        image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&h=400&fit=crop",
+        color: "Red",
+        size: "10",
+      },
       // ... 13-18 more products
     ];
     ```
@@ -348,36 +362,36 @@ All UI implementations **must** target and verify these four breakpoints extract
 
 - [ ] **3.1 — Primitive Components** (`components/ui/`)
 
-  | Component | Props | Notes |
-  |---|---|---|
-  | `Button` | `variant` (primary / outline / danger / ghost), `size` (sm / md / lg), `loading`, `disabled`, `fullWidth`, `type`, `onClick`, `children` | Blue primary matches designs. Loading state shows spinner. |
-  | `Input` | `label`, `type`, `placeholder`, `error`, `disabled`, `value`, `onChange`, `name`, `id` | Renders label above, input with border, red error text below. Matches login/register designs. |
-  | `Badge` | `variant` (success / warning / info / danger), `children` | For order status tags. |
-  | `Spinner` | `size` (sm / md / lg) | CSS-only animated spinner. |
-  | `Skeleton` | `className`, `variant` (text / circle / rect) | Loading placeholder with shimmer animation. |
+  | Component  | Props                                                                                                                                    | Notes                                                                                         |
+  | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+  | `Button`   | `variant` (primary / outline / danger / ghost), `size` (sm / md / lg), `loading`, `disabled`, `fullWidth`, `type`, `onClick`, `children` | Blue primary matches designs. Loading state shows spinner.                                    |
+  | `Input`    | `label`, `type`, `placeholder`, `error`, `disabled`, `value`, `onChange`, `name`, `id`                                                   | Renders label above, input with border, red error text below. Matches login/register designs. |
+  | `Badge`    | `variant` (success / warning / info / danger), `children`                                                                                | For order status tags.                                                                        |
+  | `Spinner`  | `size` (sm / md / lg)                                                                                                                    | CSS-only animated spinner.                                                                    |
+  | `Skeleton` | `className`, `variant` (text / circle / rect)                                                                                            | Loading placeholder with shimmer animation.                                                   |
 
 - [ ] **3.2 — Compound Components** (`components/ui/`)
 
-  | Component | Props | Notes |
-  |---|---|---|
-  | `Modal` | `isOpen`, `onClose`, `title`, `children` | Overlay + centered card. Trap focus, close on Escape & overlay click. Used for delete confirmation. |
-  | `ConfirmDialog` | `isOpen`, `onClose`, `onConfirm`, `title`, `message`, `confirmText`, `cancelText`, `variant` | Wraps Modal. Warning icon + message + Yes/No buttons. Matches "Remove Product" design. |
-  | `Toast` / `ToastContainer` | `type` (success / error / info), `message`, `onClose` | Top-right green/red bar with × close. Matches "order placed successfully" design. |
-  | `Pagination` | `currentPage`, `totalPages`, `onPageChange` | Numbered page buttons with prev/next arrows. |
-  | `SearchBar` | `value`, `onChange`, `placeholder` | Input with search icon. Matches products page design. |
-  | `SortDropdown` | `value`, `onChange`, `options` | "Sort by:" dropdown. Matches products page design. |
-  | `QuantitySelector` | `value`, `onChange`, `min`, `max` | − / value / + inline control. Matches cart & product designs. |
-  | `EmptyState` | `icon`, `title`, `description`, `action?` | Centered illustration + text for empty lists. |
-  | `ProductCard` | `product` | Image, title, price, quantity selector, "Add to Cart" button. Matches product grid card design. |
+  | Component                  | Props                                                                                        | Notes                                                                                               |
+  | -------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+  | `Modal`                    | `isOpen`, `onClose`, `title`, `children`                                                     | Overlay + centered card. Trap focus, close on Escape & overlay click. Used for delete confirmation. |
+  | `ConfirmDialog`            | `isOpen`, `onClose`, `onConfirm`, `title`, `message`, `confirmText`, `cancelText`, `variant` | Wraps Modal. Warning icon + message + Yes/No buttons. Matches "Remove Product" design.              |
+  | `Toast` / `ToastContainer` | `type` (success / error / info), `message`, `onClose`                                        | Top-right green/red bar with × close. Matches "order placed successfully" design.                   |
+  | `Pagination`               | `currentPage`, `totalPages`, `onPageChange`                                                  | Numbered page buttons with prev/next arrows.                                                        |
+  | `SearchBar`                | `value`, `onChange`, `placeholder`                                                           | Input with search icon. Matches products page design.                                               |
+  | `SortDropdown`             | `value`, `onChange`, `options`                                                               | "Sort by:" dropdown. Matches products page design.                                                  |
+  | `QuantitySelector`         | `value`, `onChange`, `min`, `max`                                                            | − / value / + inline control. Matches cart & product designs.                                       |
+  | `EmptyState`               | `icon`, `title`, `description`, `action?`                                                    | Centered illustration + text for empty lists.                                                       |
+  | `ProductCard`              | `product`                                                                                    | Image, title, price, quantity selector, "Add to Cart" button. Matches product grid card design.     |
 
 - [ ] **3.3 — Layout Components** (`components/layout/`)
 
-  | Component | Notes |
-  |---|---|
-  | `Navbar` | Left: "E-commerce" text logo. Right: home icon, bell icon, cart icon (link to /cart), "Login" link (or user avatar dropdown when authenticated). Matches design navbar. |
-  | `UserMenu` | Dropdown from avatar/name: "Orders" link, "Logout" button. Matches design dropdown. |
-  | `Footer` | Minimal footer (optional — not shown in designs, keep simple). |
-  | `AuthLayout` | Centered card on light gray background. Used by all (auth) pages. Matches login/register design wrapper. |
+  | Component    | Notes                                                                                                                                                                   |
+  | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `Navbar`     | Left: "E-commerce" text logo. Right: home icon, bell icon, cart icon (link to /cart), "Login" link (or user avatar dropdown when authenticated). Matches design navbar. |
+  | `UserMenu`   | Dropdown from avatar/name: "Orders" link, "Logout" button. Matches design dropdown.                                                                                     |
+  | `Footer`     | Minimal footer (optional — not shown in designs, keep simple).                                                                                                          |
+  | `AuthLayout` | Centered card on light gray background. Used by all (auth) pages. Matches login/register design wrapper.                                                                |
 
 - [ ] **3.4 — Toast Context**
   - Create `hooks/useToast.ts` and a `ToastProvider` context.
@@ -412,7 +426,9 @@ All UI implementations **must** target and verify these four breakpoints extract
       callbacks: {
         authorized({ auth, request: { nextUrl } }) {
           const isLoggedIn = !!auth?.user;
-          const isAuthPage = ["/login", "/register", "/forgot-password", "/reset-password"].some(p => nextUrl.pathname.startsWith(p));
+          const isAuthPage = ["/login", "/register", "/forgot-password", "/reset-password"].some(
+            (p) => nextUrl.pathname.startsWith(p)
+          );
           if (isAuthPage && isLoggedIn) return Response.redirect(new URL("/products", nextUrl));
           if (!isAuthPage && !isLoggedIn) return false; // redirects to signIn page
           return true;
@@ -439,7 +455,9 @@ All UI implementations **must** target and verify these four breakpoints extract
       providers: [
         Credentials({
           async authorize(credentials) {
-            const user = await prisma.user.findUnique({ where: { email: credentials.email as string } });
+            const user = await prisma.user.findUnique({
+              where: { email: credentials.email as string },
+            });
             if (!user) return null;
             const valid = await bcrypt.compare(credentials.password as string, user.passwordHash);
             if (!valid) return null;
@@ -450,11 +468,15 @@ All UI implementations **must** target and verify these four breakpoints extract
       callbacks: {
         ...authConfig.callbacks,
         async jwt({ token, user }) {
-          if (user) { token.id = user.id; }
+          if (user) {
+            token.id = user.id;
+          }
           return token;
         },
         async session({ session, token }) {
-          if (token.id) { session.user.id = token.id as string; }
+          if (token.id) {
+            session.user.id = token.id as string;
+          }
           return session;
         },
       },
@@ -839,13 +861,16 @@ All UI implementations **must** target and verify these four breakpoints extract
 - [ ] **10.2 — Logger Module** (`lib/logger.ts`)
   - Create a centralized Pino logger instance:
     ```typescript
-    import pino from 'pino';
+    import pino from "pino";
 
     export const logger = pino({
-      level: process.env.LOG_LEVEL || 'info',
+      level: process.env.LOG_LEVEL || "info",
       transport:
-        process.env.NODE_ENV !== 'production'
-          ? { target: 'pino-pretty', options: { colorize: true, translateTime: 'SYS:HH:MM:ss', ignore: 'pid,hostname' } }
+        process.env.NODE_ENV !== "production"
+          ? {
+              target: "pino-pretty",
+              options: { colorize: true, translateTime: "SYS:HH:MM:ss", ignore: "pid,hostname" },
+            }
           : undefined,
     });
     ```
@@ -856,20 +881,23 @@ All UI implementations **must** target and verify these four breakpoints extract
 - [ ] **10.3 — Request Logging Utility** (`lib/request-logger.ts`)
   - Create a reusable helper for logging API route requests:
     ```typescript
-    import { NextRequest } from 'next/server';
-    import { logger } from './logger';
+    import { NextRequest } from "next/server";
+    import { logger } from "./logger";
 
     export function logRequest(req: NextRequest, context?: string) {
-      logger.info({
-        method: req.method,
-        url: req.nextUrl.pathname,
-        search: req.nextUrl.search || undefined,
-        context,
-      }, `${req.method} ${req.nextUrl.pathname}`);
+      logger.info(
+        {
+          method: req.method,
+          url: req.nextUrl.pathname,
+          search: req.nextUrl.search || undefined,
+          context,
+        },
+        `${req.method} ${req.nextUrl.pathname}`
+      );
     }
 
     export function logError(error: unknown, context?: string) {
-      logger.error({ err: error, context }, context || 'Unhandled error');
+      logger.error({ err: error, context }, context || "Unhandled error");
     }
     ```
 
@@ -932,16 +960,16 @@ Phase 1 (Foundation)
 
 ## Risk Register
 
-| Risk | Impact | Mitigation |
-|---|---|---|
-| PostgreSQL not running locally | Blocks Phase 2+ | Document setup instructions. Consider Docker Compose for DB. |
-| AUTH_SECRET leaked in .env commit | Security breach | `.env` in `.gitignore`. Use `.env.example` for docs. Generated via `npx auth secret`. |
-| Prisma client not singleton in dev | DB connection exhaustion | `lib/db.ts` singleton pattern (implemented in Phase 2). |
-| Prisma adapter not Edge-compatible | Middleware crash | Split auth config: `auth.config.ts` (Edge-safe, no Prisma) + `auth.ts` (full config with Prisma). |
-| Product images from external domains blocked | Broken images | Configure `next.config.ts` `images.remotePatterns`. |
-| Cart race conditions (concurrent qty updates) | Incorrect totals | Use Prisma transactions for order placement. `@@unique` constraint prevents duplicate cart items. |
-| Password reset token brute-force | Account takeover | Use long random tokens (UUID v4). Expire after 1 hour. Clear after use. |
-| Large product datasets slow pagination | Poor UX | DB indexes on searchable/sortable columns. Limit page size. |
+| Risk                                          | Impact                   | Mitigation                                                                                        |
+| --------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------- |
+| PostgreSQL not running locally                | Blocks Phase 2+          | Document setup instructions. Consider Docker Compose for DB.                                      |
+| AUTH_SECRET leaked in .env commit             | Security breach          | `.env` in `.gitignore`. Use `.env.example` for docs. Generated via `npx auth secret`.             |
+| Prisma client not singleton in dev            | DB connection exhaustion | `lib/db.ts` singleton pattern (implemented in Phase 2).                                           |
+| Prisma adapter not Edge-compatible            | Middleware crash         | Split auth config: `auth.config.ts` (Edge-safe, no Prisma) + `auth.ts` (full config with Prisma). |
+| Product images from external domains blocked  | Broken images            | Configure `next.config.ts` `images.remotePatterns`.                                               |
+| Cart race conditions (concurrent qty updates) | Incorrect totals         | Use Prisma transactions for order placement. `@@unique` constraint prevents duplicate cart items. |
+| Password reset token brute-force              | Account takeover         | Use long random tokens (UUID v4). Expire after 1 hour. Clear after use.                           |
+| Large product datasets slow pagination        | Poor UX                  | DB indexes on searchable/sortable columns. Limit page size.                                       |
 
 ---
 

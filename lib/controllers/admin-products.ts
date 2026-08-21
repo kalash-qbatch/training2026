@@ -1,6 +1,8 @@
 import path from "path";
-import { getProductError, productErrorStatus } from "@/lib/errors/products";
+
+import { TABLE_INITIAL_PAGE, TABLE_PAGE_SIZE } from "@/lib/constants";
 import { requireAdminUser } from "@/lib/controllers/http";
+import { getProductError, productErrorStatus } from "@/lib/errors/products";
 import {
   createProduct,
   createProductsBulk,
@@ -10,7 +12,6 @@ import {
 } from "@/lib/services/products";
 import { uploadProductImage } from "@/lib/supabase";
 import { adminProductSchema } from "@/lib/validations/admin";
-import { TABLE_PAGE_SIZE, TABLE_INITIAL_PAGE } from "@/lib/constants";
 
 function productErrorResult(err: unknown) {
   const productErr = getProductError(err);
@@ -83,8 +84,7 @@ export async function listAdminProducts(request: Request) {
   const result = await findAdminProducts({
     search: searchParams.get("search") ?? undefined,
     categoryId: searchParams.get("categoryId") ?? undefined,
-    isActive:
-      status === "active" ? true : status === "inactive" ? false : undefined,
+    isActive: status === "active" ? true : status === "inactive" ? false : undefined,
     page: Number(searchParams.get("page") || TABLE_INITIAL_PAGE),
     pageSize: Number(searchParams.get("pageSize") || TABLE_PAGE_SIZE),
   });

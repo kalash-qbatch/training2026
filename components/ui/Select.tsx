@@ -1,24 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+
 import { Check, ChevronDown } from "lucide-react";
+
 import { cn } from "@/lib/utils";
-import type { SelectOption } from "@/types";
+import type { SelectOption, SelectProps } from "@/types";
 
 export type { SelectOption };
-
-type SelectProps = {
-  value: string;
-  onChange: (value: string) => void;
-  options: SelectOption[];
-  placeholder?: string;
-  /** Static text shown before the selected label (e.g. "Sort by:"). */
-  prefix?: string;
-  disabled?: boolean;
-  className?: string;
-  ariaLabel?: string;
-  labelClass?: string | null;
-};
 
 export function Select({
   value,
@@ -29,7 +18,7 @@ export function Select({
   disabled,
   className,
   ariaLabel,
-  labelClass
+  labelClass,
 }: SelectProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -69,21 +58,19 @@ export function Select({
           }
         }}
         className={cn(
-          "flex h-10 w-full items-center justify-between gap-2 rounded-md border border-neutral-border bg-white px-3 text-left text-[13px] text-neutral-text outline-none transition focus:border-[#2563EB] disabled:cursor-not-allowed disabled:opacity-60",
+          "flex h-10 w-full items-center text justify-between gap-2 rounded-md border border-neutral-border bg-white px-3 text-left text-[13px] text-neutral-text outline-none transition focus:border-[#2563EB] disabled:cursor-not-allowed disabled:opacity-60",
           open && "border-[#2563EB]",
           className
         )}
       >
         <span className="truncate">
-          {prefix ? (
-            <span className="text-[#8E94A9]">{prefix} </span>
-          ) : null}
+          {prefix ? <span className="text-[#8E94A9] uppercase">{prefix} </span> : null}
           {selected ? (
-            <span className={cn(selected.accent && "text-[#2563EB]")}>
+            <span className={cn(selected.accent && "text-[#2563EB] uppercase")}>
               {selected.label}
             </span>
           ) : (
-            <span className="text-neutral-muted">{placeholder}</span>
+            <span className="text-neutral-muted uppercase">{placeholder}</span>
           )}
         </span>
         <ChevronDown
@@ -117,16 +104,12 @@ export function Select({
                   }}
                   className={cn(
                     "flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[13px] transition hover:bg-[#f3f4f6]",
-                    isSelected
-                      ? "bg-brand-50 font-medium text-[#2563EB]"
-                      : "text-neutral-text",
+                    isSelected ? "bg-brand-50 font-medium text-[#2563EB]" : "text-neutral-text",
                     opt.accent && "font-medium text-[#2563EB]"
                   )}
                 >
-                  <span className="truncate">{opt.label}</span>
-                  {isSelected ? (
-                    <Check className="h-4 w-4 shrink-0 text-[#2563EB]" />
-                  ) : null}
+                  <span className="truncate uppercase">{opt.label}</span>
+                  {isSelected ? <Check className="h-4 w-4 shrink-0 text-[#2563EB]" /> : null}
                 </button>
               </li>
             );

@@ -3,15 +3,12 @@ export const PRODUCT_ERROR = {
   NOT_FOUND: "PRODUCT_NOT_FOUND",
 } as const;
 
-export type ProductErrorCode =
-  (typeof PRODUCT_ERROR)[keyof typeof PRODUCT_ERROR];
+export type ProductErrorCode = (typeof PRODUCT_ERROR)[keyof typeof PRODUCT_ERROR];
 
 export type ProductServiceError = Error & { code: ProductErrorCode };
 
 export function duplicateProductError(title: string): ProductServiceError {
-  const err = new Error(
-    `A product named "${title}" already exists`
-  ) as ProductServiceError;
+  const err = new Error(`A product named "${title}" already exists`) as ProductServiceError;
   err.code = PRODUCT_ERROR.DUPLICATE;
   return err;
 }

@@ -35,10 +35,7 @@ export async function createCategory(name: string): Promise<CategoryDto> {
 
   const existing = await prisma.category.findFirst({
     where: {
-      OR: [
-        { name: { equals: trimmed, mode: "insensitive" } },
-        { slug },
-      ],
+      OR: [{ name: { equals: trimmed, mode: "insensitive" } }, { slug }],
     },
     select: { id: true, name: true, slug: true },
   });

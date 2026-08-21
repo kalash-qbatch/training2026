@@ -64,15 +64,11 @@ async function resolveLine(
 
   if (product.specifications.length > 0) {
     if (!specificationId) {
-      throw new CartError(
-        `A variant selection is required for "${product.title}".`
-      );
+      throw new CartError(`A variant selection is required for "${product.title}".`);
     }
     const spec = product.specifications.find((s) => s.id === specificationId);
     if (!spec) {
-      throw new CartError(
-        `Selected variant is unavailable for "${product.title}".`
-      );
+      throw new CartError(`Selected variant is unavailable for "${product.title}".`);
     }
     return { title: product.title, stock: spec.qty, specificationId: spec.id };
   }
@@ -126,9 +122,7 @@ export async function addToCart(
     const current = existing?.quantity ?? 0;
     const left = stock - current;
     if (left <= 0) {
-      throw new CartError(
-        `Only ${stock} in stock. You already have ${current} in cart.`
-      );
+      throw new CartError(`Only ${stock} in stock. You already have ${current} in cart.`);
     }
     throw new CartError(`Only ${stock} in stock. You can add ${left} more.`);
   }

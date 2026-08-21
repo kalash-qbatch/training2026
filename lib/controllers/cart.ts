@@ -1,3 +1,4 @@
+import { requireUser } from "@/lib/controllers/http";
 import {
   addToCart,
   CartError,
@@ -7,7 +8,6 @@ import {
   removeCartItems,
   updateCartItem,
 } from "@/lib/services/cart";
-import { requireUser } from "@/lib/controllers/http";
 
 function cartErrorResult(err: unknown) {
   if (err instanceof CartError) {
@@ -99,13 +99,11 @@ export async function deleteCartItems(request: Request) {
       return { status: 200, body: { success: true, items } };
     }
 
-    const body = (await request.json().catch(() => null)) as
-      | {
-          productId?: string;
-          specificationId?: string;
-          items?: Array<{ productId: string; specificationId?: string }>;
-        }
-      | null;
+    const body = (await request.json().catch(() => null)) as {
+      productId?: string;
+      specificationId?: string;
+      items?: Array<{ productId: string; specificationId?: string }>;
+    } | null;
 
     if (body?.items?.length) {
       const items = await removeCartItems(userId, body.items);

@@ -5,10 +5,12 @@
  * Usage: npx tsx scripts/migrate-images-to-supabase.ts
  */
 import "dotenv/config";
+
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "@prisma/client";
 import { readdir, readFile } from "fs/promises";
 import path from "path";
-import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
+
 import { uploadProductImage } from "../lib/supabase";
 
 const adapter = new PrismaPg({
@@ -26,9 +28,7 @@ const MIME: Record<string, string> = {
 
 async function main() {
   const dir = path.join(process.cwd(), "public", "products");
-  const files = (await readdir(dir)).filter((f) =>
-    /\.(jpe?g|png|webp|gif)$/i.test(f)
-  );
+  const files = (await readdir(dir)).filter((f) => /\.(jpe?g|png|webp|gif)$/i.test(f));
 
   console.log(`Found ${files.length} local product images`);
 

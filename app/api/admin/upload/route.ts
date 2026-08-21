@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+
 import { uploadAdminImage } from "@/lib/controllers/admin-upload";
 
 export async function POST(request: Request) {

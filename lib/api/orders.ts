@@ -1,7 +1,10 @@
 import type { ColorFilter, Order, SizeFilter } from "@/types";
 
 /** Browser-safe: loads orders from `/api/orders` (Postgres). */
-export async function getOrders(page = 1, pageSize = 5): Promise<{
+export async function getOrders(
+  page = 1,
+  pageSize = 5
+): Promise<{
   orders: Order[];
   total: number;
   page: number;
@@ -52,13 +55,15 @@ export async function getOrderById(id: string): Promise<Order | null> {
   return data.order ?? null;
 }
 
-export async function placeOrder(items: Array<{
-  productId: string;
-  specificationId?: string;
-  quantity: number;
-  color?: string;
-  size?: string;
-}>): Promise<Order> {
+export async function placeOrder(
+  items: Array<{
+    productId: string;
+    specificationId?: string;
+    quantity: number;
+    color?: string;
+    size?: string;
+  }>
+): Promise<Order> {
   const res = await fetch("/api/orders", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

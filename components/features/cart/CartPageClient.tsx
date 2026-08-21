@@ -1,24 +1,30 @@
 "use client";
 
-import { useMemo, useState, startTransition } from "react";
+import { startTransition, useMemo, useState } from "react";
+
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
-import { placeOrder as placeOrderApi } from "@/lib/api/orders";
-import { useCartStore } from "@/lib/store/useCartStore";
-import { useAuthStore } from "@/lib/store/useAuthStore";
-import { useToast } from "@/components/ui/Toast";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { CartLineItem } from "./CartLineItem";
-import { CartSummary } from "./CartSummary";
-import { RemoveProductModal } from "./RemoveProductModal";
-import { OrderPlacedModal } from "./OrderPlacedModal";
+
 import { OrdersDrawer } from "@/components/features/orders/OrdersDrawer";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { useToast } from "@/components/ui/Toast";
+import { placeOrder as placeOrderApi } from "@/lib/api/orders";
 import { TAX_RATE } from "@/lib/constants";
+import { useAuthStore } from "@/lib/store/useAuthStore";
+import { useCartStore } from "@/lib/store/useCartStore";
 import type { CartItem } from "@/types";
 
+import { CartLineItem } from "./CartLineItem";
+import { CartSummary } from "./CartSummary";
+import { OrderPlacedModal } from "./OrderPlacedModal";
+import { RemoveProductModal } from "./RemoveProductModal";
+
 function itemKey(item: CartItem) {
-  return item.id || (item.specificationId ? `${item.productId}::${item.specificationId}` : item.productId);
+  return (
+    item.id ||
+    (item.specificationId ? `${item.productId}::${item.specificationId}` : item.productId)
+  );
 }
 
 export function CartPageClient() {
@@ -32,9 +38,7 @@ export function CartPageClient() {
 
   const [pendingRemove, setPendingRemove] = useState<CartItem | null>(null);
   const [placing, setPlacing] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(
-    () => new Set(items.map(itemKey))
-  );
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(items.map(itemKey)));
   const [successOpen, setSuccessOpen] = useState(false);
   const [placedOrderId, setPlacedOrderId] = useState<string | null>(null);
   const [ordersOpen, setOrdersOpen] = useState(false);
@@ -165,9 +169,7 @@ export function CartPageClient() {
                   onQtyChange={(qty) => {
                     void updateQty(item.productId, qty, item.specificationId).catch(
                       (err: unknown) =>
-                        toast.error(
-                          err instanceof Error ? err.message : "Failed to update qty"
-                        )
+                        toast.error(err instanceof Error ? err.message : "Failed to update qty")
                     );
                   }}
                   onRemove={() => setPendingRemove(item)}
@@ -196,11 +198,8 @@ export function CartPageClient() {
                 });
               }}
               onQtyChange={(qty) => {
-                void updateQty(item.productId, qty, item.specificationId).catch(
-                  (err: unknown) =>
-                    toast.error(
-                      err instanceof Error ? err.message : "Failed to update qty"
-                    )
+                void updateQty(item.productId, qty, item.specificationId).catch((err: unknown) =>
+                  toast.error(err instanceof Error ? err.message : "Failed to update qty")
                 );
               }}
               onRemove={() => setPendingRemove(item)}
@@ -243,11 +242,11 @@ export function CartPageClient() {
               setPlacedOrderId(order.id);
               setSuccessOpen(true);
               // Defer refresh so it doesn't block the success modal rendering
-              startTransition(() => { router.refresh(); });
+              startTransition(() => {
+                router.refresh();
+              });
             } catch (err) {
-              toast.error(
-                err instanceof Error ? err.message : "Failed to place order"
-              );
+              toast.error(err instanceof Error ? err.message : "Failed to place order");
             } finally {
               setPlacing(false);
             }
@@ -260,15 +259,10 @@ export function CartPageClient() {
         onClose={() => setPendingRemove(null)}
         onConfirm={() => {
           if (pendingRemove) {
-            void removeItem(
-              pendingRemove.productId,
-              pendingRemove.specificationId
-            )
+            void removeItem(pendingRemove.productId, pendingRemove.specificationId)
               .then(() => toast.success("Item removed from bag"))
               .catch((err: unknown) =>
-                toast.error(
-                  err instanceof Error ? err.message : "Failed to remove item"
-                )
+                toast.error(err instanceof Error ? err.message : "Failed to remove item")
               );
           }
           setPendingRemove(null);

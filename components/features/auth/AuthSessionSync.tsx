@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
+
 import { useSession } from "next-auth/react";
+
 import { useAuthStore } from "@/lib/store/useAuthStore";
 
 /** Keeps Zustand in sync with the Auth.js session used by proxy/middleware. */
@@ -22,10 +24,7 @@ export function AuthSessionSync() {
 
     login({
       id: session.user.id || session.user.email,
-      fullName:
-        session.user.name?.trim() ||
-        session.user.email.split("@")[0] ||
-        "User",
+      fullName: session.user.name?.trim() || session.user.email.split("@")[0] || "User",
       email: session.user.email,
       image: session.user.image ?? undefined,
       role: session.user.role === "ADMIN" ? "ADMIN" : "USER",

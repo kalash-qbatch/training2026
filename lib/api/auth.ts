@@ -44,9 +44,7 @@ export async function forgotPasswordRequest(email: string): Promise<void> {
 export async function validateResetTokenRequest(
   token: string
 ): Promise<{ valid: boolean; expiresAt?: string }> {
-  const res = await fetch(
-    `/api/auth/reset-password?token=${encodeURIComponent(token)}`
-  );
+  const res = await fetch(`/api/auth/reset-password?token=${encodeURIComponent(token)}`);
   const data = (await res.json()) as {
     success?: boolean;
     valid?: boolean;

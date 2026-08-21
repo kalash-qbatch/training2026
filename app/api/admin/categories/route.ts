@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  createAdminCategory,
-  listAdminCategories,
-} from "@/lib/controllers/admin-categories";
+
+import { createAdminCategory, listAdminCategories } from "@/lib/controllers/admin-categories";
 
 export async function GET() {
   try {

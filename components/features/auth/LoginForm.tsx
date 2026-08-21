@@ -1,18 +1,20 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect } from "react";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { getSession, signIn } from "next-auth/react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { loginSchema, type LoginInput } from "@/lib/validations/auth";
-import { useAuthStore } from "@/lib/store/useAuthStore";
-import { useToast } from "@/components/ui/Toast";
-import { Input } from "@/components/ui/Input";
+
+import { SocialAuthButtons } from "@/components/features/auth/SocialAuthButtons";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { SocialAuthButtons } from "@/components/features/auth/SocialAuthButtons";
+import { Input } from "@/components/ui/Input";
+import { useToast } from "@/components/ui/Toast";
+import { useAuthStore } from "@/lib/store/useAuthStore";
+import { type LoginInput, loginSchema } from "@/lib/validations/auth";
 
 export function LoginForm() {
   const searchParams = useSearchParams();
@@ -32,13 +34,11 @@ export function LoginForm() {
     const error = searchParams.get("error");
     if (!error) return;
     const messages: Record<string, string> = {
-      OAuthAccountNotLinked:
-        "This email is already registered with another sign-in method.",
+      OAuthAccountNotLinked: "This email is already registered with another sign-in method.",
       OAuthCallback: "Social login failed. Please try again.",
       AccessDenied: "Access was denied. Please try again.",
       Configuration: "Social login is misconfigured. Check OAuth app settings.",
-      CredentialsSignin:
-        "Wrong username/password, please enter correct credentials",
+      CredentialsSignin: "Wrong username/password, please enter correct credentials",
       Default: "Social login failed. Please try again.",
     };
     toast.error(messages[error] ?? messages.Default);
@@ -54,9 +54,7 @@ export function LoginForm() {
       });
 
       if (result?.error) {
-        toast.error(
-          "Wrong username/password, please enter correct credentials"
-        );
+        toast.error("Wrong username/password, please enter correct credentials");
         return;
       }
 
@@ -64,10 +62,7 @@ export function LoginForm() {
       if (session?.user?.email) {
         login({
           id: session.user.id || session.user.email,
-          fullName:
-            session.user.name?.trim() ||
-            session.user.email.split("@")[0] ||
-            "User",
+          fullName: session.user.name?.trim() || session.user.email.split("@")[0] || "User",
           email: session.user.email,
           image: session.user.image ?? undefined,
           role: session.user.role === "ADMIN" ? "ADMIN" : "USER",
@@ -99,6 +94,7 @@ export function LoginForm() {
             type="email"
             placeholder="Please enter your email"
             autoComplete="email"
+            important
             error={errors.email?.message}
             {...register("email")}
           />
@@ -107,6 +103,7 @@ export function LoginForm() {
             type="password"
             placeholder="Please enter your password"
             autoComplete="current-password"
+            important
             error={errors.password?.message}
             {...register("password")}
           />
@@ -118,7 +115,11 @@ export function LoginForm() {
             />
             Remember me
           </label>
-          <Button type="submit" loading={isSubmitting} className="mt-1 py-3 text-base font-semibold">
+          <Button
+            type="submit"
+            loading={isSubmitting}
+            className="mt-1 py-3 text-base font-semibold"
+          >
             Login
           </Button>
         </form>

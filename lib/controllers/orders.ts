@@ -1,11 +1,6 @@
 import { auth } from "@/auth";
-import {
-  createOrder,
-  findOrderById,
-  findOrders,
-  OrderError,
-} from "@/lib/services/orders";
 import { requireUser } from "@/lib/controllers/http";
+import { createOrder, findOrderById, findOrders, OrderError } from "@/lib/services/orders";
 import type { PlaceOrderItemInput } from "@/types";
 
 export async function listOrders(request: Request) {

@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+
 import { Minus, Plus } from "lucide-react";
-import { cn } from "@/lib/utils";
+
 import { useToast } from "@/components/ui/Toast";
+import { cn } from "@/lib/utils";
 
 type QtyStepperProps = {
   value: number;
@@ -13,13 +15,7 @@ type QtyStepperProps = {
   className?: string;
 };
 
-export function QtyStepper({
-  value,
-  onChange,
-  min = 1,
-  max,
-  className,
-}: QtyStepperProps) {
+export function QtyStepper({ value, onChange, min = 1, max, className }: QtyStepperProps) {
   const { toast } = useToast();
   const [draft, setDraft] = useState<string | null>(null);
   const cell =
@@ -98,7 +94,7 @@ export function QtyStepper({
             e.preventDefault();
           }
         }}
-        className="font-medium tabular-nums text-neutral-900 px-2 h-8.5 w-15.5 shrink-0 items-center justify-center border border-neutral-border bg-white text-[13px]"
+        className="font-medium tabular-nums text-neutral-900 px-2 h-8.5 w-15.5 shrink-0 items-center text-center justify-center border border-neutral-border bg-white text-[13px]"
         aria-live="polite"
       />
       <button

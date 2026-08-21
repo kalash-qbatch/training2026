@@ -1,10 +1,10 @@
+import { NOTIFICATION_INITIAL_PAGE, NOTIFICATION_PAGE_SIZE } from "@/lib/constants";
+import { requireUser } from "@/lib/controllers/http";
 import {
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
 } from "@/lib/services/notifications";
-import { requireUser } from "@/lib/controllers/http";
-import { NOTIFICATION_PAGE_SIZE, NOTIFICATION_INITIAL_PAGE } from "@/lib/constants";
 
 export async function getNotifications(req?: Request) {
   const { userId, error } = await requireUser();

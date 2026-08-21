@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  addCartItem,
-  deleteCartItems,
-  listCart,
-  patchCartItem,
-} from "@/lib/controllers/cart";
+
+import { addCartItem, deleteCartItems, listCart, patchCartItem } from "@/lib/controllers/cart";
 
 export const dynamic = "force-dynamic";
 
@@ -14,10 +10,7 @@ export async function GET() {
     return NextResponse.json(result.body, { status: result.status });
   } catch (err) {
     console.error("cart GET:", err);
-    return NextResponse.json(
-      { success: false, error: "Failed to load cart" },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: "Failed to load cart" }, { status: 500 });
   }
 }
 
@@ -28,10 +21,7 @@ export async function POST(request: Request) {
     return NextResponse.json(result.body, { status: result.status });
   } catch (err) {
     console.error("cart POST:", err);
-    return NextResponse.json(
-      { success: false, error: "Failed to add to cart" },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: "Failed to add to cart" }, { status: 500 });
   }
 }
 
@@ -42,10 +32,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json(result.body, { status: result.status });
   } catch (err) {
     console.error("cart PATCH:", err);
-    return NextResponse.json(
-      { success: false, error: "Failed to update cart" },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: "Failed to update cart" }, { status: 500 });
   }
 }
 

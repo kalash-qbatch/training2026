@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+
 import { getCategories } from "@/lib/controllers/categories";
 
 export const dynamic = "force-dynamic";

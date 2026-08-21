@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+
 import { createUser, findUserByEmail } from "@/lib/services/auth";
 import { signUpSchema } from "@/lib/validations/auth";
 

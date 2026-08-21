@@ -1,6 +1,7 @@
 import "dotenv/config";
-import { PrismaClient, type Prisma } from "@prisma/client";
+
 import { PrismaPg } from "@prisma/adapter-pg";
+import { type Prisma, PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const adapter = new PrismaPg({
@@ -143,8 +144,7 @@ async function main() {
     },
   ];
 
-  const sizeLabel = (size: string) =>
-    size === "M" ? "Medium" : size === "L" ? "Large" : size;
+  const sizeLabel = (size: string) => (size === "M" ? "Medium" : size === "L" ? "Large" : size);
 
   const products = await Promise.all(
     catalog.map((item) => {

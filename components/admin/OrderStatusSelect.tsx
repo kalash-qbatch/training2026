@@ -1,14 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import type { Order } from "@/types";
-import {
-  updateAdminOrderStatus,
-  type AdminOrderStatusUpdate,
-} from "@/lib/api/admin";
-import { toAdminOrderStatus } from "@/lib/utils";
-import { useToast } from "@/components/ui/Toast";
+
 import { Select } from "@/components/ui/Select";
+import { useToast } from "@/components/ui/Toast";
+import { type AdminOrderStatusUpdate, updateAdminOrderStatus } from "@/lib/api/admin";
+import { toAdminOrderStatus } from "@/lib/utils";
+import type { Order } from "@/types";
 
 /** Maps to Prisma OrderStatus. */
 const OPTIONS: Array<{ value: AdminOrderStatusUpdate; label: string }> = [
@@ -26,9 +24,7 @@ type Props = {
 
 export function OrderStatusSelect({ order, onUpdated, className }: Props) {
   const { toast } = useToast();
-  const [value, setValue] = useState<AdminOrderStatusUpdate>(
-    toAdminOrderStatus(order.status)
-  );
+  const [value, setValue] = useState<AdminOrderStatusUpdate>(toAdminOrderStatus(order.status));
   const [saving, setSaving] = useState(false);
   const [prevStatus, setPrevStatus] = useState(order.status);
   const [prevOrderId, setPrevOrderId] = useState(order.id);
@@ -54,9 +50,7 @@ export function OrderStatusSelect({ order, onUpdated, className }: Props) {
       toast.success(`Order marked as ${label}`);
     } catch (err) {
       setValue(prev);
-      toast.error(
-        err instanceof Error ? err.message : "Failed to update status"
-      );
+      toast.error(err instanceof Error ? err.message : "Failed to update status");
     } finally {
       setSaving(false);
     }

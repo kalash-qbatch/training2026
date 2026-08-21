@@ -1,13 +1,11 @@
 import type { z } from "zod";
+
+import type { adminCategorySchema, adminProductSchema } from "@/lib/validations/admin";
 import type {
-  adminProductSchema,
-  adminCategorySchema,
-} from "@/lib/validations/admin";
-import type {
-  loginSchema,
-  signUpSchema,
   forgotPasswordSchema,
+  loginSchema,
   resetPasswordSchema,
+  signUpSchema,
 } from "@/lib/validations/auth";
 
 /* ==========================================================================
@@ -118,6 +116,19 @@ export type GetProductsOptions = {
   signal?: AbortSignal;
 };
 
+export type SelectProps = {
+  value: string;
+  onChange: (value: string) => void;
+  options: SelectOption[];
+  placeholder?: string;
+  /** Static text shown before the selected label (e.g. "Sort by:"). */
+  prefix?: string;
+  disabled?: boolean;
+  className?: string;
+  ariaLabel?: string;
+  labelClass?: string | null;
+};
+
 export type GetProductsResult = {
   products: Product[];
   total: number;
@@ -127,10 +138,7 @@ export type GetProductsResult = {
 };
 
 export type ProductErrorCode =
-  | "PRODUCT_NOT_FOUND"
-  | "INSUFFICIENT_STOCK"
-  | "DUPLICATE_SKU"
-  | "INVALID_INPUT";
+  "PRODUCT_NOT_FOUND" | "INSUFFICIENT_STOCK" | "DUPLICATE_SKU" | "INVALID_INPUT";
 
 export type ProductServiceError = Error & { code: ProductErrorCode };
 
@@ -152,9 +160,7 @@ export type CartItem = {
   stock?: number;
 };
 
-export type AddItemResult =
-  | { ok: true; qty: number }
-  | { ok: false; error: string };
+export type AddItemResult = { ok: true; qty: number } | { ok: false; error: string };
 
 export type CartState = {
   items: CartItem[];
@@ -167,18 +173,9 @@ export type CartState = {
     qty: number,
     opts?: { specificationId?: string }
   ) => Promise<AddItemResult>;
-  updateQty: (
-    productId: string,
-    qty: number,
-    specificationId?: string
-  ) => Promise<void>;
-  removeItem: (
-    productId: string,
-    specificationId?: string
-  ) => Promise<void>;
-  removeItems: (
-    items: Array<{ productId: string; specificationId?: string }>
-  ) => Promise<void>;
+  updateQty: (productId: string, qty: number, specificationId?: string) => Promise<void>;
+  removeItem: (productId: string, specificationId?: string) => Promise<void>;
+  removeItems: (items: Array<{ productId: string; specificationId?: string }>) => Promise<void>;
   getCartQty: (productId: string, specificationId?: string) => number;
   getSubtotal: () => number;
   getTax: () => number;
@@ -190,12 +187,7 @@ export type CartState = {
    ========================================================================== */
 
 export type OrderStatus =
-  | "pending"
-  | "processing"
-  | "shipped"
-  | "delivered"
-  | "cancelled"
-  | "rejected";
+  "pending" | "processing" | "shipped" | "delivered" | "cancelled" | "rejected";
 
 export type OrderItem = {
   productId: string;
@@ -256,12 +248,7 @@ export type AdminOrderStats = {
 };
 
 export type DbOrderStatus =
-  | "PENDING"
-  | "PROCESSING"
-  | "SHIPPED"
-  | "DELIVERED"
-  | "CANCELLED"
-  | "REJECTED";
+  "PENDING" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED" | "REJECTED";
 
 export type AdminOrderFilters = {
   search?: string;

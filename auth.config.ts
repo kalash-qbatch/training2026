@@ -1,14 +1,8 @@
 import type { NextAuthConfig } from "next-auth";
-import Google from "next-auth/providers/google";
 import GitHub from "next-auth/providers/github";
+import Google from "next-auth/providers/google";
 
-const authPages = [
-  "/login",
-  "/register",
-  "/signup",
-  "/forgot-password",
-  "/reset-password",
-];
+const authPages = ["/login", "/register", "/signup", "/forgot-password", "/reset-password"];
 
 function postLoginPath(role?: string | null) {
   return role === "ADMIN" ? "/admin/products" : "/products";
@@ -63,16 +57,13 @@ export default {
 
       // Admins always use the admin app shell
       const isStorefrontRoute =
-        pathname === "/" ||
-        pathname === "/products" ||
-        pathname.startsWith("/cart");
+        pathname === "/" || pathname === "/products" || pathname.startsWith("/cart");
 
       if (isLoggedIn && isAdmin && isStorefrontRoute) {
         return Response.redirect(new URL("/admin/products", nextUrl));
       }
 
-      const isPublicRoute =
-        pathname === "/" || pathname === "/products";
+      const isPublicRoute = pathname === "/" || pathname === "/products";
 
       if (isPublicRoute) {
         return true;

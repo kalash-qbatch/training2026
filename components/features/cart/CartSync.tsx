@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
+
 import { useSession } from "next-auth/react";
+
 import { useCartStore } from "@/lib/store/useCartStore";
 
 /** Loads server cart when authenticated; clears local cache on logout. */

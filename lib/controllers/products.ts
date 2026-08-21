@@ -1,6 +1,6 @@
+import { CARD_INITIAL_PAGE, CARD_PAGE_SIZE } from "@/lib/constants";
 import { findProductById, findProducts } from "@/lib/services/products";
 import type { ProductSort } from "@/types";
-import { CARD_PAGE_SIZE, CARD_INITIAL_PAGE } from "@/lib/constants";
 
 export async function listProducts(request: Request) {
   const { searchParams } = new URL(request.url);

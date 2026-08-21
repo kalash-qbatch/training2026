@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+
 import { AuthProvider } from "@/components/features/auth/AuthProvider";
 import { AuthSessionSync } from "@/components/features/auth/AuthSessionSync";
 import { CartSync } from "@/components/features/cart/CartSync";
 import { ToastProvider } from "@/components/ui/Toast";
+
 import "./globals.css";
 
 const inter = Inter({
@@ -11,10 +13,7 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
-const BASE_URL =
-  process.env.NEXTAUTH_URL ||
-  process.env.AUTH_URL ||
-  "https://bhaikastore.com";
+const BASE_URL = process.env.NEXTAUTH_URL || process.env.AUTH_URL || "https://bhaikastore.com";
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),

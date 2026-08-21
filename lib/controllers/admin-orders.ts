@@ -1,5 +1,7 @@
-import { OrderStatus } from "@prisma/client";
+import type { OrderStatus } from "@prisma/client";
 import { z } from "zod";
+
+import { TABLE_INITIAL_PAGE, TABLE_PAGE_SIZE } from "@/lib/constants";
 import { requireAdminUser } from "@/lib/controllers/http";
 import {
   findAdminOrders,
@@ -7,7 +9,6 @@ import {
   OrderError,
   updateOrderStatus,
 } from "@/lib/services/orders";
-import { TABLE_PAGE_SIZE, TABLE_INITIAL_PAGE } from "@/lib/constants";
 
 const statusSchema = z.object({
   status: z.enum(["PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"]),
@@ -56,10 +57,7 @@ export async function patchAdminOrderStatus(id: string, body: unknown) {
   }
 
   try {
-    const order = await updateOrderStatus(
-      id,
-      parsed.data.status as OrderStatus
-    );
+    const order = await updateOrderStatus(id, parsed.data.status as OrderStatus);
     return {
       status: 200,
       body: {

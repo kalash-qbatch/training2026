@@ -1,16 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Image from "next/image";
+
 import { X } from "lucide-react";
-import type { Product } from "@/types";
-import { cn, colorSwatch, formatCurrency } from "@/lib/utils";
-import {
-  FREE_SIZE_LABEL,
-  getColorSlideIndex,
-  isFreeSizeProduct,
-} from "@/lib/product";
+import Image from "next/image";
+
 import { Modal } from "@/components/ui/Modal";
+import { FREE_SIZE_LABEL, getColorSlideIndex, isFreeSizeProduct } from "@/lib/product";
+import { cn, colorSwatch, formatCurrency } from "@/lib/utils";
+import type { Product } from "@/types";
 
 function PreviewContent({ product }: { product: Product }) {
   const freeSize = isFreeSizeProduct(product);
@@ -40,12 +38,9 @@ function PreviewContent({ product }: { product: Product }) {
 
   const selectedVariant = product.variants?.find(
     (v) =>
-      v.color.toLowerCase() === color.toLowerCase() &&
-      v.size.toLowerCase() === size.toLowerCase()
+      v.color.toLowerCase() === color.toLowerCase() && v.size.toLowerCase() === size.toLowerCase()
   );
-  const stock = product.variants?.length
-    ? (selectedVariant?.qty ?? 0)
-    : (product.stock ?? 0);
+  const stock = product.variants?.length ? (selectedVariant?.qty ?? 0) : (product.stock ?? 0);
 
   const slides = useMemo(() => {
     if (product.images?.length) return product.images;
@@ -68,22 +63,14 @@ function PreviewContent({ product }: { product: Product }) {
               key={`${img.url}-${img.color ?? "global"}-${i}`}
               className="relative h-full w-full shrink-0"
             >
-              <Image
-                src={img.url}
-                alt={product.name}
-                fill
-                className="object-cover"
-                sizes="400px"
-              />
+              <Image src={img.url} alt={product.name} fill className="object-cover" sizes="400px" />
             </div>
           ))}
         </div>
       </div>
 
       <div className="px-5 pb-6 pt-4">
-        <h3 className="text-[16px] font-semibold text-neutral-900">
-          {product.name}
-        </h3>
+        <h3 className="text-[16px] font-semibold text-neutral-900">{product.name}</h3>
 
         <p className="mt-3 text-[14px]">
           <span className="text-[#6b7280]">Price: </span>
@@ -142,9 +129,7 @@ function PreviewContent({ product }: { product: Product }) {
           </>
         )}
 
-        <p className="mt-3 text-[13px] text-neutral-muted">
-          {stock} in stock
-        </p>
+        <p className="mt-3 text-[13px] text-neutral-muted">{stock} in stock</p>
       </div>
     </>
   );

@@ -1,9 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
+
 import { CloudUpload, Trash2 } from "lucide-react";
-import { bulkUploadProducts } from "@/lib/api/admin";
+
 import { Modal } from "@/components/ui/Modal";
+import { bulkUploadProducts } from "@/lib/api/admin";
 
 export function AddMultipleProductsModal({
   open,

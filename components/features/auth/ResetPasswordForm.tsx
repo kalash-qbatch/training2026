@@ -1,32 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
+import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  resetPasswordSchema,
-  type ResetPasswordInput,
-} from "@/lib/validations/auth";
-import {
-  resetPasswordRequest,
-  validateResetTokenRequest,
-} from "@/lib/api/auth";
-import { resetTokenExpiryLabel } from "@/lib/constants/auth";
-import { useToast } from "@/components/ui/Toast";
-import { Input } from "@/components/ui/Input";
+
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
+import { useToast } from "@/components/ui/Toast";
+import { resetPasswordRequest, validateResetTokenRequest } from "@/lib/api/auth";
+import { resetTokenExpiryLabel } from "@/lib/constants/auth";
+import { type ResetPasswordInput, resetPasswordSchema } from "@/lib/validations/auth";
 
 export function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const token = searchParams.get("token") ?? "";
-  const [tokenStatus, setTokenStatus] = useState<
-    "checking" | "valid" | "invalid"
-  >("checking");
+  const [tokenStatus, setTokenStatus] = useState<"checking" | "valid" | "invalid">("checking");
   const [tokenError, setTokenError] = useState("");
 
   const {
@@ -56,9 +50,7 @@ export function ResetPasswordForm() {
         if (!cancelled) {
           setTokenStatus("invalid");
           setTokenError(
-            err instanceof Error
-              ? err.message
-              : "Invalid or expired reset link. Request a new one."
+            err instanceof Error ? err.message : "Invalid or expired reset link. Request a new one."
           );
         }
       }
@@ -72,14 +64,8 @@ export function ResetPasswordForm() {
 
   const onSubmit = handleSubmit(async (values) => {
     try {
-      await resetPasswordRequest(
-        token,
-        values.password,
-        values.confirmPassword
-      );
-      toast.success(
-        "Your password has been updated. Please login with your new password."
-      );
+      await resetPasswordRequest(token, values.password, values.confirmPassword);
+      toast.success("Your password has been updated. Please login with your new password.");
       window.setTimeout(() => router.push("/login"), 1200);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Reset failed";
@@ -94,9 +80,7 @@ export function ResetPasswordForm() {
   if (tokenStatus === "checking") {
     return (
       <div className="w-full">
-        <h1 className="mb-4 text-xl font-medium text-brand-500">
-          Reset Password
-        </h1>
+        <h1 className="mb-4 text-xl font-medium text-brand-500">Reset Password</h1>
         <Card className="w-full">
           <div className="h-24 animate-pulse rounded-lg bg-neutral-border/50" />
         </Card>
@@ -107,9 +91,7 @@ export function ResetPasswordForm() {
   if (tokenStatus === "invalid") {
     return (
       <div className="w-full">
-        <h1 className="mb-4 text-xl font-medium text-brand-500">
-          Reset Password
-        </h1>
+        <h1 className="mb-4 text-xl font-medium text-brand-500">Reset Password</h1>
         <Card className="w-full space-y-4">
           <p className="text-sm text-neutral-muted">{tokenError}</p>
           <Link
@@ -129,22 +111,22 @@ export function ResetPasswordForm() {
       <Card className="w-full">
         <p className="mb-5 text-sm text-neutral-muted">
           Choose a new password. This link expires in{" "}
-          <span className="font-medium text-neutral-text">
-            {resetTokenExpiryLabel()}
-          </span>{" "}
-          and can only be used once.
+          <span className="font-medium text-neutral-text">{resetTokenExpiryLabel()}</span> and can
+          only be used once.
         </p>
         <form onSubmit={onSubmit} className="space-y-5" noValidate>
           <Input
             label="New password"
             type="password"
             placeholder="Please enter new password"
+            important
             error={errors.password?.message}
             {...register("password")}
           />
           <Input
             label="Confirm password"
             type="password"
+            important
             placeholder="Please confirm password"
             error={errors.confirmPassword?.message}
             {...register("confirmPassword")}

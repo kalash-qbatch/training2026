@@ -1,5 +1,8 @@
-import { ButtonHTMLAttributes, forwardRef } from "react";
+import { forwardRef } from "react";
+
 import { Loader2 } from "lucide-react";
+import type { ButtonHTMLAttributes } from "react";
+
 import { cn } from "@/lib/utils";
 
 type Variant = "primary" | "secondary" | "danger" | "ghost";
@@ -10,27 +13,15 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const variants: Record<Variant, string> = {
-  primary:
-    "bg-brand-500 text-white hover:bg-brand-600 focus-visible:ring-brand-500",
+  primary: "bg-brand-500 text-white hover:bg-brand-600 focus-visible:ring-brand-500",
   secondary:
     "bg-neutral-bg text-neutral-text border border-neutral-border hover:bg-neutral-border/40 focus-visible:ring-brand-500",
-  danger:
-    "bg-brand-500 text-white hover:bg-brand-600 focus-visible:ring-brand-500",
+  danger: "bg-brand-500 text-white hover:bg-brand-600 focus-visible:ring-brand-500",
   ghost: "bg-transparent text-brand-500 hover:bg-brand-50 focus-visible:ring-brand-500",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  (
-    {
-      className,
-      variant = "primary",
-      loading = false,
-      disabled,
-      children,
-      ...props
-    },
-    ref
-  ) => {
+  ({ className, variant = "primary", loading = false, disabled, children, ...props }, ref) => {
     return (
       <button
         ref={ref}

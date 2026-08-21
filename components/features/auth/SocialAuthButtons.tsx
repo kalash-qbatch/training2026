@@ -1,9 +1,10 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { signIn } from "next-auth/react";
-import { useToast } from "@/components/ui/Toast";
+import type { ReactNode } from "react";
+
 import { GithubIcon, GoogleIcon } from "@/components/ui/SocialIcons";
+import { useToast } from "@/components/ui/Toast";
 
 type Provider = "google" | "github";
 
@@ -17,15 +18,13 @@ const providers: {
     id: "google",
     label: "Continue with Google",
     icon: <GoogleIcon size={18} />,
-    className:
-      "border-neutral-border bg-white text-neutral-text hover:bg-neutral-bg",
+    className: "border-neutral-border bg-white text-neutral-text hover:bg-neutral-bg",
   },
   {
     id: "github",
     label: "Continue with GitHub",
     icon: <GithubIcon size={18} className="text-neutral-text" />,
-    className:
-      "border-neutral-border bg-neutral-surface text-neutral-text hover:bg-neutral-bg",
+    className: "border-neutral-border bg-neutral-surface text-neutral-text hover:bg-neutral-bg",
   },
 ];
 

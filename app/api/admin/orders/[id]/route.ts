@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  getAdminOrder,
-  patchAdminOrderStatus,
-} from "@/lib/controllers/admin-orders";
+
+import { getAdminOrder, patchAdminOrderStatus } from "@/lib/controllers/admin-orders";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -13,10 +11,7 @@ export async function GET(_request: Request, context: Ctx) {
     return NextResponse.json(result.body, { status: result.status });
   } catch (err) {
     console.error("admin order GET:", err);
-    return NextResponse.json(
-      { success: false, error: "Failed to load order" },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: "Failed to load order" }, { status: 500 });
   }
 }
 
