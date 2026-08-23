@@ -151,8 +151,7 @@ export function OrdersPageClient() {
               return (
                 <TableRow key={o.id}>
                   <TableCell>{formatDate(o.date)}</TableCell>
-                  {/* <TableCell className="font-medium">{o.orderNumber || o.id}</TableCell> */}
-                  <TableCell className="font-medium">{o.id}</TableCell>
+                  <TableCell className="font-medium">{o.orderNumber || o.id}</TableCell>
                   <TableCell>{o.userName}</TableCell>
                   <TableCell>{productCount}</TableCell>
                   <TableCell className="font-medium tabular-nums">
