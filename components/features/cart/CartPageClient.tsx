@@ -6,7 +6,6 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { OrdersDrawer } from "@/components/features/orders/OrdersDrawer";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useToast } from "@/components/ui/Toast";
 import { placeOrder as placeOrderApi } from "@/lib/api/orders";
@@ -41,7 +40,6 @@ export function CartPageClient() {
   const [selected, setSelected] = useState<Set<string>>(() => new Set(items.map(itemKey)));
   const [successOpen, setSuccessOpen] = useState(false);
   const [placedOrderId, setPlacedOrderId] = useState<string | null>(null);
-  const [ordersOpen, setOrdersOpen] = useState(false);
   const [prevItems, setPrevItems] = useState(items);
 
   // Sync selection with cart items during render
@@ -66,24 +64,21 @@ export function CartPageClient() {
   const allSelected = items.length > 0 && selected.size === items.length;
 
   const overlays = (
-    <>
-      <OrderPlacedModal
-        open={successOpen}
-        onDetails={() => {
-          setSuccessOpen(false);
-          setOrdersOpen(true);
-        }}
-        onHome={() => {
-          setSuccessOpen(false);
-          router.push("/products");
-        }}
-      />
-      <OrdersDrawer
-        open={ordersOpen}
-        onClose={() => setOrdersOpen(false)}
-        initialOrderId={placedOrderId}
-      />
-    </>
+    <OrderPlacedModal
+      open={successOpen}
+      onDetails={() => {
+        setSuccessOpen(false);
+        if (placedOrderId) {
+          router.push(`/orders/${placedOrderId}`);
+        } else {
+          router.push("/orders");
+        }
+      }}
+      onHome={() => {
+        setSuccessOpen(false);
+        router.push("/products");
+      }}
+    />
   );
 
   if (!items.length) {

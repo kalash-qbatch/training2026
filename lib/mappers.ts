@@ -97,6 +97,7 @@ export function mapOrder(row: DbOrderWithRelations): Order {
   const tax = Number(row.tax);
   return {
     id: row.id,
+    orderNumber: row.orderNumber,
     date: row.createdAt.toISOString(),
     userId: row.userId,
     userName: row.user.fullName || row.user.name || "Customer",

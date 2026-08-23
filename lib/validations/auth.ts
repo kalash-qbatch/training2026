@@ -22,7 +22,8 @@ export const signUpSchema = z
     email: z.email("Enter a valid email address"),
     mobile: z
       .string()
-      .min(10, "Enter a valid mobile number with country code (e.g. +911234567890)"),
+      .min(10, "Enter a valid mobile number with country code (e.g. +911234567890)")
+      .regex(/^[0-9]+$/, "Enter a valid mobile number with country code (e.g. +911234567890)"),
     password: passwordSchema,
     confirmPassword: z.string(),
   })

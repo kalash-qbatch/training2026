@@ -24,7 +24,7 @@ export function AdminSidebar() {
           href="/admin/products"
           className="text-[15px] font-semibold tracking-tight text-neutral-text transition-colors duration-200 hover:text-[#2563EB]"
         >
-          E-commerce
+        Bhai Ka Store (Admin)
         </Link>
       </div>
 
