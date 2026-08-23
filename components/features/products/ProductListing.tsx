@@ -198,7 +198,7 @@ export function ProductListing() {
               value={categoryId}
               onChange={setCategoryId}
               options={[
-                { value: "", label: "All categories" },
+                { value: "", label: "All CATEGORIES" },
                 ...categories.map((c) => ({ value: c.id, label: c.name })),
               ]}
               ariaLabel="Filter by category"

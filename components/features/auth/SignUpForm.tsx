@@ -58,6 +58,7 @@ export function SignUpForm() {
             label="Mobile"
             type="tel"
             placeholder="Please enter your mobile"
+            important
             error={errors.mobile?.message}
             {...register("mobile")}
           />

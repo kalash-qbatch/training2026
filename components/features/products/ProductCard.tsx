@@ -81,7 +81,13 @@ export function ProductCard({ product }: { product: Product }) {
   const totalStock = hasVariants
     ? (product.variants?.reduce((sum, v) => sum + v.qty, 0) ?? 0)
     : (product.stock ?? 0);
-  const stock = hasVariants ? (selectedVariant?.qty ?? 0) : (product.stock ?? 0);
+  const baseStock = hasVariants ? (selectedVariant?.qty ?? 0) : (product.stock ?? 0);
+
+  // Track how many units of the current variant the user has added to cart
+  // so the displayed stock shrinks optimistically without a server refetch.
+  const [reservedQty, setReservedQty] = useState(0);
+  const stock = Math.max(0, baseStock - reservedQty);
+
   const outOfStock = stock <= 0;
   const productFullyOut = totalStock <= 0;
   const invalidCombo = hasVariants && !selectedVariant;
@@ -159,7 +165,10 @@ export function ProductCard({ product }: { product: Product }) {
                   type="button"
                   aria-label={`Select ${c}`}
                   aria-pressed={color === c}
-                  onClick={() => setColor(c)}
+                  onClick={() => {
+                    setColor(c);
+                    setReservedQty(0);
+                  }}
                   className={cn(
                     "h-4 w-4 rounded-full border border-[#d9dee7] ring-offset-1",
                     color === c && "ring-1 ring-brand-500"
@@ -176,7 +185,10 @@ export function ProductCard({ product }: { product: Product }) {
                       key={s}
                       type="button"
                       aria-pressed={size === s}
-                      onClick={() => setSize(s)}
+                      onClick={() => {
+                        setSize(s);
+                        setReservedQty(0);
+                      }}
                       className={cn(
                         "h-6 min-w-5 sm:min-w-7 rounded-[3px] border border-[#e1e5eb] px-2 text-[11px] font-medium uppercase text-neutral-900",
                         size === s && "border-neutral-900 bg-neutral-900 text-white"
@@ -239,6 +251,8 @@ export function ProductCard({ product }: { product: Product }) {
                 toast.error(result.error);
                 return;
               }
+              // Optimistically reduce the displayed stock by the added quantity
+              setReservedQty((prev) => prev + selectedQty);
               toast.success("Added to cart");
             }}
           >
