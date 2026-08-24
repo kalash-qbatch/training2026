@@ -253,7 +253,7 @@ export function ProductCard({ product }: { product: Product }) {
               }
               // Optimistically reduce the displayed stock by the added quantity
               setReservedQty((prev) => prev + selectedQty);
-              toast.success("Added to cart");
+              toast.success("Added into cart");
             }}
           >
             Add to Cart
