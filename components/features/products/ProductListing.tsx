@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 
 import { Loader2, Search } from "lucide-react";
 
@@ -15,27 +15,28 @@ import { ProductGridSkeleton } from "./ProductGridSkeleton";
 
 export function ProductListing() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [startPage, setStartPage] = useState(1);
+  const [endPage, setEndPage] = useState(1);
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [sort, setSort] = useState<ProductSort>("name-asc");
   const [categoryId, setCategoryId] = useState("");
 
-  // Pagination state
-  const [page, setPage] = useState(CARD_INITIAL_PAGE);
   const [totalPages, setTotalPages] = useState(1);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadingMoreDown, setLoadingMoreDown] = useState(false);
+  const [loadingMoreUp, setLoadingMoreUp] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [, startTransition] = useTransition();
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const topSentinelRef = useRef<HTMLDivElement | null>(null);
+  const bottomSentinelRef = useRef<HTMLDivElement | null>(null);
 
   // Tracks the in-flight request so stale responses can be aborted/ignored.
-  // Fixes a race condition where a slow earlier request (e.g. from fast
-  // typing or rapid filter changes) could resolve after a newer one and
-  // overwrite fresh data with stale data.
   const abortControllerRef = useRef<AbortController | null>(null);
+  // Keep track of the current anchor element ID and its old top position in a ref for scroll anchoring
+  const scrollAnchorRef = useRef<{ id: string; oldTop: number } | null>(null);
 
   // Debounce search input
   useEffect(() => {
@@ -50,23 +51,27 @@ export function ProductListing() {
       .catch(() => setCategories([]));
   }, []);
 
-  // Fetch a page of products and append/replace
+  // Fetch a page of products
   const fetchPage = useCallback(
-    async (pageNum: number, isFirstPage: boolean) => {
-      // Cancel any in-flight request before starting a new one so its
-      // response can never land after (and overwrite) this one's.
+    async (pageNum: number, isFirstPage: boolean, direction?: "up" | "down") => {
       abortControllerRef.current?.abort();
       const controller = new AbortController();
       abortControllerRef.current = controller;
 
-      // Reset list state atomically when starting a fresh filter/search
       if (isFirstPage) {
         setProducts([]);
+        setStartPage(1);
+        setEndPage(1);
         setTotalPages(1);
-        setError(null);
         setInitialLoading(true);
+        setError(null);
+        scrollAnchorRef.current = null;
       } else {
-        setLoadingMore(true);
+        if (direction === "up") {
+          setLoadingMoreUp(true);
+        } else {
+          setLoadingMoreDown(true);
+        }
       }
 
       try {
@@ -79,34 +84,108 @@ export function ProductListing() {
           signal: controller.signal,
         });
 
-        // If this request was superseded/aborted while in flight, ignore
-        // its result entirely.
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted) return null;
 
-        setProducts((prev) => (isFirstPage ? data.products : [...prev, ...data.products]));
         setTotalPages(data.totalPages);
-        setPage(pageNum);
+        if (isFirstPage) {
+          setProducts(data.products);
+        }
+        return data;
       } catch (err: unknown) {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted) return null;
         if (isFirstPage) {
           setError(err instanceof Error ? err.message : "Failed to load products");
-          setProducts([]);
         }
+        return null;
       } finally {
         if (!controller.signal.aborted) {
           setInitialLoading(false);
-          setLoadingMore(false);
+          setLoadingMoreDown(false);
+          setLoadingMoreUp(false);
         }
       }
     },
     [debounced, sort, categoryId]
   );
+
+  const handleScrollDown = useCallback(async () => {
+    if (loadingMoreDown || loadingMoreUp || initialLoading || endPage >= totalPages) return;
+
+    const nextPage = endPage + 1;
+    const data = await fetchPage(nextPage, false, "down");
+    if (data) {
+      const overlapIndex = products.length === 16 ? 8 : 0;
+      const anchorProduct = products[overlapIndex];
+      if (anchorProduct) {
+        const element = document.getElementById(`product-card-${anchorProduct.id}`);
+        if (element) {
+          scrollAnchorRef.current = {
+            id: `product-card-${anchorProduct.id}`,
+            oldTop: element.getBoundingClientRect().top,
+          };
+        }
+      }
+
+      setProducts((prev) => {
+        if (prev.length === 8) {
+          return [...prev, ...data.products];
+        } else {
+          return [...prev.slice(8), ...data.products];
+        }
+      });
+      setStartPage((prev) => (products.length === 16 ? prev + 1 : prev));
+      setEndPage(nextPage);
+    }
+  }, [endPage, totalPages, products, loadingMoreDown, loadingMoreUp, initialLoading, fetchPage]);
+
+  const handleScrollUp = useCallback(async () => {
+    if (loadingMoreDown || loadingMoreUp || initialLoading) return;
+
+    if (startPage > 1) {
+      const prevPage = startPage - 1;
+      const data = await fetchPage(prevPage, false, "up");
+      if (data) {
+        const anchorProduct = products[0];
+        if (anchorProduct) {
+          const element = document.getElementById(`product-card-${anchorProduct.id}`);
+          if (element) {
+            scrollAnchorRef.current = {
+              id: `product-card-${anchorProduct.id}`,
+              oldTop: element.getBoundingClientRect().top,
+            };
+          }
+        }
+
+        setProducts((prev) => {
+          return [...data.products, ...prev.slice(0, 8)];
+        });
+        setStartPage(prevPage);
+        setEndPage((prev) => prev - 1);
+      }
+    } else if (startPage === 1 && endPage === 2) {
+      const anchorProduct = products[0];
+      if (anchorProduct) {
+        const element = document.getElementById(`product-card-${anchorProduct.id}`);
+        if (element) {
+          scrollAnchorRef.current = {
+            id: `product-card-${anchorProduct.id}`,
+            oldTop: element.getBoundingClientRect().top,
+          };
+        }
+      }
+
+      setProducts((prev) => prev.slice(0, 8));
+      setEndPage(1);
+    }
+  }, [startPage, endPage, products, loadingMoreDown, loadingMoreUp, initialLoading, fetchPage]);
+
   const filterKey = `${debounced}|${sort}|${categoryId}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
 
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey);
-    setPage(CARD_INITIAL_PAGE);
+    setStartPage(1);
+    setEndPage(1);
   }
 
   // When filters change: trigger fetch for first page and reset page state
@@ -117,28 +196,21 @@ export function ProductListing() {
     return () => window.clearTimeout(id);
   }, [debounced, sort, categoryId, fetchPage]);
 
-  // When user clicks pagination or scrolls (page state increases)
-  // When page increments (infinite scroll), fetch next page after a short
-  // delay (gives the "loading more" spinner a moment to be visible and
-  // avoids hammering the API if the user scrolls quickly).
-  useEffect(() => {
-    if (page === CARD_INITIAL_PAGE) return;
-
-    // Deferred (rather than called directly in the effect body) to avoid
-    // the "setState synchronously within an effect" cascading-render
-    // warning — this still shows on the very next tick, imperceptibly.
-    const showTimer = window.setTimeout(() => setLoadingMore(true), 0);
-
-    const fetchTimer = window.setTimeout(() => {
-      startTransition(() => void fetchPage(page, false));
-    }, 1000);
-
-    return () => {
-      window.clearTimeout(showTimer);
-      window.clearTimeout(fetchTimer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+  // Scroll anchoring adjustment
+  useLayoutEffect(() => {
+    if (scrollAnchorRef.current) {
+      const { id, oldTop } = scrollAnchorRef.current;
+      const element = document.getElementById(id);
+      if (element) {
+        const newTop = element.getBoundingClientRect().top;
+        const diff = newTop - oldTop;
+        if (Math.abs(diff) > 0.5) {
+          window.scrollBy(0, diff);
+        }
+      }
+      scrollAnchorRef.current = null;
+    }
+  }, [products]);
 
   // Abort any in-flight request on unmount
   useEffect(() => {
@@ -147,25 +219,41 @@ export function ProductListing() {
     };
   }, []);
 
-  // IntersectionObserver — fires when sentinel enters viewport
+  // Bottom sentinel observer (scroll down)
   useEffect(() => {
-    const sentinel = sentinelRef.current;
+    const sentinel = bottomSentinelRef.current;
     if (!sentinel) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        startTransition(() => {
-          if (entries[0]?.isIntersecting && !loadingMore && !initialLoading && page < totalPages) {
-            setPage((prev) => prev + 1);
-          }
-        });
+        if (entries[0]?.isIntersecting) {
+          void handleScrollDown();
+        }
       },
       { rootMargin: "200px" }
     );
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [loadingMore, initialLoading, page, totalPages]);
+  }, [handleScrollDown]);
+
+  // Top sentinel observer (scroll up)
+  useEffect(() => {
+    const sentinel = topSentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          void handleScrollUp();
+        }
+      },
+      { rootMargin: "200px" }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [handleScrollUp]);
 
   return (
     <section className="bg-white">
@@ -236,21 +324,34 @@ export function ProductListing() {
         />
       ) : (
         <>
+          {/* Top sentinel for scroll up */}
+          <div ref={topSentinelRef} className="h-1 w-full" />
+          {loadingMoreUp && (
+            <div className="mb-4 flex justify-center">
+              <Loader2
+                className="h-6 w-6 animate-spin text-brand-500"
+                aria-label="Loading previous products"
+              />
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4 xl:gap-6">
             {products.map((p) => (
-              <ProductCard key={p.id} product={p} />
+              <div key={p.id} id={`product-card-${p.id}`} className="h-full">
+                <ProductCard product={p} />
+              </div>
             ))}
           </div>
 
-          {/* Infinite scroll sentinel */}
-          <div ref={sentinelRef} className="mt-8 flex justify-center">
-            {loadingMore && (
+          {/* Bottom sentinel for scroll down */}
+          <div ref={bottomSentinelRef} className="mt-8 flex justify-center">
+            {loadingMoreDown && (
               <Loader2
                 className="h-6 w-6 animate-spin text-brand-500"
                 aria-label="Loading more products"
               />
             )}
-            {!loadingMore && page >= totalPages && products.length > 0 && (
+            {!loadingMoreDown && endPage >= totalPages && products.length > 0 && (
               <p className="text-sm text-neutral-muted">All products loaded</p>
             )}
           </div>
