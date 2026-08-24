@@ -6,10 +6,12 @@ function getTransporter() {
   const host = process.env.SMTP_HOST;
   const port = Number(process.env.SMTP_PORT || 587);
   const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const pass = process.env.SMTP_PASS || process.env.SMTP_PASSWORD;
 
   if (!host || !user || !pass) {
-    throw new Error("SMTP is not configured. Check SMTP_HOST, SMTP_USER, SMTP_PASS in .env");
+    throw new Error(
+      "SMTP is not configured. Check SMTP_HOST, SMTP_USER, SMTP_PASS/SMTP_PASSWORD in .env"
+    );
   }
 
   return nodemailer.createTransport({
