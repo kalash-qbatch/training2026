@@ -127,6 +127,7 @@ export type SelectProps = {
   className?: string;
   ariaLabel?: string;
   labelClass?: string | null;
+  buttonClass?: string;
 };
 
 export type GetProductsResult = {

@@ -337,6 +337,7 @@ function ProductFormFields({
               <div className="mt-1.5">
                 <Select
                   value={form.categoryId}
+                  buttonClass="!uppercase"
                   onChange={(value) => {
                     setForm((f) => ({
                       ...f,
@@ -350,7 +351,8 @@ function ProductFormFields({
                       value: NEW_CATEGORY,
                       label: "+ Create New Category",
                       accent: true,
-                      className: "sticky -bottom-0 w-full z-30 bg-white border-t border-[#e5e7eb]",
+                      className:
+                        "sticky -bottom-0 uppercase w-full z-30 bg-white border-t border-[#e5e7eb]",
                     },
                   ]}
                   placeholder="Select Category"
@@ -362,11 +364,11 @@ function ProductFormFields({
               Status
               <div className="mt-1.5">
                 <Select
-                  value={form.isActive ? "active" : "inactive"}
-                  onChange={(v) => setForm((f) => ({ ...f, isActive: v === "active" }))}
+                  value={form.isActive ? "ACTIVE" : "INACTIVE"}
+                  onChange={(v) => setForm((f) => ({ ...f, isActive: v === "ACTIVE" }))}
                   options={[
-                    { value: "active", label: "Active" },
-                    { value: "inactive", label: "Inactive" },
+                    { value: "ACTIVE", label: "ACTIVE" },
+                    { value: "INACTIVE", label: "INACTIVE" },
                   ]}
                   ariaLabel="Product status"
                 />

@@ -7,7 +7,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 
-import { OrdersDrawer } from "@/components/features/orders/OrdersDrawer";
 import { useAuthStore } from "@/lib/store/useAuthStore";
 import { cn } from "@/lib/utils";
 
@@ -51,7 +50,6 @@ export function UserMenu() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const [open, setOpen] = useState(false);
-  const [ordersOpen, setOrdersOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -115,18 +113,15 @@ export function UserMenu() {
               Admin dashboard
             </Link>
           ) : (
-            <button
-              type="button"
+            <Link
               role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                setOrdersOpen(true);
-              }}
+              href="/orders"
+              onClick={() => setOpen(false)}
               className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-text hover:bg-brand-50 hover:text-brand-600"
             >
               <History className="h-4 w-4" strokeWidth={1.75} />
               Order history
-            </button>
+            </Link>
           )}
 
           <button
@@ -144,8 +139,6 @@ export function UserMenu() {
           </button>
         </div>
       ) : null}
-
-      <OrdersDrawer open={ordersOpen} onClose={() => setOrdersOpen(false)} />
     </div>
   );
 }

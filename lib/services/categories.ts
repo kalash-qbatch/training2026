@@ -9,7 +9,7 @@ export type CategoryDto = {
 export function slugifyCategory(name: string): string {
   return name
     .trim()
-    .toLowerCase()
+    .toUpperCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 }

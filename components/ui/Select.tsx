@@ -19,6 +19,7 @@ export function Select({
   className,
   ariaLabel,
   labelClass,
+  buttonClass,
 }: SelectProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -105,7 +106,8 @@ export function Select({
                   className={cn(
                     "flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[13px] transition hover:bg-[#f3f4f6]",
                     isSelected ? "bg-brand-50 font-medium text-[#2563EB]" : "text-neutral-text",
-                    opt.accent && "font-medium text-[#2563EB]"
+                    opt.accent && "font-medium text-[#2563EB]",
+                    buttonClass
                   )}
                 >
                   <span className="truncate uppercase">{opt.label}</span>
