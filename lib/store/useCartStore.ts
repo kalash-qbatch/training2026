@@ -4,6 +4,7 @@ import { create } from "zustand";
 
 import {
   addCartItem,
+  clearCartApi,
   fetchCart,
   removeCartItemApi,
   removeCartItemsApi,
@@ -75,6 +76,10 @@ export const useCartStore = create<CartState>()((set, get) => ({
         specificationId: i.specificationId?.trim() || undefined,
       }))
     );
+    set({ items, loaded: true });
+  },
+  clearCart: async () => {
+    const items = await clearCartApi();
     set({ items, loaded: true });
   },
   getSubtotal: () => get().items.reduce((sum, i) => sum + i.price * i.qty, 0),

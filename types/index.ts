@@ -177,6 +177,7 @@ export type CartState = {
   updateQty: (productId: string, qty: number, specificationId?: string) => Promise<void>;
   removeItem: (productId: string, specificationId?: string) => Promise<void>;
   removeItems: (items: Array<{ productId: string; specificationId?: string }>) => Promise<void>;
+  clearCart: () => Promise<void>;
   getCartQty: (productId: string, specificationId?: string) => number;
   getSubtotal: () => number;
   getTax: () => number;

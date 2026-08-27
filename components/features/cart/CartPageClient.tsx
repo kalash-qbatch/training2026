@@ -34,8 +34,10 @@ export function CartPageClient() {
   const updateQty = useCartStore((s) => s.updateQty);
   const removeItem = useCartStore((s) => s.removeItem);
   const removeItems = useCartStore((s) => s.removeItems);
+  const clearCart = useCartStore((s) => s.clearCart);
 
   const [pendingRemove, setPendingRemove] = useState<CartItem | null>(null);
+  const [pendingClearAll, setPendingClearAll] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(() => new Set(items.map(itemKey)));
   const [successOpen, setSuccessOpen] = useState(false);
@@ -106,7 +108,7 @@ export function CartPageClient() {
 
   return (
     <section>
-      <div className="mb-6 flex items-center gap-2">
+      <div className="mb-6 flex items-center justify-between gap-2">
         <Link
           href="/products"
           className="inline-flex items-center gap-2 text-lg font-semibold text-brand-600 hover:text-brand-700"
@@ -114,6 +116,13 @@ export function CartPageClient() {
           <ArrowLeft className="h-5 w-5" strokeWidth={2.25} />
           Your Shopping Bag
         </Link>
+        <button
+          type="button"
+          onClick={() => setPendingClearAll(true)}
+          className="text-sm font-medium text-[#EF4444] hover:underline"
+        >
+          Remove all
+        </button>
       </div>
 
       <div className="overflow-x-auto">
@@ -261,6 +270,20 @@ export function CartPageClient() {
               );
           }
           setPendingRemove(null);
+        }}
+      />
+      <RemoveProductModal
+        open={pendingClearAll}
+        onClose={() => setPendingClearAll(false)}
+        title="Remove all products?"
+        description="Are you sure you want to remove all items from your bag?"
+        onConfirm={() => {
+          setPendingClearAll(false);
+          void clearCart()
+            .then(() => toast.success("Bag cleared"))
+            .catch((err: unknown) =>
+              toast.error(err instanceof Error ? err.message : "Failed to clear bag")
+            );
         }}
       />
       {overlays}

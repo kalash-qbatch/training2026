@@ -78,3 +78,12 @@ export async function removeCartItemsApi(
   }
   return data.items ?? [];
 }
+
+export async function clearCartApi(): Promise<CartItem[]> {
+  const res = await fetch("/api/cart?all=1", { method: "DELETE" });
+  const data = await parseJson<{ success: boolean; items: CartItem[] }>(res);
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || "Failed to clear cart");
+  }
+  return data.items ?? [];
+}
