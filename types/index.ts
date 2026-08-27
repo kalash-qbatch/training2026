@@ -214,7 +214,6 @@ export type Order = {
   subTotal: number;
   tax: number;
   status: OrderStatus;
-  paymentMethod: string;
   items: OrderItem[];
 };
 

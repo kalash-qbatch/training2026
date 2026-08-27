@@ -5,27 +5,55 @@ import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 
 /** Bump when schema models/relations change so the cached client is recreated. */
-const PRISMA_CLIENT_VERSION = 7;
+const PRISMA_CLIENT_VERSION = 12;
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
+  pgPool: Pool | undefined;
   prismaVersion?: number;
 };
 
-function createPrismaClient() {
-  const pool = new Pool({
+function createPool() {
+  return new Pool({
     connectionString: process.env.DATABASE_URL!,
-    max: process.env.NODE_ENV === "production" ? 10 : 5,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
+    // Neon pooler is connection-limited; keep this low and reuse one pool.
+    max: process.env.NODE_ENV === "production" ? 5 : 3,
+    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 15_000,
+    allowExitOnIdle: true,
   });
+}
+
+function createPrismaClient() {
+  const pool = globalForPrisma.pgPool ?? createPool();
+  globalForPrisma.pgPool = pool;
   const adapter = new PrismaPg(pool);
-  return new PrismaClient({ adapter });
+  return new PrismaClient({
+    adapter,
+    transactionOptions: {
+      maxWait: 15_000,
+      timeout: 30_000,
+    },
+  });
+}
+
+async function disposeClient() {
+  try {
+    await globalForPrisma.prisma?.$disconnect();
+  } catch {
+    // ignore
+  }
+  try {
+    await globalForPrisma.pgPool?.end();
+  } catch {
+    // ignore
+  }
+  globalForPrisma.prisma = undefined;
+  globalForPrisma.pgPool = undefined;
 }
 
 if (globalForPrisma.prismaVersion !== PRISMA_CLIENT_VERSION) {
-  void globalForPrisma.prisma?.$disconnect().catch(() => {});
-  globalForPrisma.prisma = undefined;
+  void disposeClient();
   globalForPrisma.prismaVersion = PRISMA_CLIENT_VERSION;
 }
 
@@ -34,7 +62,3 @@ export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
 }
-
-// Next.js dev mode mein hot-reload ki wajah se agar Prisma Client normal tareeqe se banate to har
-//  save pe naya database connection khulta rehta, connections exhaust ho jate.
-//   Isliye singleton pattern use kiya taake ek hi client globally reuse ho."

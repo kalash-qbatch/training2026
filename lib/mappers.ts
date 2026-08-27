@@ -105,7 +105,6 @@ export function mapOrder(row: DbOrderWithRelations): Order {
     subTotal,
     tax,
     status: mapStatus(row.status),
-    paymentMethod: "Card",
     items: row.items.map((item): OrderItem => ({
       productId: item.productId,
       specificationId: item.specificationId ?? undefined,

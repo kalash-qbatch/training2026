@@ -24,138 +24,141 @@ export async function createOrder(userId: string, items: PlaceOrderItemInput[]) 
     throw new OrderError("Cart is empty");
   }
 
-  return prisma.$transaction(async (tx) => {
-    const lineData: Array<{
-      productId: string;
-      specificationId?: string;
-      quantity: number;
-      price: number;
-      color?: string;
-      size?: string;
-    }> = [];
+  return prisma.$transaction(
+    async (tx) => {
+      const lineData: Array<{
+        productId: string;
+        specificationId?: string;
+        quantity: number;
+        price: number;
+        color?: string;
+        size?: string;
+      }> = [];
 
-    for (const item of items) {
-      if (item.quantity < 1) {
-        throw new OrderError("Invalid quantity");
-      }
+      for (const item of items) {
+        if (item.quantity < 1) {
+          throw new OrderError("Invalid quantity");
+        }
 
-      const product = await tx.product.findUnique({
-        where: { id: item.productId },
-        include: { specifications: true },
-      });
-      if (!product) {
-        throw new OrderError("Product not found", 404);
-      }
-      if (!product.isActive) {
-        throw new OrderError(`"${product.title}" is no longer available.`);
-      }
+        const product = await tx.product.findUnique({
+          where: { id: item.productId },
+          include: { specifications: true },
+        });
+        if (!product) {
+          throw new OrderError("Product not found", 404);
+        }
+        if (!product.isActive) {
+          throw new OrderError(`"${product.title}" is no longer available.`);
+        }
 
-      const hasSpecs = product.specifications.length > 0;
-      let color = item.color?.trim() || undefined;
-      let size = item.size?.trim() || undefined;
-      let specificationId: string | undefined = item.specificationId?.trim() || undefined;
+        const hasSpecs = product.specifications.length > 0;
+        let color = item.color?.trim() || undefined;
+        let size = item.size?.trim() || undefined;
+        let specificationId: string | undefined = item.specificationId?.trim() || undefined;
 
-      if (hasSpecs) {
-        let spec = specificationId
-          ? await tx.specification.findUnique({
-              where: { id: specificationId },
-            })
-          : null;
+        if (hasSpecs) {
+          let spec = specificationId
+            ? await tx.specification.findUnique({
+                where: { id: specificationId },
+              })
+            : null;
 
-        // Fallback lookup if specificationId wasn't passed directly
-        if (!spec && (color || size)) {
-          spec = await tx.specification.findFirst({
-            where: {
-              productId: product.id,
-              color: { equals: color ?? "", mode: "insensitive" },
-              size: { equals: size ?? "", mode: "insensitive" },
-            },
+          // Fallback lookup if specificationId wasn't passed directly
+          if (!spec && (color || size)) {
+            spec = await tx.specification.findFirst({
+              where: {
+                productId: product.id,
+                color: { equals: color ?? "", mode: "insensitive" },
+                size: { equals: size ?? "", mode: "insensitive" },
+              },
+            });
+          }
+
+          if (!spec) {
+            throw new OrderError(`A valid variant selection is required for "${product.title}".`);
+          }
+
+          specificationId = spec.id;
+          color = spec.color;
+          size = spec.size;
+
+          // Atomic decrement — fails if concurrent order already consumed stock
+          const decremented = await tx.specification.updateMany({
+            where: { id: spec.id, qty: { gte: item.quantity } },
+            data: { qty: { decrement: item.quantity } },
           });
+
+          if (decremented.count !== 1) {
+            throw new OrderError(`Not enough stock for "${product.title}". Only ${spec.qty} left.`);
+          }
+
+          const agg = await tx.specification.aggregate({
+            where: { productId: product.id },
+            _sum: { qty: true },
+          });
+          await tx.product.update({
+            where: { id: product.id },
+            data: { stock: agg._sum.qty ?? 0 },
+          });
+        } else {
+          const decremented = await tx.product.updateMany({
+            where: { id: product.id, stock: { gte: item.quantity } },
+            data: { stock: { decrement: item.quantity } },
+          });
+          if (decremented.count !== 1) {
+            throw new OrderError(
+              `Not enough stock for "${product.title}". Only ${product.stock} left.`
+            );
+          }
+          specificationId = undefined;
+          color = undefined;
+          size = undefined;
         }
 
-        if (!spec) {
-          throw new OrderError(`A valid variant selection is required for "${product.title}".`);
-        }
-
-        specificationId = spec.id;
-        color = spec.color;
-        size = spec.size;
-
-        // Atomic decrement — fails if concurrent order already consumed stock
-        const decremented = await tx.specification.updateMany({
-          where: { id: spec.id, qty: { gte: item.quantity } },
-          data: { qty: { decrement: item.quantity } },
+        lineData.push({
+          productId: product.id,
+          specificationId,
+          quantity: item.quantity,
+          price: Number(product.price),
+          color,
+          size,
         });
-
-        if (decremented.count !== 1) {
-          throw new OrderError(`Not enough stock for "${product.title}". Only ${spec.qty} left.`);
-        }
-
-        const agg = await tx.specification.aggregate({
-          where: { productId: product.id },
-          _sum: { qty: true },
-        });
-        await tx.product.update({
-          where: { id: product.id },
-          data: { stock: agg._sum.qty ?? 0 },
-        });
-      } else {
-        const decremented = await tx.product.updateMany({
-          where: { id: product.id, stock: { gte: item.quantity } },
-          data: { stock: { decrement: item.quantity } },
-        });
-        if (decremented.count !== 1) {
-          throw new OrderError(
-            `Not enough stock for "${product.title}". Only ${product.stock} left.`
-          );
-        }
-        specificationId = undefined;
-        color = undefined;
-        size = undefined;
       }
 
-      lineData.push({
-        productId: product.id,
-        specificationId,
-        quantity: item.quantity,
-        price: Number(product.price),
-        color,
-        size,
-      });
-    }
+      const subTotal = lineData.reduce((sum, line) => sum + line.price * line.quantity, 0);
+      const tax = Number((subTotal * TAX_RATE).toFixed(2));
+      const total = Number((subTotal + tax).toFixed(2));
 
-    const subTotal = lineData.reduce((sum, line) => sum + line.price * line.quantity, 0);
-    const tax = Number((subTotal * TAX_RATE).toFixed(2));
-    const total = Number((subTotal + tax).toFixed(2));
-
-    const order = await tx.order.create({
-      data: {
-        userId,
-        status: "PROCESSING",
-        subTotal,
-        tax,
-        total,
-        items: {
-          create: lineData.map((line) => ({
-            productId: line.productId,
-            specificationId: line.specificationId,
-            quantity: line.quantity,
-            price: line.price,
-            color: line.color,
-            size: line.size,
-          })),
+      const order = await tx.order.create({
+        data: {
+          userId,
+          status: "PROCESSING",
+          subTotal,
+          tax,
+          total,
+          items: {
+            create: lineData.map((line) => ({
+              productId: line.productId,
+              specificationId: line.specificationId,
+              quantity: line.quantity,
+              price: line.price,
+              color: line.color,
+              size: line.size,
+            })),
+          },
         },
-      },
-      include: {
-        user: { select: { fullName: true, name: true, email: true } },
-        items: { include: { product: true } },
-      },
-    });
+        include: {
+          user: { select: { fullName: true, name: true, email: true } },
+          items: { include: { product: true } },
+        },
+      });
 
-    await notifyOrderPlaced(tx, userId, order.id);
+      await notifyOrderPlaced(tx, userId, order.id);
 
-    return mapOrder(order);
-  });
+      return mapOrder(order);
+    },
+    { maxWait: 15_000, timeout: 30_000 }
+  );
 }
 
 export async function findOrders(

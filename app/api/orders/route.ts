@@ -19,6 +19,7 @@ export async function POST(request: Request) {
     return NextResponse.json(result.body, { status: result.status });
   } catch (error) {
     console.error("orders POST error:", error);
-    return NextResponse.json({ success: false, error: "Failed to place order" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Failed to place order";
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
