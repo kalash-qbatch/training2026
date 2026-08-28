@@ -20,14 +20,19 @@ function createPool() {
     max: process.env.NODE_ENV === "production" ? 5 : 3,
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 15_000,
-    allowExitOnIdle: true,
+    allowExitOnIdle: false,
   });
 }
 
+function getPool() {
+  if (!globalForPrisma.pgPool) {
+    globalForPrisma.pgPool = createPool();
+  }
+  return globalForPrisma.pgPool;
+}
+
 function createPrismaClient() {
-  const pool = globalForPrisma.pgPool ?? createPool();
-  globalForPrisma.pgPool = pool;
-  const adapter = new PrismaPg(pool);
+  const adapter = new PrismaPg(getPool());
   return new PrismaClient({
     adapter,
     transactionOptions: {
@@ -37,25 +42,21 @@ function createPrismaClient() {
   });
 }
 
-async function disposeClient() {
-  try {
-    await globalForPrisma.prisma?.$disconnect();
-  } catch {
-    // ignore
-  }
-  try {
-    await globalForPrisma.pgPool?.end();
-  } catch {
-    // ignore
-  }
+function resetPrismaClientForSchemaBump() {
+  if (globalForPrisma.prismaVersion === PRISMA_CLIENT_VERSION) return;
+
+  const staleClient = globalForPrisma.prisma;
   globalForPrisma.prisma = undefined;
-  globalForPrisma.pgPool = undefined;
+  globalForPrisma.prismaVersion = PRISMA_CLIENT_VERSION;
+
+  if (staleClient) {
+    // Disconnect only — never end the shared pool here (hot reload + async races
+    // leave other module instances using the same pool and cause AccessDenied on login).
+    staleClient.$disconnect().catch(() => {});
+  }
 }
 
-if (globalForPrisma.prismaVersion !== PRISMA_CLIENT_VERSION) {
-  void disposeClient();
-  globalForPrisma.prismaVersion = PRISMA_CLIENT_VERSION;
-}
+resetPrismaClientForSchemaBump();
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 

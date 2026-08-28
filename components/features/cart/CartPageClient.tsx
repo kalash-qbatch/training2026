@@ -116,13 +116,15 @@ export function CartPageClient() {
           <ArrowLeft className="h-5 w-5" strokeWidth={2.25} />
           Your Shopping Bag
         </Link>
-        <button
-          type="button"
-          onClick={() => setPendingClearAll(true)}
-          className="text-sm font-medium text-[#EF4444] hover:underline"
-        >
-          Remove all
-        </button>
+        {items.length > 1 ? (
+          <button
+            type="button"
+            onClick={() => setPendingClearAll(true)}
+            className="text-sm font-medium text-[#EF4444] hover:underline"
+          >
+            Remove all
+          </button>
+        ) : null}
       </div>
 
       <div className="overflow-x-auto">
