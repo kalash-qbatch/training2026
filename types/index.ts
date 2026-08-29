@@ -214,6 +214,8 @@ export type Order = {
   subTotal: number;
   tax: number;
   status: OrderStatus;
+  paymentMethod: "CARD" | "COD";
+  paymentStatus: "UNPAID" | "PENDING" | "PROCESSING" | "PAID" | "SUCCEEDED" | "FAILED" | "REFUNDED";
   items: OrderItem[];
 };
 
@@ -311,3 +313,36 @@ export type SelectOption = {
   /** Optional class names for specific option items (e.g. sticky bottom). */
   className?: string;
 };
+
+/* ==========================================================================
+   9. Checkout UI Types
+   ========================================================================== */
+
+export type SavedPM = {
+  id: string;
+  brand: string;
+  last4: string;
+  expMonth: number;
+  expYear: number;
+  isDefault: boolean;
+};
+
+export type PaymentErrorInfo = {
+  title: string;
+  message: string;
+  suggestion: string;
+  recoverable: boolean;
+};
+
+export type UserInfo = {
+  fullName: string;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  postalCode: string;
+};
+
+export type UserInfoErrors = Partial<Record<keyof UserInfo, string>>;
+
+export type CheckoutStep = 1 | 2;

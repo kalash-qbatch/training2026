@@ -18,7 +18,12 @@ export async function placeOrder(body: unknown) {
   const { userId, error } = await requireUser();
   if (error || !userId) return error!;
 
-  const data = body as { items?: PlaceOrderItemInput[] };
+  const data = body as {
+    items?: PlaceOrderItemInput[];
+    paymentMethod?: "CARD" | "COD";
+    paymentStatus?:
+      "UNPAID" | "PENDING" | "PROCESSING" | "PAID" | "SUCCEEDED" | "FAILED" | "REFUNDED";
+  };
   if (!Array.isArray(data.items) || !data.items.length) {
     return {
       status: 400,
@@ -27,7 +32,10 @@ export async function placeOrder(body: unknown) {
   }
 
   try {
-    const order = await createOrder(userId, data.items);
+    const order = await createOrder(userId, data.items, {
+      paymentMethod: data.paymentMethod ?? "CARD",
+      paymentStatus: data.paymentStatus ?? "PENDING",
+    });
     return {
       status: 200,
       body: {

@@ -104,9 +104,12 @@ export function OrderStatusSelect({ order, onUpdated, className }: Props) {
   }
 
   const isTerminal = value === "DELIVERED" || value === "CANCELLED";
+  const isCardPayment = order.paymentMethod === "CARD";
+  const isPaymentSuccessful = order.paymentStatus === "SUCCEEDED" || order.paymentStatus === "PAID";
+  const isCardPaymentLocked = isCardPayment && !isPaymentSuccessful;
 
   async function handleStep(step: Step) {
-    if (saving) return;
+    if (saving || isCardPaymentLocked) return;
     const isEnabled = step.enabledFrom.includes(value);
     if (!isEnabled || isTerminal) return;
 
@@ -129,20 +132,43 @@ export function OrderStatusSelect({ order, onUpdated, className }: Props) {
   return (
     <div className={cn("flex flex-col gap-2", className)}>
       {/* Current status badge */}
-      <span
-        className={cn(
-          "inline-flex w-fit items-center rounded-full border px-3 py-1 text-[11px] font-semibold",
-          STATUS_BADGE[value]
-        )}
-      >
-        {STATUS_LABEL[value]}
-        {saving && (
-          <span className="ml-1.5 inline-block h-2.5 w-2.5 animate-spin rounded-full border border-current border-t-transparent" />
-        )}
-      </span>
+      <div className="flex flex-wrap items-center gap-2">
+        <span
+          className={cn(
+            "inline-flex w-fit items-center rounded-full border px-3 py-1 text-[11px] font-semibold",
+            STATUS_BADGE[value]
+          )}
+        >
+          {STATUS_LABEL[value]}
+          {saving && (
+            <span className="ml-1.5 inline-block h-2.5 w-2.5 animate-spin rounded-full border border-current border-t-transparent" />
+          )}
+        </span>
+
+        {/* Payment info tag */}
+        <span
+          className={cn(
+            "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium",
+            order.paymentMethod === "COD"
+              ? "bg-amber-50 text-amber-700 border-amber-200"
+              : isPaymentSuccessful
+                ? "bg-green-50 text-green-700 border-green-200"
+                : "bg-orange-50 text-orange-700 border-orange-200"
+          )}
+        >
+          {order.paymentMethod === "COD" ? "COD" : "CARD"}: {order.paymentStatus || "PENDING"}
+        </span>
+      </div>
+
+      {isCardPaymentLocked && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800">
+          ⚠️ Card payment is <span className="font-semibold">{order.paymentStatus}</span>. Order
+          status change is locked until payment succeeds.
+        </div>
+      )}
 
       {/* Action buttons */}
-      {!isTerminal && (
+      {!isTerminal && !isCardPaymentLocked && (
         <div className="flex flex-wrap gap-2">
           {STEPS.map((step) => {
             const isEnabled = step.enabledFrom.includes(value) && !saving;

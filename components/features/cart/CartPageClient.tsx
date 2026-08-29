@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -8,7 +8,6 @@ import { useRouter } from "next/navigation";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useToast } from "@/components/ui/Toast";
-import { placeOrder as placeOrderApi } from "@/lib/api/orders";
 import { TAX_RATE } from "@/lib/constants";
 import { useAuthStore } from "@/lib/store/useAuthStore";
 import { useCartStore } from "@/lib/store/useCartStore";
@@ -220,42 +219,17 @@ export function CartPageClient() {
           tax={tax}
           total={total}
           disabled={selectedItems.length === 0}
-          loading={placing}
-          onPlaceOrder={async () => {
+          loading={false}
+          onPlaceOrder={() => {
             if (!user) {
-              router.push("/login?next=/cart");
+              router.push("/login?next=/checkout");
               return;
             }
             if (!selectedItems.length) {
-              toast.error("Select at least one item to place an order");
+              toast.error("Select at least one item to proceed to checkout");
               return;
             }
-            setPlacing(true);
-            try {
-              const order = await placeOrderApi(
-                selectedItems.map((i) => ({
-                  productId: i.productId,
-                  specificationId: i.specificationId,
-                  quantity: i.qty,
-                }))
-              );
-              await removeItems(
-                selectedItems.map((i) => ({
-                  productId: i.productId,
-                  specificationId: i.specificationId,
-                }))
-              );
-              setPlacedOrderId(order.id);
-              setSuccessOpen(true);
-              // Defer refresh so it doesn't block the success modal rendering
-              startTransition(() => {
-                router.refresh();
-              });
-            } catch (err) {
-              toast.error(err instanceof Error ? err.message : "Failed to place order");
-            } finally {
-              setPlacing(false);
-            }
+            router.push("/checkout");
           }}
         />
       </div>

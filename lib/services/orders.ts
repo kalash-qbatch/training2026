@@ -1,4 +1,4 @@
-import type { OrderStatus, Prisma } from "@prisma/client";
+import type { OrderStatus, PaymentStatus, Prisma } from "@prisma/client";
 
 import { TAX_RATE } from "@/lib/constants";
 import { prisma } from "@/lib/db";
@@ -7,6 +7,7 @@ import { notifyOrderPlaced, notifyOrderStatusChange } from "@/lib/services/notif
 import type { AdminOrderFilters, Order, PlaceOrderItemInput } from "@/types";
 
 export type { AdminOrderFilters, PlaceOrderItemInput };
+export type { PaymentStatus };
 
 // Error handling component with status code as well
 export class OrderError extends Error {
@@ -19,7 +20,16 @@ export class OrderError extends Error {
   }
 }
 
-export async function createOrder(userId: string, items: PlaceOrderItemInput[]) {
+export async function createOrder(
+  userId: string,
+  items: PlaceOrderItemInput[],
+  opts?: {
+    paymentMethod?: "CARD" | "COD";
+    paymentStatus?: PaymentStatus;
+    stripePaymentIntentId?: string;
+    stripeClientSecret?: string;
+  }
+) {
   if (!items.length) {
     throw new OrderError("Cart is empty");
   }
@@ -129,10 +139,17 @@ export async function createOrder(userId: string, items: PlaceOrderItemInput[]) 
       const tax = Number((subTotal * TAX_RATE).toFixed(2));
       const total = Number((subTotal + tax).toFixed(2));
 
+      const paymentMethod = opts?.paymentMethod ?? "CARD";
+      const paymentStatus = opts?.paymentStatus ?? "PENDING";
+
       const order = await tx.order.create({
         data: {
           userId,
           status: "PROCESSING",
+          paymentMethod,
+          paymentStatus,
+          stripePaymentIntentId: opts?.stripePaymentIntentId ?? null,
+          stripeClientSecret: opts?.stripeClientSecret ?? null,
           subTotal,
           tax,
           total,
@@ -377,6 +394,14 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
       throw new OrderError("Order not found", 404);
     }
 
+    // Block status changes for card orders where payment is not yet completed
+    if (existing.paymentMethod === "CARD" && existing.paymentStatus !== "SUCCEEDED") {
+      throw new OrderError(
+        "Cannot update order status for card payments until payment is successfully completed.",
+        400
+      );
+    }
+
     const wasCancelled = existing.status === "CANCELLED";
     const willCancel = status === "CANCELLED";
 
@@ -491,4 +516,35 @@ export async function listUsersForAdmin() {
     fullName: u.fullName || u.name || "User",
     email: u.email ?? "",
   }));
+}
+
+/**
+ * Find an order by its Stripe PaymentIntent ID.
+ */
+export async function findOrderByPaymentIntentId(paymentIntentId: string) {
+  return prisma.order.findFirst({
+    where: { stripePaymentIntentId: paymentIntentId },
+    include: {
+      user: { select: { fullName: true, name: true, email: true } },
+      items: { include: { product: true } },
+    },
+  });
+}
+
+/**
+ * Update an order's payment status (called by webhooks / checkout confirm).
+ * Also transitions order status to PROCESSING when payment succeeds.
+ */
+export async function updateOrderPaymentStatus(orderId: string, paymentStatus: PaymentStatus) {
+  return prisma.order.update({
+    where: { id: orderId },
+    data: {
+      paymentStatus,
+      // When payment succeeds keep order in PROCESSING, when it fails keep PENDING
+    },
+    include: {
+      user: { select: { fullName: true, name: true, email: true } },
+      items: { include: { product: true } },
+    },
+  });
 }
