@@ -312,6 +312,7 @@ export type SelectOption = {
   accent?: boolean;
   /** Optional class names for specific option items (e.g. sticky bottom). */
   className?: string;
+  disabled?: boolean;
 };
 
 /* ==========================================================================
