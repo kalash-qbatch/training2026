@@ -10,6 +10,8 @@ export const mockOrder: Order = {
   subTotal: 59.98,
   tax: 4.8,
   status: "pending",
+  paymentMethod: "COD",
+  paymentStatus: "PENDING",
   items: [
     {
       productId: "prod-001",
