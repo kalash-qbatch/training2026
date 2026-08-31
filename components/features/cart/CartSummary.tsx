@@ -41,7 +41,7 @@ export function CartSummary({
         loading={loading}
         onClick={onPlaceOrder}
       >
-        Place Order
+        Proceed to Checkout
       </Button>
     </div>
   );

@@ -88,16 +88,38 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             ? `${user.id || account.providerAccountId}@github.user`
             : null);
         if (!email) return false;
-        await prisma.user.upsert({
+
+        const fullName =
+          user.name || (account.provider === "github" ? "GitHub User" : "Google User");
+
+        const dbUser = await prisma.user.upsert({
           where: { email },
           update: {},
           create: {
             email,
-            fullName: user.name || (account.provider === "github" ? "GitHub User" : "Google User"),
+            fullName,
             phone: "",
             passwordHash: "",
           },
         });
+
+        // Create Stripe customer for OAuth users if they don't have one yet
+        if (!dbUser.stripeCustomerId) {
+          try {
+            const { stripe } = await import("@/lib/stripe");
+            const customer = await stripe.customers.create({
+              email: dbUser.email,
+              name: dbUser.fullName || dbUser.name || "Customer",
+              metadata: { userId: dbUser.id },
+            });
+            await prisma.user.update({
+              where: { id: dbUser.id },
+              data: { stripeCustomerId: customer.id },
+            });
+          } catch (err) {
+            console.error("Failed to create Stripe customer for OAuth user:", err);
+          }
+        }
       }
       return true;
     },

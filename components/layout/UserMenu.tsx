@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { ChevronDown, History, LayoutDashboard, LogOut, User } from "lucide-react";
+import { ChevronDown, CreditCard, History, LayoutDashboard, LogOut, User } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
@@ -113,15 +113,26 @@ export function UserMenu() {
               Admin dashboard
             </Link>
           ) : (
-            <Link
-              role="menuitem"
-              href="/orders"
-              onClick={() => setOpen(false)}
-              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-text hover:bg-brand-50 hover:text-brand-600"
-            >
-              <History className="h-4 w-4" strokeWidth={1.75} />
-              Order history
-            </Link>
+            <>
+              <Link
+                role="menuitem"
+                href="/orders"
+                onClick={() => setOpen(false)}
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-text hover:bg-brand-50 hover:text-brand-600"
+              >
+                <History className="h-4 w-4" strokeWidth={1.75} />
+                Order history
+              </Link>
+              <Link
+                role="menuitem"
+                href="/payment-methods"
+                onClick={() => setOpen(false)}
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-text hover:bg-brand-50 hover:text-brand-600"
+              >
+                <CreditCard className="h-4 w-4" strokeWidth={1.75} />
+                Payment methods
+              </Link>
+            </>
           )}
 
           <button

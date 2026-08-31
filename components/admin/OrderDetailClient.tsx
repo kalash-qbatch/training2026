@@ -17,12 +17,7 @@ import {
 import { fetchAdminOrder } from "@/lib/api/admin";
 import { TAX_RATE } from "@/lib/constants";
 import { formatLineColor, formatLineSize } from "@/lib/product";
-import {
-  formatCurrency,
-  formatDate,
-  // orderStatusClass,
-  // orderStatusLabel,
-} from "@/lib/utils";
+import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { Order } from "@/types";
 
 export function OrderDetailClient({ orderId }: { orderId: string }) {
@@ -97,9 +92,26 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
           <Meta label="Tax" value={formatCurrency(tax)} />
           <Meta label="Total" value={formatCurrency(order.amount)} />
         </div>
-        <div className="flex flex-col gap-2">
-          <p className="text-[12px] text-neutral-muted">Status</p>
-          <OrderStatusSelect order={order} onUpdated={setOrder} />
+        <div className="flex flex-wrap items-end gap-6">
+          <div className="flex flex-col gap-2">
+            <p className="text-[12px] text-neutral-muted">Payment</p>
+            <span
+              className={cn(
+                "inline-flex w-fit items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium",
+                order.paymentMethod === "COD"
+                  ? "bg-amber-50 text-amber-700 border-amber-200"
+                  : order.paymentStatus === "SUCCEEDED" || order.paymentStatus === "PAID"
+                    ? "bg-green-50 text-green-700 border-green-200"
+                    : "bg-orange-50 text-orange-700 border-orange-200"
+              )}
+            >
+              {order.paymentMethod === "COD" ? "COD" : "CARD"}: {order.paymentStatus || "PENDING"}
+            </span>
+          </div>
+          <div className="flex flex-col gap-2">
+            <p className="text-[12px] text-neutral-muted">Status</p>
+            <OrderStatusSelect order={order} onUpdated={setOrder} />
+          </div>
         </div>
       </div>
 

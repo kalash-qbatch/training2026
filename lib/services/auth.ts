@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { stripe } from "@/lib/stripe";
 
 export async function findUserByEmail(email: string) {
   return prisma.user.findUnique({ where: { email } });
@@ -10,7 +11,7 @@ export async function createUser(data: {
   phone: string;
   passwordHash: string;
 }) {
-  return prisma.user.create({
+  const user = await prisma.user.create({
     data: {
       fullName: data.fullName,
       name: data.fullName,
@@ -19,6 +20,23 @@ export async function createUser(data: {
       passwordHash: data.passwordHash,
     },
   });
+
+  // Create Stripe customer and save back to DB (fire-and-forget safe — just log on failure)
+  try {
+    const customer = await stripe.customers.create({
+      email: user.email,
+      name: user.fullName || user.name || "Customer",
+      metadata: { userId: user.id },
+    });
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { stripeCustomerId: customer.id },
+    });
+  } catch (err) {
+    console.error("Failed to create Stripe customer during signup:", err);
+  }
+
+  return user;
 }
 
 export async function setUserResetToken(userId: string, resetToken: string, resetTokenExp: Date) {

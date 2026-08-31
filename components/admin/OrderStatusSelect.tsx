@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { Select } from "@/components/ui/Select";
 import { useToast } from "@/components/ui/Toast";
 import { type AdminOrderStatusUpdate, updateAdminOrderStatus } from "@/lib/api/admin";
 import { toAdminOrderStatus } from "@/lib/utils";
@@ -34,8 +35,6 @@ type Step = {
   label: string;
   /** Which current statuses allow clicking this action */
   enabledFrom: AdminOrderStatusUpdate[];
-  /** Visual style variant */
-  variant: "approve" | "deliver" | "cancel";
 };
 
 const STEPS: Step[] = [
@@ -43,19 +42,16 @@ const STEPS: Step[] = [
     value: "SHIPPED",
     label: "Approve",
     enabledFrom: ["PROCESSING"],
-    variant: "approve",
   },
   {
     value: "DELIVERED",
     label: "Deliver",
     enabledFrom: ["SHIPPED"],
-    variant: "deliver",
   },
   {
     value: "CANCELLED",
     label: "Cancel",
     enabledFrom: ["PROCESSING", "SHIPPED"],
-    variant: "cancel",
   },
 ];
 
@@ -71,21 +67,6 @@ const STATUS_BADGE: Record<AdminOrderStatusUpdate, string> = {
   SHIPPED: "bg-blue-50 text-blue-700 border-blue-200",
   DELIVERED: "bg-green-50 text-green-700 border-green-200",
   CANCELLED: "bg-red-50 text-red-700 border-red-200",
-};
-
-const VARIANT_BASE: Record<Step["variant"], string> = {
-  approve:
-    "border-blue-300 text-blue-700 hover:bg-blue-600 hover:text-white hover:border-blue-600 focus-visible:ring-blue-400",
-  deliver:
-    "border-green-300 text-green-700 hover:bg-green-600 hover:text-white hover:border-green-600 focus-visible:ring-green-400",
-  cancel:
-    "border-red-300 text-red-700 hover:bg-red-600 hover:text-white hover:border-red-600 focus-visible:ring-red-400",
-};
-
-const VARIANT_ACTIVE: Record<Step["variant"], string> = {
-  approve: "bg-blue-600 border-blue-600 text-white",
-  deliver: "bg-green-600 border-green-600 text-white",
-  cancel: "bg-red-600 border-red-600 text-white",
 };
 
 export function OrderStatusSelect({ order, onUpdated, className }: Props) {
@@ -104,9 +85,12 @@ export function OrderStatusSelect({ order, onUpdated, className }: Props) {
   }
 
   const isTerminal = value === "DELIVERED" || value === "CANCELLED";
+  const isCardPayment = order.paymentMethod === "CARD";
+  const isPaymentSuccessful = order.paymentStatus === "SUCCEEDED" || order.paymentStatus === "PAID";
+  const isCardPaymentLocked = isCardPayment && !isPaymentSuccessful;
 
   async function handleStep(step: Step) {
-    if (saving) return;
+    if (saving || isCardPaymentLocked) return;
     const isEnabled = step.enabledFrom.includes(value);
     if (!isEnabled || isTerminal) return;
 
@@ -128,7 +112,6 @@ export function OrderStatusSelect({ order, onUpdated, className }: Props) {
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>
-      {/* Current status badge */}
       <span
         className={cn(
           "inline-flex w-fit items-center rounded-full border px-3 py-1 text-[11px] font-semibold",
@@ -141,32 +124,30 @@ export function OrderStatusSelect({ order, onUpdated, className }: Props) {
         )}
       </span>
 
-      {/* Action buttons */}
-      {!isTerminal && (
-        <div className="flex flex-wrap gap-2">
-          {STEPS.map((step) => {
-            const isEnabled = step.enabledFrom.includes(value) && !saving;
-            const isActive = value === step.value;
-
-            return (
-              <button
-                key={step.value}
-                type="button"
-                disabled={!isEnabled}
-                onClick={() => handleStep(step)}
-                className={cn(
-                  "rounded-md border px-3 py-1.5 text-[12px] font-semibold transition-all duration-150",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1",
-                  isActive ? VARIANT_ACTIVE[step.variant] : VARIANT_BASE[step.variant],
-                  !isEnabled &&
-                    "cursor-not-allowed border-neutral-200 bg-neutral-50 text-neutral-300 hover:bg-neutral-50 hover:text-neutral-300 hover:border-neutral-200"
-                )}
-              >
-                {step.label}
-              </button>
-            );
-          })}
+      {isCardPaymentLocked && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800">
+          ⚠️ Card payment is <span className="font-semibold">{order.paymentStatus}</span>. Order
+          status change is locked until payment succeeds.
         </div>
+      )}
+
+      {!isTerminal && !isCardPaymentLocked && (
+        <Select
+          value=""
+          placeholder="Update status"
+          ariaLabel="Change order status"
+          disabled={saving}
+          className="min-w-40"
+          options={STEPS.map((step) => ({
+            value: step.value,
+            label: step.label,
+            disabled: !step.enabledFrom.includes(value) || saving,
+          }))}
+          onChange={(next) => {
+            const step = STEPS.find((s) => s.value === next);
+            if (step) handleStep(step);
+          }}
+        />
       )}
 
       {isTerminal && (
