@@ -74,6 +74,10 @@ export async function createNotification(
 
   try {
     emitNotificationToUser(data.userId, payload);
+    const unreadCount = await tx.notification.count({
+      where: { userId: data.userId, read: false },
+    });
+    emitUnreadCountToUser(data.userId, unreadCount);
   } catch {
     // ignore socket emit error
   }

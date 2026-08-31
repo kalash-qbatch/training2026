@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "tsx server.ts",
+    "dev:next": "next dev --turbopack",
+    "dev:socket": "tsx server.ts",
     "build": "prisma generate && next build",
     "start": "next start",
     "db:migrate": "prisma migrate dev",

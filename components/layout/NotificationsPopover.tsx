@@ -101,7 +101,7 @@ export function NotificationsPopover() {
       }
 
       try {
-        // Only apply 1s delay when user opens popover or scrolls (not background polling)
+        // Only apply delay when user opens popover or scrolls (not socket sync)
         if (withDelay) {
           await new Promise((resolve) => setTimeout(resolve, 1000));
           if (controller.signal.aborted) return;
@@ -152,7 +152,7 @@ export function NotificationsPopover() {
     return () => clearTimeout(timer);
   }, [fetchPage]);
 
-  // Real-time socket event subscription
+  // Real-time socket subscription (no background polling)
   useSocketNotifications({
     onNewNotification: (newNotif) => {
       setNotifications((prev) => {
@@ -164,6 +164,15 @@ export function NotificationsPopover() {
     },
     onUnreadCountChange: (count) => {
       setUnreadCount(count);
+    },
+    onSync: (latestNotifications, count) => {
+      setUnreadCount(count);
+      setNotifications((prev) => {
+        if (!prev.length) return latestNotifications;
+        const incomingIds = new Set(latestNotifications.map((n) => n.id));
+        const older = prev.filter((n) => !incomingIds.has(n.id));
+        return [...latestNotifications, ...older];
+      });
     },
   });
 
