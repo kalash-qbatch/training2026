@@ -237,6 +237,8 @@ export function NotificationsPopover() {
   const filteredNotifications =
     activeTab === "unread" ? notifications.filter((n) => !n.read) : notifications;
 
+  const hasUnread = unreadCount > 0 || notifications.some((n) => !n.read);
+
   return (
     <div ref={rootRef} className="relative flex items-center">
       <button
@@ -280,15 +282,19 @@ export function NotificationsPopover() {
             <div className="flex items-center justify-between gap-3 border-b border-[#e5e7eb] px-4 py-3.5">
               <p className="text-[15px] font-bold text-neutral-900">Notifications</p>
               <div className="flex items-center gap-2">
-                {unreadCount > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => void onMarkAllRead()}
-                    className="whitespace-nowrap text-[12px] font-semibold text-brand-500 hover:text-brand-600 transition-colors"
-                  >
-                    Mark all as read
-                  </button>
-                ) : null}
+                <button
+                  type="button"
+                  onClick={() => void onMarkAllRead()}
+                  disabled={!hasUnread}
+                  className={cn(
+                    "whitespace-nowrap text-[12px] font-semibold transition-colors",
+                    hasUnread
+                      ? "text-brand-500 hover:text-brand-600"
+                      : "cursor-not-allowed text-neutral-300"
+                  )}
+                >
+                  Mark all as read
+                </button>
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
