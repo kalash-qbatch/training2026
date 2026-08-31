@@ -8,6 +8,7 @@ import Google from "next-auth/providers/google";
 
 import { SESSION_EXPIRY_DEFAULT, SESSION_EXPIRY_REMEMBER_ME } from "@/lib/constants";
 import { prisma } from "@/lib/db";
+import { isStripeConfigured } from "@/lib/stripe";
 
 import authConfig from "./auth.config";
 
@@ -104,10 +105,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         });
 
         // Create Stripe customer for OAuth users if they don't have one yet
-        if (!dbUser.stripeCustomerId) {
+        if (!dbUser.stripeCustomerId && isStripeConfigured()) {
           try {
-            const { stripe } = await import("@/lib/stripe");
-            const customer = await stripe.customers.create({
+            const { getStripe } = await import("@/lib/stripe");
+            const customer = await getStripe().customers.create({
               email: dbUser.email,
               name: dbUser.fullName || dbUser.name || "Customer",
               metadata: { userId: dbUser.id },

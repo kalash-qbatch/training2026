@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { stripe } from "@/lib/stripe";
+import { getStripe } from "@/lib/stripe";
 
 export type SavedPaymentMethod = {
   id: string;
@@ -24,7 +24,7 @@ export async function getOrCreateStripeCustomer(
 
   if (user.stripeCustomerId) return user.stripeCustomerId;
 
-  const customer = await stripe.customers.create({
+  const customer = await getStripe().customers.create({
     email,
     name,
     metadata: { userId },
@@ -46,11 +46,11 @@ export async function listCustomerPaymentMethods(userId: string): Promise<SavedP
   if (!user?.stripeCustomerId) return [];
 
   const [pms, customer] = await Promise.all([
-    stripe.paymentMethods.list({
+    getStripe().paymentMethods.list({
       customer: user.stripeCustomerId,
       type: "card",
     }),
-    stripe.customers.retrieve(user.stripeCustomerId),
+    getStripe().customers.retrieve(user.stripeCustomerId),
   ]);
 
   const defaultPmId =
@@ -81,7 +81,7 @@ export async function createCustomerSetupIntent(userId: string): Promise<string>
     user.fullName || user.name || "Customer"
   );
 
-  const setupIntent = await stripe.setupIntents.create({
+  const setupIntent = await getStripe().setupIntents.create({
     customer: customerId,
     payment_method_types: ["card"],
     usage: "off_session",
@@ -101,12 +101,12 @@ export async function setDefaultCustomerPaymentMethod(
   if (!user?.stripeCustomerId) throw new Error("No Stripe customer found");
 
   // Verify this PM belongs to our customer
-  const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
+  const pm = await getStripe().paymentMethods.retrieve(paymentMethodId);
   if (pm.customer !== user.stripeCustomerId) {
     throw new Error("Payment method does not belong to this customer");
   }
 
-  await stripe.customers.update(user.stripeCustomerId, {
+  await getStripe().customers.update(user.stripeCustomerId, {
     invoice_settings: { default_payment_method: paymentMethodId },
   });
 }
@@ -122,12 +122,12 @@ export async function deleteCustomerPaymentMethod(
   if (!user?.stripeCustomerId) throw new Error("No Stripe customer found");
 
   // Verify this PM belongs to our customer before detaching
-  const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
+  const pm = await getStripe().paymentMethods.retrieve(paymentMethodId);
   if (pm.customer !== user.stripeCustomerId) {
     throw new Error("Payment method does not belong to this customer");
   }
 
-  await stripe.paymentMethods.detach(paymentMethodId);
+  await getStripe().paymentMethods.detach(paymentMethodId);
 }
 
 /**
@@ -140,7 +140,7 @@ export async function attachPaymentMethodToCustomer(
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user?.stripeCustomerId) throw new Error("No Stripe customer found");
 
-  await stripe.paymentMethods.attach(paymentMethodId, {
+  await getStripe().paymentMethods.attach(paymentMethodId, {
     customer: user.stripeCustomerId,
   });
 }
@@ -163,6 +163,7 @@ export async function createPaymentIntentForCart(
     user.fullName || user.name || "Customer"
   );
 
+  const stripe = getStripe();
   const intentData: Parameters<typeof stripe.paymentIntents.create>[0] = {
     amount: totalAmountCents,
     currency: "usd",

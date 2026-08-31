@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { createOrder } from "@/lib/services/orders";
 import { OrderError } from "@/lib/services/orders";
 import { mapStripeError } from "@/lib/services/payment-errors";
-import { stripe } from "@/lib/stripe";
+import { getStripe } from "@/lib/stripe";
 import type { PlaceOrderItemInput } from "@/types";
 
 export async function POST(request: Request) {
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    const intent = await getStripe().paymentIntents.retrieve(paymentIntentId);
 
     if (intent.status === "succeeded") {
       const order = await createOrder(userId, items, {

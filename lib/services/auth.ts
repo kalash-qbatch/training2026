@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { stripe } from "@/lib/stripe";
+import { getStripe, isStripeConfigured } from "@/lib/stripe";
 
 export async function findUserByEmail(email: string) {
   return prisma.user.findUnique({ where: { email } });
@@ -21,19 +21,21 @@ export async function createUser(data: {
     },
   });
 
-  // Create Stripe customer and save back to DB (fire-and-forget safe — just log on failure)
-  try {
-    const customer = await stripe.customers.create({
-      email: user.email,
-      name: user.fullName || user.name || "Customer",
-      metadata: { userId: user.id },
-    });
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { stripeCustomerId: customer.id },
-    });
-  } catch (err) {
-    console.error("Failed to create Stripe customer during signup:", err);
+  // Create Stripe customer when configured (optional in CI/local without Stripe)
+  if (isStripeConfigured()) {
+    try {
+      const customer = await getStripe().customers.create({
+        email: user.email,
+        name: user.fullName || user.name || "Customer",
+        metadata: { userId: user.id },
+      });
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { stripeCustomerId: customer.id },
+      });
+    } catch (err) {
+      console.error("Failed to create Stripe customer during signup:", err);
+    }
   }
 
   return user;

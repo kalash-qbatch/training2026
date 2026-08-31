@@ -1,10 +1,23 @@
 import Stripe from "stripe";
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error("STRIPE_SECRET_KEY environment variable is not set");
+let stripeClient: Stripe | undefined;
+
+export function getStripe(): Stripe {
+  if (!stripeClient) {
+    const secretKey = process.env.STRIPE_SECRET_KEY;
+    if (!secretKey) {
+      throw new Error("STRIPE_SECRET_KEY environment variable is not set");
+    }
+
+    stripeClient = new Stripe(secretKey, {
+      apiVersion: "2026-08-26.dahlia",
+      typescript: true,
+    });
+  }
+
+  return stripeClient;
 }
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2026-08-26.dahlia",
-  typescript: true,
-});
+export function isStripeConfigured(): boolean {
+  return Boolean(process.env.STRIPE_SECRET_KEY);
+}
