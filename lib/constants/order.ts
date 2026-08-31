@@ -17,3 +17,6 @@ export const CARD_INITIAL_PAGE = 1;
 /** Notifications loaded per batch/page */
 export const NOTIFICATION_PAGE_SIZE = 8;
 export const NOTIFICATION_INITIAL_PAGE = 1;
+
+/** Polling interval for deployed environment (10 seconds) */
+export const NOTIFICATION_POLL_INTERVAL_MS = 10_000;

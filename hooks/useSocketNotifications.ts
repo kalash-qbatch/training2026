@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import type { Socket } from "socket.io-client";
 
 import { fetchNotifications } from "@/lib/api/notifications";
-import { NOTIFICATION_PAGE_SIZE } from "@/lib/constants";
+import { NOTIFICATION_PAGE_SIZE, NOTIFICATION_POLL_INTERVAL_MS } from "@/lib/constants";
 import { disconnectSocketClient, getSocketClient, isSocketEnabled } from "@/lib/socket/client";
 import { useAuthStore } from "@/lib/store/useAuthStore";
 import type { AppNotification } from "@/types";
@@ -63,18 +63,30 @@ export function useSocketNotifications({
       }
     }
 
+    // Deployed / Production: Poll every 10 seconds
     if (!isSocketEnabled()) {
       void syncOnce();
+      const interval = setInterval(() => {
+        void syncOnce();
+      }, NOTIFICATION_POLL_INTERVAL_MS);
+
       return () => {
         isSubscribed = false;
+        clearInterval(interval);
       };
     }
 
+    // Local: Connect via Socket.IO
     const socket = getSocketClient(user.id);
     if (!socket) {
       void syncOnce();
+      const interval = setInterval(() => {
+        void syncOnce();
+      }, NOTIFICATION_POLL_INTERVAL_MS);
+
       return () => {
         isSubscribed = false;
+        clearInterval(interval);
       };
     }
 
