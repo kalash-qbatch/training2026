@@ -7,26 +7,13 @@ const nextConfig: NextConfig = {
   },
   images: {
     remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "lh3.googleusercontent.com",
-      },
-      {
-        protocol: "https",
-        hostname: "avatars.githubusercontent.com",
-      },
-      {
-        protocol: "https",
-        hostname: "**.supabase.co",
-      },
-      {
-        protocol: "https",
-        hostname: "**.supabase.in",
-      },
-      {
-        protocol: "https",
-        hostname: "picsum.photos",
-      },
+      new URL("https://lh3.googleusercontent.com/**"),
+      new URL("https://platform-lookaside.fbsbx.com/**"),
+      new URL("https://*.fbcdn.net/**"),
+      new URL("https://graph.facebook.com/**"),
+      new URL("https://*.supabase.co/**"),
+      new URL("https://*.supabase.in/**"),
+      new URL("https://picsum.photos/**"),
     ],
   },
   allowedDevOrigins: [

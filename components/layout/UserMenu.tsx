@@ -2,48 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { ChevronDown, CreditCard, History, LayoutDashboard, LogOut, User } from "lucide-react";
-import Image from "next/image";
+import { ChevronDown, CreditCard, History, LayoutDashboard, LogOut } from "lucide-react";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuthStore } from "@/lib/store/useAuthStore";
 import { cn } from "@/lib/utils";
 
-function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? "")
-    .join("");
-}
-
 function Avatar({ name, image, size = 32 }: { name: string; image?: string; size?: number }) {
-  const label = initials(name);
-
-  if (image) {
-    return (
-      <Image
-        src={image}
-        alt={name}
-        width={size}
-        height={size}
-        className="rounded-full object-cover"
-        referrerPolicy="no-referrer"
-      />
-    );
-  }
-
-  return (
-    <span
-      className="flex items-center justify-center rounded-full bg-brand-50 text-xs font-semibold text-brand-600"
-      style={{ width: size, height: size }}
-      aria-hidden
-    >
-      {label || <User className="h-4 w-4" />}
-    </span>
-  );
+  return <UserAvatar name={name} image={image} size={size} />;
 }
 
 export function UserMenu() {

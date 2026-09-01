@@ -2,21 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { ChevronDown, LogOut, User } from "lucide-react";
-import Image from "next/image";
+import { ChevronDown, LogOut } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import { useAuthStore } from "@/lib/store/useAuthStore";
 import { cn } from "@/lib/utils";
-
-function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? "")
-    .join("");
-}
 
 export function AdminTopBar() {
   const { data: session } = useSession();
@@ -53,20 +44,7 @@ export function AdminTopBar() {
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-2.5 rounded-md p-1 text-[#333333] transition hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
       >
-        {image ? (
-          <Image
-            src={image}
-            alt={name}
-            width={32}
-            height={32}
-            className="rounded-full object-cover"
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-50 text-[11px] font-semibold text-brand-600">
-            {initials(name) || <User className="h-4 w-4" />}
-          </span>
-        )}
+        <UserAvatar name={name} image={image} size={32} />
         <span className="hidden text-[13px] font-medium sm:inline">{name}</span>
         <ChevronDown
           className={cn("h-4 w-4 text-[#6b7280] transition-transform", open && "rotate-180")}

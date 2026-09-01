@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import NextAuth from "next-auth";
 import { decode as jwtDecode, encode as jwtEncode } from "next-auth/jwt";
 import Credentials from "next-auth/providers/credentials";
-import GitHub from "next-auth/providers/github";
+import Facebook from "next-auth/providers/facebook";
 import Google from "next-auth/providers/google";
 
 import { SESSION_EXPIRY_DEFAULT, SESSION_EXPIRY_REMEMBER_ME } from "@/lib/constants";
@@ -11,6 +11,19 @@ import { prisma } from "@/lib/db";
 import { isStripeConfigured } from "@/lib/stripe";
 
 import authConfig from "./auth.config";
+
+const SOCIAL_PROVIDERS = new Set(["google", "facebook"]);
+
+function socialFallbackEmail(provider: string, userId: string, providerAccountId: string) {
+  if (provider === "facebook") return `${providerAccountId}@facebook.user`;
+  return `${userId || providerAccountId}@oauth.user`;
+}
+
+function socialFallbackName(provider: string) {
+  if (provider === "facebook") return "Facebook User";
+  if (provider === "google") return "Google User";
+  return "User";
+}
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
@@ -37,9 +50,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
   },
   providers: [
-    GitHub({
-      clientId: process.env.GITHUB_ID ?? process.env.GITHUB_CLIENT_ID,
-      clientSecret: process.env.GITHUB_SECRET ?? process.env.GITHUB_CLIENT_SECRET,
+    Facebook({
+      clientId: process.env.FACEBOOK_CLIENT_ID,
+      clientSecret: process.env.FACEBOOK_CLIENT_SECRET,
+      authorization: { params: { scope: "email public_profile" } },
     }),
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
@@ -82,16 +96,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     async signIn({ user, account }) {
-      if (account?.provider === "google" || account?.provider === "github") {
+      if (account?.provider && SOCIAL_PROVIDERS.has(account.provider)) {
         const email =
           user.email ||
-          (account.provider === "github"
-            ? `${user.id || account.providerAccountId}@github.user`
-            : null);
+          socialFallbackEmail(account.provider, user.id ?? "", account.providerAccountId);
         if (!email) return false;
 
-        const fullName =
-          user.name || (account.provider === "github" ? "GitHub User" : "Google User");
+        const fullName = user.name || socialFallbackName(account.provider);
 
         const dbUser = await prisma.user.upsert({
           where: { email },
@@ -148,7 +159,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         if (
           rememberMe === undefined &&
-          (account?.provider === "google" || account?.provider === "github")
+          account?.provider &&
+          SOCIAL_PROVIDERS.has(account.provider)
         ) {
           try {
             const cookieStore = await cookies();
@@ -168,10 +180,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.exp =
           Math.floor(Date.now() / 1000) +
           (token.rememberMe ? SESSION_EXPIRY_REMEMBER_ME : SESSION_EXPIRY_DEFAULT);
-      } else if (
-        (account?.provider === "google" || account?.provider === "github") &&
-        token.email
-      ) {
+      } else if (account?.provider && SOCIAL_PROVIDERS.has(account.provider) && token.email) {
         const dbUser = await prisma.user.findUnique({
           where: { email: token.email },
         });

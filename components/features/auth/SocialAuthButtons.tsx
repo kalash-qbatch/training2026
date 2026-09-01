@@ -3,10 +3,10 @@
 import { signIn } from "next-auth/react";
 import type { ReactNode } from "react";
 
-import { GithubIcon, GoogleIcon } from "@/components/ui/SocialIcons";
+import { FacebookIcon, GoogleIcon } from "@/components/ui/SocialIcons";
 import { useToast } from "@/components/ui/Toast";
 
-type Provider = "google" | "github";
+type Provider = "google" | "facebook";
 
 const providers: {
   id: Provider;
@@ -21,10 +21,10 @@ const providers: {
     className: "border-neutral-border bg-white text-neutral-text hover:bg-neutral-bg",
   },
   {
-    id: "github",
-    label: "Continue with GitHub",
-    icon: <GithubIcon size={18} className="text-neutral-text" />,
-    className: "border-neutral-border bg-neutral-surface text-neutral-text hover:bg-neutral-bg",
+    id: "facebook",
+    label: "Continue with Facebook",
+    icon: <FacebookIcon size={18} />,
+    className: "border-[#1877F2]/30 bg-[#1877F2] text-white hover:bg-[#166FE5]",
   },
 ];
 
