@@ -127,12 +127,23 @@ model Order {
   subTotal              Decimal       @db.Decimal(10, 2)
   tax                   Decimal       @db.Decimal(10, 2)
   total                 Decimal       @db.Decimal(10, 2)
+  shippingFullName      String?
+  shippingEmail         String?
+  shippingPhone         String?
+  shippingAddress       String?
+  shippingCity          String?
+  shippingPostalCode    String?
+  paymentAttemptCount   Int           @default(0)
+  maxPaymentAttempts    Int           @default(3)
+  nextPaymentRetryAt    DateTime?
+  lastFailedPaymentIntentId String?
   createdAt             DateTime      @default(now())
   updatedAt             DateTime      @updatedAt
   user                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   items                 OrderItem[]
 
   @@index([userId])
+  @@index([paymentStatus, nextPaymentRetryAt])
 }
 
 model OrderItem {

@@ -9,6 +9,15 @@ import type { AdminOrderFilters, Order, PlaceOrderItemInput } from "@/types";
 export type { AdminOrderFilters, PlaceOrderItemInput };
 export type { PaymentStatus };
 
+export type ShippingInfo = {
+  fullName: string;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  postalCode: string;
+};
+
 // Error handling component with status code as well
 export class OrderError extends Error {
   constructor(
@@ -17,6 +26,10 @@ export class OrderError extends Error {
   ) {
     super(message);
     this.name = "OrderError";
+  }
+
+  static is(error: unknown): error is OrderError {
+    return error instanceof OrderError || (error instanceof Error && error.name === "OrderError");
   }
 }
 
@@ -28,6 +41,8 @@ export async function createOrder(
     paymentStatus?: PaymentStatus;
     stripePaymentIntentId?: string;
     stripeClientSecret?: string;
+    shipping?: ShippingInfo;
+    orderStatus?: OrderStatus;
   }
 ) {
   if (!items.length) {
@@ -141,15 +156,22 @@ export async function createOrder(
 
       const paymentMethod = opts?.paymentMethod ?? "CARD";
       const paymentStatus = opts?.paymentStatus ?? "PENDING";
+      const orderStatus = opts?.orderStatus ?? "PROCESSING";
 
       const order = await tx.order.create({
         data: {
           userId,
-          status: "PROCESSING",
+          status: orderStatus,
           paymentMethod,
           paymentStatus,
           stripePaymentIntentId: opts?.stripePaymentIntentId ?? null,
           stripeClientSecret: opts?.stripeClientSecret ?? null,
+          shippingFullName: opts?.shipping?.fullName ?? null,
+          shippingEmail: opts?.shipping?.email ?? null,
+          shippingPhone: opts?.shipping?.phone ?? null,
+          shippingAddress: opts?.shipping?.address ?? null,
+          shippingCity: opts?.shipping?.city ?? null,
+          shippingPostalCode: opts?.shipping?.postalCode ?? null,
           subTotal,
           tax,
           total,
@@ -394,8 +416,14 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
       throw new OrderError("Order not found", 404);
     }
 
-    // Block status changes for card orders where payment is not yet completed
-    if (existing.paymentMethod === "CARD" && existing.paymentStatus !== "SUCCEEDED") {
+    // Block status changes for card orders where payment is not yet completed,
+    // except cancellation (e.g. after all payment retries fail).
+    if (
+      existing.paymentMethod === "CARD" &&
+      existing.paymentStatus !== "SUCCEEDED" &&
+      existing.paymentStatus !== "PAID" &&
+      status !== "CANCELLED"
+    ) {
       throw new OrderError(
         "Cannot update order status for card payments until payment is successfully completed.",
         400
@@ -533,18 +561,229 @@ export async function findOrderByPaymentIntentId(paymentIntentId: string) {
 
 /**
  * Update an order's payment status (called by webhooks / checkout confirm).
- * Also transitions order status to PROCESSING when payment succeeds.
  */
 export async function updateOrderPaymentStatus(orderId: string, paymentStatus: PaymentStatus) {
-  return prisma.order.update({
+  const order = await prisma.order.update({
     where: { id: orderId },
     data: {
       paymentStatus,
-      // When payment succeeds keep order in PROCESSING, when it fails keep PENDING
+      ...(paymentStatus === "SUCCEEDED" || paymentStatus === "PAID"
+        ? { nextPaymentRetryAt: null }
+        : {}),
     },
     include: {
       user: { select: { fullName: true, name: true, email: true } },
       items: { include: { product: true } },
     },
   });
+
+  return mapOrder(order);
+}
+
+/**
+ * Attach a Stripe PaymentIntent to an existing order (retry flow).
+ */
+export async function attachPaymentIntentToOrder(
+  orderId: string,
+  userId: string,
+  stripePaymentIntentId: string,
+  stripeClientSecret: string
+) {
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, userId },
+  });
+  if (!order) {
+    throw new OrderError("Order not found", 404);
+  }
+  if (order.status === "CANCELLED") {
+    throw new OrderError("This order has been cancelled.", 400);
+  }
+  if (order.paymentStatus === "SUCCEEDED" || order.paymentStatus === "PAID") {
+    throw new OrderError("This order has already been paid.", 400);
+  }
+
+  const updated = await prisma.order.update({
+    where: { id: orderId },
+    data: {
+      stripePaymentIntentId,
+      stripeClientSecret,
+      paymentStatus: "PENDING",
+      paymentMethod: "CARD",
+      nextPaymentRetryAt: null,
+    },
+    include: {
+      user: { select: { fullName: true, name: true, email: true } },
+      items: { include: { product: true } },
+    },
+  });
+
+  return mapOrder(updated);
+}
+
+/**
+ * Switch a failed card order to COD (retry with different payment method).
+ */
+export async function switchOrderToCod(orderId: string, userId: string) {
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, userId },
+  });
+  if (!order) {
+    throw new OrderError("Order not found", 404);
+  }
+  if (order.status === "CANCELLED") {
+    throw new OrderError("This order has been cancelled.", 400);
+  }
+  if (order.paymentStatus === "SUCCEEDED" || order.paymentStatus === "PAID") {
+    throw new OrderError("This order has already been paid.", 400);
+  }
+
+  const updated = await prisma.order.update({
+    where: { id: orderId },
+    data: {
+      paymentMethod: "COD",
+      paymentStatus: "PENDING",
+      stripePaymentIntentId: null,
+      stripeClientSecret: null,
+      nextPaymentRetryAt: null,
+      status: "PROCESSING",
+    },
+    include: {
+      user: { select: { fullName: true, name: true, email: true } },
+      items: { include: { product: true } },
+    },
+  });
+
+  return mapOrder(updated);
+}
+
+function daysUntilNextRetry(attemptCount: number): number {
+  return attemptCount <= 1 ? 2 : 3;
+}
+
+/**
+ * Handle a failed payment: increment attempts, schedule auto-retry, or cancel + restock.
+ */
+export async function handlePaymentFailure(orderId: string, paymentIntentId?: string) {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: {
+          select: {
+            productId: true,
+            specificationId: true,
+            quantity: true,
+            color: true,
+            size: true,
+          },
+        },
+      },
+    });
+    if (!existing || existing.status === "CANCELLED") return null;
+
+    if (paymentIntentId && existing.lastFailedPaymentIntentId === paymentIntentId) {
+      return null;
+    }
+
+    const newAttemptCount = existing.paymentAttemptCount + 1;
+
+    if (newAttemptCount >= existing.maxPaymentAttempts) {
+      await restoreStockForOrderItems(tx, existing.items);
+      const row = await tx.order.update({
+        where: { id: orderId },
+        data: {
+          status: "CANCELLED",
+          paymentStatus: "FAILED",
+          paymentAttemptCount: newAttemptCount,
+          nextPaymentRetryAt: null,
+          lastFailedPaymentIntentId: paymentIntentId ?? existing.lastFailedPaymentIntentId,
+        },
+        include: {
+          user: { select: { fullName: true, name: true, email: true } },
+          items: { include: { product: true } },
+        },
+      });
+      await notifyOrderStatusChange(tx, existing.userId, orderId, "CANCELLED");
+      return { action: "cancelled" as const, order: mapOrder(row) };
+    }
+
+    const nextRetry = new Date();
+    nextRetry.setDate(nextRetry.getDate() + daysUntilNextRetry(newAttemptCount));
+
+    const row = await tx.order.update({
+      where: { id: orderId },
+      data: {
+        paymentStatus: "FAILED",
+        paymentAttemptCount: newAttemptCount,
+        nextPaymentRetryAt: nextRetry,
+        lastFailedPaymentIntentId: paymentIntentId ?? existing.lastFailedPaymentIntentId,
+      },
+      include: {
+        user: { select: { fullName: true, name: true, email: true } },
+        items: { include: { product: true } },
+      },
+    });
+
+    return { action: "retry_scheduled" as const, order: mapOrder(row) };
+  });
+}
+
+/**
+ * Find orders due for automatic off-session payment retry.
+ */
+export async function findOrdersDueForPaymentRetry() {
+  return prisma.order.findMany({
+    where: {
+      status: { not: "CANCELLED" },
+      paymentMethod: "CARD",
+      paymentStatus: "FAILED",
+      nextPaymentRetryAt: { lte: new Date() },
+      stripePaymentIntentId: { not: null },
+    },
+    include: {
+      user: {
+        select: { id: true, email: true, fullName: true, name: true, stripeCustomerId: true },
+      },
+      items: { include: { product: true } },
+    },
+  });
+}
+
+/**
+ * Mark payment success on an existing order after Stripe confirms.
+ */
+export async function confirmExistingOrderPayment(
+  orderId: string,
+  userId: string,
+  paymentStatus: PaymentStatus,
+  stripePaymentIntentId: string,
+  stripeClientSecret?: string
+) {
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, userId },
+  });
+  if (!order) {
+    throw new OrderError("Order not found", 404);
+  }
+  if (order.status === "CANCELLED") {
+    throw new OrderError("This order has been cancelled.", 400);
+  }
+
+  const updated = await prisma.order.update({
+    where: { id: orderId },
+    data: {
+      paymentStatus,
+      paymentMethod: "CARD",
+      stripePaymentIntentId,
+      stripeClientSecret: stripeClientSecret ?? order.stripeClientSecret,
+      nextPaymentRetryAt: null,
+      status: "PROCESSING",
+    },
+    include: {
+      user: { select: { fullName: true, name: true, email: true } },
+      items: { include: { product: true } },
+    },
+  });
+
+  return mapOrder(updated);
 }

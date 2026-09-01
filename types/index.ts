@@ -216,6 +216,9 @@ export type Order = {
   status: OrderStatus;
   paymentMethod: "CARD" | "COD";
   paymentStatus: "UNPAID" | "PENDING" | "PROCESSING" | "PAID" | "SUCCEEDED" | "FAILED" | "REFUNDED";
+  paymentAttemptCount?: number;
+  maxPaymentAttempts?: number;
+  shipping?: UserInfo;
   items: OrderItem[];
 };
 
@@ -333,6 +336,7 @@ export type PaymentErrorInfo = {
   message: string;
   suggestion: string;
   recoverable: boolean;
+  orderId?: string;
 };
 
 export type UserInfo = {

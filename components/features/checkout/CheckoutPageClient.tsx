@@ -3,48 +3,66 @@
 import { useState } from "react";
 
 import { Elements } from "@stripe/react-stripe-js";
-import { Lock, ShoppingBag } from "lucide-react";
+import { AlertCircle, Lock, ShoppingBag } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { TAX_RATE } from "@/lib/constants";
 import { useAuthStore } from "@/lib/store/useAuthStore";
 import { useCartStore } from "@/lib/store/useCartStore";
 import { getStripe } from "@/lib/stripe-client";
-import type { CartItem, CheckoutStep, PaymentErrorInfo, SavedPM, UserInfo } from "@/types";
+import type { CartItem, CheckoutStep, Order, SavedPM, UserInfo } from "@/types";
 
 import { CheckoutForm } from "./CheckoutForm";
 import { CheckoutOrderSummary } from "./CheckoutOrderSummary";
-import { PaymentErrorBanner } from "./PaymentErrorBanner";
 import { StepIndicator } from "./StepIndicator";
 import { UserInfoForm } from "./UserInfoForm";
+
+function orderItemsToCartItems(order: Order): CartItem[] {
+  return order.items.map((item) => ({
+    productId: item.productId,
+    specificationId: item.specificationId,
+    name: item.title,
+    price: item.price,
+    qty: item.qty,
+    imageUrl: item.imageUrl,
+    color: item.color,
+    size: item.size,
+  }));
+}
 
 export function CheckoutPageClient({
   selectedItems: propItems,
   savedPMs,
+  retryOrder,
 }: {
   selectedItems: CartItem[];
   savedPMs: SavedPM[];
+  retryOrder?: Order | null;
 }) {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const storeItems = useCartStore((s) => s.items);
 
-  const selectedItems = propItems.length > 0 ? propItems : storeItems;
+  const isRetry = Boolean(retryOrder);
+  const retryItems = retryOrder ? orderItemsToCartItems(retryOrder) : [];
+  const selectedItems = isRetry ? retryItems : propItems.length > 0 ? propItems : storeItems;
 
-  const subtotal = selectedItems.reduce((s, i) => s + i.price * i.qty, 0);
-  const tax = Number((subtotal * 0.1).toFixed(2));
-  const total = Number((subtotal + tax).toFixed(2));
+  const subtotal = isRetry
+    ? retryOrder!.subTotal
+    : selectedItems.reduce((s, i) => s + i.price * i.qty, 0);
+  const tax = isRetry ? retryOrder!.tax : Number((subtotal * TAX_RATE).toFixed(2));
+  const total = isRetry ? retryOrder!.amount : Number((subtotal + tax).toFixed(2));
 
-  const [step, setStep] = useState<CheckoutStep>(1);
+  const [step, setStep] = useState<CheckoutStep>(isRetry ? 2 : 1);
   const [userInfo, setUserInfo] = useState<UserInfo>({
-    fullName: user?.fullName ?? "",
-    email: user?.email ?? "",
-    phone: user?.mobile ?? "",
-    address: "",
-    city: "",
-    postalCode: "",
+    fullName: retryOrder?.shipping?.fullName ?? user?.fullName ?? "",
+    email: retryOrder?.shipping?.email ?? user?.email ?? "",
+    phone: retryOrder?.shipping?.phone ?? user?.mobile ?? "",
+    address: retryOrder?.shipping?.address ?? "",
+    city: retryOrder?.shipping?.city ?? "",
+    postalCode: retryOrder?.shipping?.postalCode ?? "",
   });
-  const [errorInfo, setErrorInfo] = useState<PaymentErrorInfo | null>(null);
 
   if (!user) {
     router.push("/login?next=/checkout");
@@ -73,28 +91,39 @@ export function CheckoutPageClient({
 
   return (
     <div className="mx-auto max-w-6xl">
-      <PaymentErrorBanner
-        open={Boolean(errorInfo)}
-        errorInfo={errorInfo}
-        onDismiss={() => setErrorInfo(null)}
-        onTryAgain={() => setErrorInfo(null)}
-      />
-
-      {/* <div className="mb-5 flex flex-col gap-4 sm:mb-7 lg:flex-row lg:items-center lg:justify-between"> */}
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_21rem] lg:gap-8 xl:grid-cols-[minmax(0,1fr)_23rem] mb-5">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-neutral-text sm:text-2xl">
-            Checkout
+            {isRetry ? "Retry Payment" : "Checkout"}
           </h1>
           <p className="mt-1 flex items-center gap-1.5 text-sm text-neutral-muted">
             <Lock className="h-3.5 w-3.5" />
-            Complete your order in a few steps
+            {isRetry
+              ? "Complete payment for your existing order"
+              : "Complete your order in a few steps"}
           </p>
         </div>
-        <div className="flex w-full justify-center lg:w-auto lg:justify-end">
-          <StepIndicator currentStep={step} />
-        </div>
+        {!isRetry ? (
+          <div className="flex w-full justify-center lg:w-auto lg:justify-end">
+            <StepIndicator currentStep={step} />
+          </div>
+        ) : null}
       </div>
+
+      {isRetry ? (
+        <div className="mb-5 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <div className="text-sm text-amber-800">
+            <p className="font-semibold">
+              Payment required for order #{retryOrder!.id.slice(0, 8)}
+            </p>
+            <p className="mt-0.5">
+              Your order is placed and items are reserved. Choose a payment method below to complete
+              your purchase.
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_21rem] lg:gap-8 xl:grid-cols-[minmax(0,1fr)_23rem]">
         <div className="min-w-0">
@@ -119,16 +148,19 @@ export function CheckoutPageClient({
                   total={total}
                   savedPMs={savedPMs}
                   userInfo={userInfo}
+                  retryOrderId={retryOrder?.id}
                   onSuccess={(orderId, method) => {
                     router.push(`/checkout/success?orderId=${orderId}&method=${method}`);
                   }}
                   onError={(info) => {
-                    setErrorInfo(info);
-                    if (!info.recoverable) {
-                      router.push(
-                        `/checkout/failed?title=${encodeURIComponent(info.title)}&message=${encodeURIComponent(info.message)}&suggestion=${encodeURIComponent(info.suggestion)}`
-                      );
-                    }
+                    const params = new URLSearchParams({
+                      title: info.title || "Payment Failed",
+                      message: info.message || "Your payment could not be processed.",
+                      suggestion:
+                        info.suggestion || "Please try again or use a different payment method.",
+                    });
+                    if (info.orderId) params.set("orderId", info.orderId);
+                    router.push(`/checkout/failed?${params.toString()}`);
                   }}
                   onBack={() => setStep(1)}
                 />

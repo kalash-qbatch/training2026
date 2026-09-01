@@ -11,7 +11,7 @@ import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 
 /** Bump when schema models/relations change so the cached client is recreated. */
-const PRISMA_CLIENT_VERSION = 18;
+const PRISMA_CLIENT_VERSION = 21;
 
 const RETRY_ATTEMPTS = 3;
 const RETRY_BASE_DELAY_MS = 300;

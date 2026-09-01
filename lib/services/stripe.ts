@@ -152,7 +152,8 @@ export async function createPaymentIntentForCart(
   userId: string,
   totalAmountCents: number,
   paymentMethodId?: string,
-  savePaymentMethod?: boolean
+  savePaymentMethod?: boolean,
+  orderId?: string
 ): Promise<{ clientSecret: string; paymentIntentId: string }> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new Error("User not found");
@@ -170,7 +171,7 @@ export async function createPaymentIntentForCart(
     customer: customerId,
     setup_future_usage: savePaymentMethod ? "off_session" : undefined,
     payment_method_types: ["card"],
-    metadata: { userId },
+    metadata: { userId, ...(orderId ? { orderId } : {}) },
   };
 
   if (paymentMethodId) {
@@ -183,4 +184,38 @@ export async function createPaymentIntentForCart(
     clientSecret: intent.client_secret!,
     paymentIntentId: intent.id,
   };
+}
+
+/**
+ * Creates a PaymentIntent for an existing order (payment retry).
+ */
+export async function createPaymentIntentForOrder(
+  userId: string,
+  orderId: string,
+  totalAmountCents: number,
+  paymentMethodId?: string,
+  savePaymentMethod?: boolean
+): Promise<{ clientSecret: string; paymentIntentId: string }> {
+  return createPaymentIntentForCart(
+    userId,
+    totalAmountCents,
+    paymentMethodId,
+    savePaymentMethod,
+    orderId
+  );
+}
+
+/**
+ * Attempt off-session payment retry for a failed order using the customer's default PM.
+ */
+export async function retryOffSessionPayment(
+  paymentIntentId: string,
+  paymentMethodId: string
+): Promise<{ status: string }> {
+  const stripe = getStripe();
+  const intent = await stripe.paymentIntents.confirm(paymentIntentId, {
+    payment_method: paymentMethodId,
+    off_session: true,
+  });
+  return { status: intent.status };
 }

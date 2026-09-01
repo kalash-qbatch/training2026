@@ -1,7 +1,13 @@
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
-import { findOrderByPaymentIntentId, updateOrderPaymentStatus } from "@/lib/services/orders";
+import {
+  confirmExistingOrderPayment,
+  findOrderByPaymentIntentId,
+  handlePaymentFailure,
+  updateOrderPaymentStatus,
+  updateOrderStatus,
+} from "@/lib/services/orders";
 import { getStripe } from "@/lib/stripe";
 
 export async function POST(request: Request) {
@@ -26,8 +32,15 @@ export async function POST(request: Request) {
       case "payment_intent.succeeded": {
         const paymentIntent = event.data.object;
         const order = await findOrderByPaymentIntentId(paymentIntent.id);
+
         if (order) {
-          await updateOrderPaymentStatus(order.id, "SUCCEEDED");
+          await confirmExistingOrderPayment(
+            order.id,
+            order.userId,
+            "SUCCEEDED",
+            paymentIntent.id,
+            paymentIntent.client_secret ?? undefined
+          );
         }
         break;
       }
@@ -35,8 +48,9 @@ export async function POST(request: Request) {
       case "payment_intent.payment_failed": {
         const paymentIntent = event.data.object;
         const order = await findOrderByPaymentIntentId(paymentIntent.id);
+
         if (order) {
-          await updateOrderPaymentStatus(order.id, "FAILED");
+          await handlePaymentFailure(order.id, paymentIntent.id);
         }
         break;
       }
@@ -50,8 +64,16 @@ export async function POST(request: Request) {
         break;
       }
 
+      case "payment_intent.canceled": {
+        const paymentIntent = event.data.object;
+        const order = await findOrderByPaymentIntentId(paymentIntent.id);
+        if (order && order.status !== "CANCELLED") {
+          await updateOrderStatus(order.id, "CANCELLED");
+        }
+        break;
+      }
+
       default:
-        // Ignore other event types
         break;
     }
 

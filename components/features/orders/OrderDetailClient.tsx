@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, CreditCard } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -71,6 +71,13 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
   const tax = order.tax ?? Number((subTotal * TAX_RATE).toFixed(2));
   const total = order.amount;
 
+  const canRetryPayment =
+    order.paymentMethod === "CARD" &&
+    order.status !== "cancelled" &&
+    order.paymentStatus !== "SUCCEEDED" &&
+    order.paymentStatus !== "PAID" &&
+    order.paymentStatus !== "PROCESSING";
+
   return (
     <div className="space-y-6">
       <Link
@@ -80,6 +87,24 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
         <ArrowLeft className="h-5 w-5" strokeWidth={2.25} />
         Order Detail
       </Link>
+
+      {canRetryPayment ? (
+        <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-amber-900">Payment failed</p>
+            <p className="mt-0.5 text-sm text-amber-800">
+              Your order is placed and items are reserved. Retry payment or choose another method.
+            </p>
+          </div>
+          <Link
+            href={`/checkout?orderId=${order.id}`}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
+          >
+            <CreditCard className="h-4 w-4" />
+            Retry Payment
+          </Link>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-neutral-border pb-5">
         <div className="grid flex-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">

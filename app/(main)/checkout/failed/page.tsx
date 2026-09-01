@@ -12,6 +12,8 @@ function FailedContent() {
   const message = params.get("message") ?? "Your payment could not be processed at this time.";
   const suggestion =
     params.get("suggestion") ?? "Please try again or use a different payment method.";
+  const orderId = params.get("orderId");
+  const retryHref = orderId ? `/checkout?orderId=${orderId}` : "/checkout";
 
   return (
     <div className="flex min-h-[calc(100dvh-8rem)] items-center justify-center py-6 sm:py-10">
@@ -22,14 +24,22 @@ function FailedContent() {
               <XCircle className="h-12 w-12 text-white" strokeWidth={2} />
             </div>
             <h1 className="text-2xl font-bold text-white">{title}</h1>
-            <p className="mt-1 text-red-100">Your order was not completed</p>
+            <p className="mt-1 text-red-100">
+              {orderId
+                ? "Your order is placed — payment is pending"
+                : "Payment could not be completed"}
+            </p>
           </div>
 
-          {/* Details */}
           <div className="space-y-5 px-5 py-6 sm:px-8 sm:py-8">
             <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-4 space-y-1">
               <p className="text-sm font-semibold text-red-800">{message}</p>
               <p className="text-sm text-red-700">{suggestion}</p>
+              {orderId ? (
+                <p className="text-xs text-red-600">
+                  Order #{orderId.slice(0, 8)} — items are reserved while payment is pending.
+                </p>
+              ) : null}
             </div>
 
             <p className="text-center text-sm font-semibold text-neutral-600">
@@ -38,20 +48,29 @@ function FailedContent() {
 
             <div className="space-y-3">
               <Link
-                href="/checkout"
+                href={retryHref}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
               >
                 <RefreshCw className="h-4 w-4" />
-                Try Again with a Different Card
+                Retry Payment
               </Link>
 
               <Link
-                href="/checkout"
+                href={retryHref}
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-100"
               >
                 <Truck className="h-4 w-4" />
                 Switch to Cash on Delivery
               </Link>
+
+              {orderId ? (
+                <Link
+                  href={`/orders/${orderId}`}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-neutral-200 px-4 py-3 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+                >
+                  View Order Details
+                </Link>
+              ) : null}
 
               <Link
                 href="/payment-methods"

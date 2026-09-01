@@ -45,7 +45,7 @@ export async function placeOrder(body: unknown) {
       },
     };
   } catch (err) {
-    if (err instanceof OrderError) {
+    if (OrderError.is(err)) {
       return {
         status: err.status,
         body: { success: false, error: err.message },

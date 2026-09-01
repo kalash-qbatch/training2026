@@ -11,7 +11,6 @@ import { useCartStore } from "@/lib/store/useCartStore";
 import { formatCurrency } from "@/lib/utils";
 import type { CartItem, PaymentErrorInfo, SavedPM, UserInfo } from "@/types";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
 const CARD_ELEMENT_OPTIONS = {
   hidePostalCode: true,
   style: {
@@ -83,7 +82,6 @@ function brandLabel(brand: string) {
   return map[brand] ?? brand.charAt(0).toUpperCase() + brand.slice(1);
 }
 
-// ─── Props ────────────────────────────────────────────────────────────────────
 type Props = {
   selectedItems: CartItem[];
   subtotal: number;
@@ -91,13 +89,12 @@ type Props = {
   total: number;
   savedPMs: SavedPM[];
   userInfo: UserInfo;
+  retryOrderId?: string;
   onSuccess: (orderId: string, method: "CARD" | "COD") => void;
   onError: (info: PaymentErrorInfo) => void;
   onBack: () => void;
 };
 
-// ─── Component ────────────────────────────────────────────────────────────────
-// NOTE: Must be rendered inside a Stripe <Elements> provider.
 export function CheckoutForm({
   selectedItems,
   subtotal,
@@ -105,6 +102,7 @@ export function CheckoutForm({
   total,
   savedPMs,
   userInfo,
+  retryOrderId,
   onSuccess,
   onError,
   onBack,
@@ -120,8 +118,14 @@ export function CheckoutForm({
   );
   const [saveCard, setSaveCard] = useState(false);
   const [placing, setPlacing] = useState(false);
+  const [pendingOrderId, setPendingOrderId] = useState<string | undefined>(retryOrderId);
 
-  // ── COD checkout ─────────────────────────────────────────────────────
+  const itemPayload = selectedItems.map((i) => ({
+    productId: i.productId,
+    specificationId: i.specificationId,
+    quantity: i.qty,
+  }));
+
   async function handleCOD() {
     setPlacing(true);
     try {
@@ -130,19 +134,19 @@ export function CheckoutForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           paymentMethod: "COD",
-          items: selectedItems.map((i) => ({
-            productId: i.productId,
-            specificationId: i.specificationId,
-            quantity: i.qty,
-          })),
+          items: retryOrderId ? undefined : itemPayload,
+          orderId: retryOrderId,
+          shipping: retryOrderId ? undefined : userInfo,
         }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "Order failed");
 
-      await removeItems(
-        selectedItems.map((i) => ({ productId: i.productId, specificationId: i.specificationId }))
-      );
+      if (!retryOrderId) {
+        await removeItems(
+          selectedItems.map((i) => ({ productId: i.productId, specificationId: i.specificationId }))
+        );
+      }
       onSuccess(data.order.id, "COD");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to place order");
@@ -151,24 +155,22 @@ export function CheckoutForm({
     }
   }
 
-  // ── Card checkout ─────────────────────────────────────────────────────
   async function handleCard() {
     if (!stripe || !elements) return;
     setPlacing(true);
 
+    const activeOrderId = pendingOrderId ?? retryOrderId;
+
     try {
       const useExistingPm = selectedPmId !== "new" && selectedPmId !== "";
 
-      // 1. Create PaymentIntent on server
       const intentRes = await fetch("/api/checkout/create-intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          items: selectedItems.map((i) => ({
-            productId: i.productId,
-            specificationId: i.specificationId,
-            quantity: i.qty,
-          })),
+          items: activeOrderId ? undefined : itemPayload,
+          orderId: activeOrderId,
+          shipping: activeOrderId ? undefined : userInfo,
           paymentMethodId: useExistingPm ? selectedPmId : undefined,
           savePaymentMethod: saveCard,
         }),
@@ -176,9 +178,9 @@ export function CheckoutForm({
       const intentData = await intentRes.json();
       if (!intentData.success) throw new Error(intentData.error || "Could not initiate payment");
 
-      const { clientSecret, paymentIntentId } = intentData;
+      const { clientSecret, paymentIntentId, orderId } = intentData;
+      setPendingOrderId(orderId);
 
-      // 2. Confirm PaymentIntent in browser
       let confirmResult;
       if (useExistingPm) {
         confirmResult = await stripe.confirmCardPayment(clientSecret, {
@@ -193,53 +195,70 @@ export function CheckoutForm({
       }
 
       if (confirmResult.error) {
+        await fetch("/api/checkout/confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            paymentMethod: "CARD",
+            paymentIntentId,
+            orderId,
+          }),
+        });
+
         onError({
           title: "Payment Failed",
           message: confirmResult.error.message || "Your payment could not be processed.",
           suggestion: "Please check your card details or try a different payment method.",
           recoverable: true,
+          orderId,
         });
         return;
       }
 
-      // 3. Confirm order on server
       const confirmRes = await fetch("/api/checkout/confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           paymentMethod: "CARD",
           paymentIntentId,
-          items: selectedItems.map((i) => ({
-            productId: i.productId,
-            specificationId: i.specificationId,
-            quantity: i.qty,
-          })),
+          orderId,
         }),
       });
       const confirmData = await confirmRes.json();
       if (!confirmData.success) {
         onError(
-          confirmData.errorInfo ?? {
-            title: "Order Failed",
-            message: confirmData.error || "Failed to create order",
-            suggestion: "Please try again or contact support.",
-            recoverable: true,
-          }
+          confirmData.errorInfo
+            ? { ...confirmData.errorInfo, orderId }
+            : {
+                title: "Payment Failed",
+                message: confirmData.error || "Failed to confirm payment",
+                suggestion: "Please try again or use a different payment method.",
+                recoverable: true,
+                orderId,
+              }
         );
         return;
       }
 
-      await removeItems(
-        selectedItems.map((i) => ({ productId: i.productId, specificationId: i.specificationId }))
-      );
+      if (!retryOrderId) {
+        await removeItems(
+          selectedItems.map((i) => ({ productId: i.productId, specificationId: i.specificationId }))
+        );
+      }
       onSuccess(confirmData.order.id, "CARD");
     } catch (err) {
-      onError({
-        title: "Payment Error",
-        message: err instanceof Error ? err.message : "An unexpected error occurred.",
-        suggestion: "Please try again or use Cash on Delivery.",
-        recoverable: true,
-      });
+      const orderId = pendingOrderId ?? retryOrderId;
+      if (orderId) {
+        onError({
+          title: "Payment Error",
+          message: err instanceof Error ? err.message : "An unexpected error occurred.",
+          suggestion: "Please try again or use a different payment method.",
+          recoverable: true,
+          orderId,
+        });
+      } else {
+        toast.error(err instanceof Error ? err.message : "Failed to process payment");
+      }
     } finally {
       setPlacing(false);
     }
@@ -267,13 +286,15 @@ export function CheckoutForm({
                   {userInfo.fullName}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={onBack}
-                className="shrink-0 rounded-md px-2.5 py-1 text-xs font-medium text-brand-600 transition-colors hover:bg-white"
-              >
-                Edit
-              </button>
+              {!retryOrderId ? (
+                <button
+                  type="button"
+                  onClick={onBack}
+                  className="shrink-0 rounded-md px-2.5 py-1 text-xs font-medium text-brand-600 transition-colors hover:bg-white"
+                >
+                  Edit
+                </button>
+              ) : null}
             </div>
             <p className="mt-0.5 text-xs text-neutral-muted">{userInfo.phone}</p>
             <p className="mt-0.5 wrap-break-word text-xs text-neutral-muted">
@@ -469,7 +490,7 @@ export function CheckoutForm({
           {paymentOption === "COD" ? (
             <span className="flex items-center justify-center gap-2">
               <Truck className="h-4 w-4" />
-              Place Order (Cash on Delivery)
+              {retryOrderId ? "Switch to Cash on Delivery" : "Place Order (Cash on Delivery)"}
             </span>
           ) : (
             <span className="flex items-center justify-center gap-2">
@@ -479,14 +500,16 @@ export function CheckoutForm({
           )}
         </Button>
 
-        <button
-          type="button"
-          onClick={onBack}
-          className="flex w-full items-center justify-center gap-1.5 text-sm text-neutral-muted transition-colors hover:text-brand-600"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Back to Delivery Info
-        </button>
+        {!retryOrderId ? (
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex w-full items-center justify-center gap-1.5 text-sm text-neutral-muted transition-colors hover:text-brand-600"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back to Delivery Info
+          </button>
+        ) : null}
       </div>
     </div>
   );

@@ -107,6 +107,18 @@ export function mapOrder(row: DbOrderWithRelations): Order {
     status: mapStatus(row.status),
     paymentMethod: (row as { paymentMethod?: string }).paymentMethod === "COD" ? "COD" : "CARD",
     paymentStatus: (row as { paymentStatus?: Order["paymentStatus"] }).paymentStatus ?? "PENDING",
+    paymentAttemptCount: (row as { paymentAttemptCount?: number }).paymentAttemptCount ?? 0,
+    maxPaymentAttempts: (row as { maxPaymentAttempts?: number }).maxPaymentAttempts ?? 3,
+    shipping: (row as { shippingFullName?: string | null }).shippingFullName
+      ? {
+          fullName: (row as { shippingFullName?: string }).shippingFullName!,
+          email: (row as { shippingEmail?: string }).shippingEmail ?? "",
+          phone: (row as { shippingPhone?: string }).shippingPhone ?? "",
+          address: (row as { shippingAddress?: string }).shippingAddress ?? "",
+          city: (row as { shippingCity?: string }).shippingCity ?? "",
+          postalCode: (row as { shippingPostalCode?: string }).shippingPostalCode ?? "",
+        }
+      : undefined,
     items: row.items.map((item): OrderItem => ({
       productId: item.productId,
       specificationId: item.specificationId ?? undefined,
