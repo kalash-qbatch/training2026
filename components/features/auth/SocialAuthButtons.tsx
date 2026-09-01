@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 
 import { FacebookIcon, GoogleIcon } from "@/components/ui/SocialIcons";
 import { useToast } from "@/components/ui/Toast";
+import { authCallbackUrl } from "@/lib/app-url";
 
 type Provider = "google" | "facebook";
 
@@ -43,7 +44,7 @@ export function SocialAuthButtons({ context = "login", getRememberMe }: SocialAu
   async function handleProvider(id: Provider, label: string) {
     try {
       setRememberMeCookie(getRememberMe ? getRememberMe() : true);
-      await signIn(id, { callbackUrl: "/products" });
+      await signIn(id, { callbackUrl: authCallbackUrl("/products") });
     } catch {
       toast.error(
         `${label} failed. Try again or use email ${context === "signup" ? "sign up" : "login"}.`

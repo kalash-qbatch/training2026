@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toast";
+import { sessionToAuthUser } from "@/lib/session-user";
 import { useAuthStore } from "@/lib/store/useAuthStore";
 import { type LoginInput, loginSchema } from "@/lib/validations/auth";
 
@@ -59,19 +60,14 @@ export function LoginForm() {
       }
 
       const session = await getSession();
-      if (session?.user?.email) {
-        login({
-          id: session.user.id || session.user.email,
-          fullName: session.user.name?.trim() || session.user.email.split("@")[0] || "User",
-          email: session.user.email,
-          image: session.user.image ?? undefined,
-          role: session.user.role === "ADMIN" ? "ADMIN" : "USER",
-        });
+      const authUser = session ? sessionToAuthUser(session) : null;
+      if (authUser) {
+        login(authUser);
       }
 
       toast.success("Logged in successfully");
       const next = searchParams.get("next");
-      const isAdmin = session?.user?.role === "ADMIN";
+      const isAdmin = authUser?.role === "ADMIN";
       const destination = isAdmin
         ? next?.startsWith("/admin")
           ? next

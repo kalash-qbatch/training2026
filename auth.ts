@@ -53,7 +53,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     Facebook({
       clientId: process.env.FACEBOOK_CLIENT_ID,
       clientSecret: process.env.FACEBOOK_CLIENT_SECRET,
-      authorization: { params: { scope: "email public_profile" } },
+      // email scope requires Meta app permission setup; public_profile works without it
+      authorization: { params: { scope: "public_profile" } },
+      userinfo: { params: { fields: "id,name,picture" } },
     }),
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
@@ -152,9 +154,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
 
       if (user) {
-        token.id = user.id;
-        token.role = user.role;
-
         let rememberMe = (user as { rememberMe?: boolean }).rememberMe;
 
         if (
@@ -180,6 +179,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.exp =
           Math.floor(Date.now() / 1000) +
           (token.rememberMe ? SESSION_EXPIRY_REMEMBER_ME : SESSION_EXPIRY_DEFAULT);
+
+        if (account?.provider && SOCIAL_PROVIDERS.has(account.provider)) {
+          const email =
+            user.email ||
+            socialFallbackEmail(account.provider, user.id ?? "", account.providerAccountId ?? "");
+          token.email = email;
+
+          const dbUser = await prisma.user.findUnique({ where: { email } });
+          token.id = dbUser?.id ?? user.id;
+          token.role = dbUser?.role ?? user.role;
+        } else {
+          token.id = user.id;
+          token.role = user.role;
+        }
       } else if (account?.provider && SOCIAL_PROVIDERS.has(account.provider) && token.email) {
         const dbUser = await prisma.user.findUnique({
           where: { email: token.email },
@@ -207,6 +220,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         (session.user as { role?: string; provider?: string }).role = token.role as string;
         (session.user as { role?: string; provider?: string }).provider = token.provider as string;
         (session.user as { rememberMe?: boolean }).rememberMe = token.rememberMe as boolean;
+      }
+      if (token.email) {
+        session.user.email = token.email as string;
       }
       if (token.exp) {
         (session as { expires?: string }).expires = new Date(
