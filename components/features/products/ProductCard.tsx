@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -47,7 +47,7 @@ function defaultInStockVariant(product: Product): {
   return { color: "", size: "" };
 }
 
-export function ProductCard({ product }: { product: Product }) {
+export const ProductCard = memo(function ProductCard({ product }: { product: Product }) {
   const colors = useMemo(() => allColors(product), [product]);
   const sizes = useMemo(() => allSizes(product), [product]);
   const hasVariants = Boolean(product.variants?.length);
@@ -262,4 +262,4 @@ export function ProductCard({ product }: { product: Product }) {
       </div>
     </article>
   );
-}
+});

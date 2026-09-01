@@ -26,7 +26,14 @@ export function AuthSessionSync() {
     const authUser = sessionToAuthUser(session);
     if (!authUser) return;
 
-    login(authUser);
+    const current = useAuthStore.getState();
+    if (
+      !current.isAuthenticated ||
+      current.user?.id !== authUser.id ||
+      current.user?.email !== authUser.email
+    ) {
+      login(authUser);
+    }
   }, [status, session, login, logout]);
 
   return null;

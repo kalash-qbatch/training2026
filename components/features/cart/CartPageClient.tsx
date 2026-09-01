@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { ArrowLeft } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -15,8 +16,15 @@ import type { CartItem } from "@/types";
 
 import { CartLineItem } from "./CartLineItem";
 import { CartSummary } from "./CartSummary";
-import { OrderPlacedModal } from "./OrderPlacedModal";
-import { RemoveProductModal } from "./RemoveProductModal";
+
+const OrderPlacedModal = dynamic(
+  () => import("./OrderPlacedModal").then((m) => ({ default: m.OrderPlacedModal })),
+  { loading: () => null }
+);
+const RemoveProductModal = dynamic(
+  () => import("./RemoveProductModal").then((m) => ({ default: m.RemoveProductModal })),
+  { loading: () => null }
+);
 
 function itemKey(item: CartItem) {
   return (
@@ -64,22 +72,25 @@ export function CartPageClient() {
   const total = Number((subtotal + tax).toFixed(2));
   const allSelected = items.length > 0 && selected.size === items.length;
 
-  const overlays = (
-    <OrderPlacedModal
-      open={successOpen}
-      onDetails={() => {
-        setSuccessOpen(false);
-        if (placedOrderId) {
-          router.push(`/orders/${placedOrderId}`);
-        } else {
-          router.push("/orders");
-        }
-      }}
-      onHome={() => {
-        setSuccessOpen(false);
-        router.push("/products");
-      }}
-    />
+  const overlays = useMemo(
+    () => (
+      <OrderPlacedModal
+        open={successOpen}
+        onDetails={() => {
+          setSuccessOpen(false);
+          if (placedOrderId) {
+            router.push(`/orders/${placedOrderId}`);
+          } else {
+            router.push("/orders");
+          }
+        }}
+        onHome={() => {
+          setSuccessOpen(false);
+          router.push("/products");
+        }}
+      />
+    ),
+    [placedOrderId, router, successOpen]
   );
 
   if (!items.length) {

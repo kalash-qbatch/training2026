@@ -2,21 +2,25 @@
 
 import { useState } from "react";
 
-import { Elements } from "@stripe/react-stripe-js";
 import { AlertCircle, Lock, ShoppingBag } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { CheckoutFormSkeleton } from "@/components/ui/skeletons/CheckoutFormSkeleton";
 import { TAX_RATE } from "@/lib/constants";
 import { useAuthStore } from "@/lib/store/useAuthStore";
 import { useCartStore } from "@/lib/store/useCartStore";
-import { getStripe } from "@/lib/stripe-client";
 import type { CartItem, CheckoutStep, Order, SavedPM, UserInfo } from "@/types";
 
-import { CheckoutForm } from "./CheckoutForm";
 import { CheckoutOrderSummary } from "./CheckoutOrderSummary";
 import { StepIndicator } from "./StepIndicator";
 import { UserInfoForm } from "./UserInfoForm";
+
+const CheckoutPaymentStep = dynamic(
+  () => import("./CheckoutPaymentStep").then((m) => ({ default: m.CheckoutPaymentStep })),
+  { ssr: false, loading: () => <CheckoutFormSkeleton /> }
+);
 
 function orderItemsToCartItems(order: Order): CartItem[] {
   return order.items.map((item) => ({
@@ -140,31 +144,29 @@ export function CheckoutPageClient({
                 }}
               />
             ) : (
-              <Elements stripe={getStripe()}>
-                <CheckoutForm
-                  selectedItems={selectedItems}
-                  subtotal={subtotal}
-                  tax={tax}
-                  total={total}
-                  savedPMs={savedPMs}
-                  userInfo={userInfo}
-                  retryOrderId={retryOrder?.id}
-                  onSuccess={(orderId, method) => {
-                    router.push(`/checkout/success?orderId=${orderId}&method=${method}`);
-                  }}
-                  onError={(info) => {
-                    const params = new URLSearchParams({
-                      title: info.title || "Payment Failed",
-                      message: info.message || "Your payment could not be processed.",
-                      suggestion:
-                        info.suggestion || "Please try again or use a different payment method.",
-                    });
-                    if (info.orderId) params.set("orderId", info.orderId);
-                    router.push(`/checkout/failed?${params.toString()}`);
-                  }}
-                  onBack={() => setStep(1)}
-                />
-              </Elements>
+              <CheckoutPaymentStep
+                selectedItems={selectedItems}
+                subtotal={subtotal}
+                tax={tax}
+                total={total}
+                savedPMs={savedPMs}
+                userInfo={userInfo}
+                retryOrderId={retryOrder?.id}
+                onSuccess={(orderId, method) => {
+                  router.push(`/checkout/success?orderId=${orderId}&method=${method}`);
+                }}
+                onError={(info) => {
+                  const params = new URLSearchParams({
+                    title: info.title || "Payment Failed",
+                    message: info.message || "Your payment could not be processed.",
+                    suggestion:
+                      info.suggestion || "Please try again or use a different payment method.",
+                  });
+                  if (info.orderId) params.set("orderId", info.orderId);
+                  router.push(`/checkout/failed?${params.toString()}`);
+                }}
+                onBack={() => setStep(1)}
+              />
             )}
           </div>
         </div>

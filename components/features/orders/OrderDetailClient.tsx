@@ -7,6 +7,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { EmptyState } from "@/components/ui/EmptyState";
+import { OrderDetailSkeleton } from "@/components/ui/skeletons/OrderDetailSkeleton";
 import { getOrderById } from "@/lib/api/orders";
 import { TAX_RATE } from "@/lib/constants";
 import { formatLineColor, formatLineSize } from "@/lib/product";
@@ -37,13 +38,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
   }, [orderId]);
 
   if (order === undefined) {
-    return (
-      <div className="space-y-6">
-        <div className="h-8 w-48 animate-pulse rounded bg-neutral-border/50" />
-        <div className="h-20 animate-pulse rounded-lg bg-neutral-border/50" />
-        <div className="h-64 animate-pulse rounded-lg bg-neutral-border/50" />
-      </div>
-    );
+    return <OrderDetailSkeleton />;
   }
 
   if (!order) {

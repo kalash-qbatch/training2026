@@ -3,13 +3,40 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Eye, Pencil, Search, Trash2 } from "lucide-react";
+import dynamic from "next/dynamic";
 
-import { AddMultipleProductsModal } from "@/components/admin/AddMultipleProductsModal";
-import { DeleteConfirmModal } from "@/components/admin/DeleteConfirmModal";
-import { AddProductDrawer, EditProductDrawer } from "@/components/admin/ProductDrawers";
-import { ProductPreviewModal } from "@/components/admin/ProductPreviewModal";
+const AddMultipleProductsModal = dynamic(
+  () =>
+    import("@/components/admin/AddMultipleProductsModal").then((m) => ({
+      default: m.AddMultipleProductsModal,
+    })),
+  { loading: () => null }
+);
+const DeleteConfirmModal = dynamic(
+  () =>
+    import("@/components/admin/DeleteConfirmModal").then((m) => ({
+      default: m.DeleteConfirmModal,
+    })),
+  { loading: () => null }
+);
+const AddProductDrawer = dynamic(
+  () => import("@/components/admin/ProductDrawers").then((m) => ({ default: m.AddProductDrawer })),
+  { loading: () => null }
+);
+const EditProductDrawer = dynamic(
+  () => import("@/components/admin/ProductDrawers").then((m) => ({ default: m.EditProductDrawer })),
+  { loading: () => null }
+);
+const ProductPreviewModal = dynamic(
+  () =>
+    import("@/components/admin/ProductPreviewModal").then((m) => ({
+      default: m.ProductPreviewModal,
+    })),
+  { loading: () => null }
+);
 import { Pagination } from "@/components/ui/Pagination";
 import { Select } from "@/components/ui/Select";
+import { AdminTableBodySkeleton } from "@/components/ui/skeletons/AdminTableBodySkeleton";
 import {
   Table,
   TableBody,
@@ -222,7 +249,7 @@ export function ProductsPageClient() {
         </TableHeader>
         <TableBody>
           {loading ? (
-            <TableEmpty colSpan={6}>Loading…</TableEmpty>
+            <AdminTableBodySkeleton rows={6} columns={6} />
           ) : !products.length ? (
             <TableEmpty colSpan={6}>No products found</TableEmpty>
           ) : (
@@ -287,69 +314,79 @@ export function ProductsPageClient() {
 
       <Pagination page={page} totalPages={totalPages} onChange={setPage} className="mt-4" />
 
-      <ProductPreviewModal product={previewProduct} onClose={() => setPreviewProduct(null)} />
-      <AddProductDrawer
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-        onSave={async (data) => {
-          await createAdminProduct(data);
-          toast.success("Product created successfully");
-          await load();
-        }}
-      />
-      <EditProductDrawer
-        open={!!editProduct}
-        product={editProduct}
-        onClose={() => setEditProduct(null)}
-        onSave={async (data) => {
-          if (!editProduct) return;
-          await updateAdminProduct(editProduct.id, data);
-          toast.success("Product updated successfully");
-          await load();
-        }}
-      />
-      <AddMultipleProductsModal
-        open={bulkOpen}
-        onClose={() => setBulkOpen(false)}
-        onDone={async () => {
-          toast.success("Products uploaded successfully");
-          await load();
-        }}
-      />
-      <DeleteConfirmModal
-        open={!!deleteId}
-        loading={deleting}
-        onClose={() => setDeleteId(null)}
-        onConfirm={async () => {
-          if (!deleteId) return;
-          setDeleting(true);
-          try {
-            const result = await deleteAdminProduct(deleteId);
-            setDeleteId(null);
-            toast.success(
-              result.deactivated
-                ? "Product set to Inactive because it appears in past orders"
-                : "Product deleted successfully"
-            );
-            const data = await fetchAdminProducts({
-              search: debounced,
-              categoryId: categoryId || undefined,
-              status,
-              page,
-            });
-            if (data.page > data.totalPages) {
-              setPage(data.totalPages);
-            } else {
-              setProducts(data.products);
-              setTotalPages(data.totalPages);
+      {previewProduct ? (
+        <ProductPreviewModal product={previewProduct} onClose={() => setPreviewProduct(null)} />
+      ) : null}
+      {addOpen ? (
+        <AddProductDrawer
+          open={addOpen}
+          onClose={() => setAddOpen(false)}
+          onSave={async (data) => {
+            await createAdminProduct(data);
+            toast.success("Product created successfully");
+            await load();
+          }}
+        />
+      ) : null}
+      {editProduct ? (
+        <EditProductDrawer
+          open={!!editProduct}
+          product={editProduct}
+          onClose={() => setEditProduct(null)}
+          onSave={async (data) => {
+            if (!editProduct) return;
+            await updateAdminProduct(editProduct.id, data);
+            toast.success("Product updated successfully");
+            await load();
+          }}
+        />
+      ) : null}
+      {bulkOpen ? (
+        <AddMultipleProductsModal
+          open={bulkOpen}
+          onClose={() => setBulkOpen(false)}
+          onDone={async () => {
+            toast.success("Products uploaded successfully");
+            await load();
+          }}
+        />
+      ) : null}
+      {deleteId ? (
+        <DeleteConfirmModal
+          open={!!deleteId}
+          loading={deleting}
+          onClose={() => setDeleteId(null)}
+          onConfirm={async () => {
+            if (!deleteId) return;
+            setDeleting(true);
+            try {
+              const result = await deleteAdminProduct(deleteId);
+              setDeleteId(null);
+              toast.success(
+                result.deactivated
+                  ? "Product set to Inactive because it appears in past orders"
+                  : "Product deleted successfully"
+              );
+              const data = await fetchAdminProducts({
+                search: debounced,
+                categoryId: categoryId || undefined,
+                status,
+                page,
+              });
+              if (data.page > data.totalPages) {
+                setPage(data.totalPages);
+              } else {
+                setProducts(data.products);
+                setTotalPages(data.totalPages);
+              }
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Delete failed");
+            } finally {
+              setDeleting(false);
             }
-          } catch (err) {
-            toast.error(err instanceof Error ? err.message : "Delete failed");
-          } finally {
-            setDeleting(false);
-          }
-        }}
-      />
+          }}
+        />
+      ) : null}
     </div>
   );
 }

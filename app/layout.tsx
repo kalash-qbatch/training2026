@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 
+import { auth } from "@/auth";
 import { AuthProvider } from "@/components/features/auth/AuthProvider";
 import { AuthSessionSync } from "@/components/features/auth/AuthSessionSync";
 import { CartSync } from "@/components/features/cart/CartSync";
@@ -43,15 +44,17 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth();
+
   return (
     <html lang="en" className={`${inter.variable} h-full`}>
       <body className="min-h-full font-sans antialiased" suppressHydrationWarning>
-        <AuthProvider>
+        <AuthProvider session={session}>
           <AuthSessionSync />
           <CartSync />
           <ToastProvider>{children}</ToastProvider>

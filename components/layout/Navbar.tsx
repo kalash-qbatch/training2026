@@ -1,21 +1,58 @@
 "use client";
 
 import { ShoppingBag } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 
-import { NotificationsPopover } from "@/components/layout/NotificationsPopover";
-import { UserMenu } from "@/components/layout/UserMenu";
 import { useAuthStore } from "@/lib/store/useAuthStore";
 import { useCartStore } from "@/lib/store/useCartStore";
 
+const NotificationsPopover = dynamic(
+  () =>
+    import("@/components/layout/NotificationsPopover").then((m) => ({
+      default: m.NotificationsPopover,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-neutral-bg animate-pulse" />
+    ),
+  }
+);
+
+const UserMenuLazy = dynamic(
+  () => import("@/components/layout/UserMenu").then((m) => ({ default: m.UserMenu })),
+  {
+    ssr: false,
+    loading: () => (
+      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-neutral-bg animate-pulse" />
+    ),
+  }
+);
+
+function AuthNavSkeleton() {
+  return (
+    <>
+      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-neutral-bg animate-pulse" />
+      <span className="inline-flex h-8 w-24 items-center gap-2 rounded-full bg-neutral-bg animate-pulse" />
+    </>
+  );
+}
+
 export function Navbar() {
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const { status } = useSession();
+  const isAuthenticatedStore = useAuthStore((s) => s.isAuthenticated);
   const itemCount = useCartStore((s) => s.items.reduce((n, i) => n + i.qty, 0));
+
+  const authLoading = status === "loading";
+  const isAuthenticated = status === "authenticated" || isAuthenticatedStore;
+  const showLoggedInChrome = authLoading || isAuthenticated;
 
   return (
     <header className="border-b border-[#e5e7eb] sticky top-0 z-50 bg-white">
       <div
-        className={`mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8 ${isAuthenticated ? "py-1" : "py-3.25"}`}
+        className={`mx-auto flex items-center justify-between px-4 sm:px-6 h-12 lg:px-8 ${showLoggedInChrome ? "py-1" : "py-3.5"}`}
       >
         <Link href="/products" className="text-[15px] font-semibold tracking-tight text-[#333333]">
           Bhai ka Store
@@ -35,10 +72,13 @@ export function Navbar() {
             ) : null}
           </Link>
 
-          {isAuthenticated ? <NotificationsPopover /> : null}
-
-          {isAuthenticated ? (
-            <UserMenu />
+          {authLoading ? (
+            <AuthNavSkeleton />
+          ) : isAuthenticated ? (
+            <>
+              <NotificationsPopover />
+              <UserMenuLazy />
+            </>
           ) : (
             <Link
               href="/login"

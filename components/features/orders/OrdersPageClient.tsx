@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Pagination } from "@/components/ui/Pagination";
+import { OrdersTableSkeleton } from "@/components/ui/skeletons/OrdersTableSkeleton";
 import { getOrders } from "@/lib/api/orders";
 import { TABLE_INITIAL_PAGE, TABLE_PAGE_SIZE } from "@/lib/constants";
 import type { Order } from "@/types";
@@ -50,6 +51,7 @@ export function OrdersPageClient() {
   }, [page]);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / TABLE_PAGE_SIZE));
+  const handleViewOrder = useCallback((id: string) => router.push(`/orders/${id}`), [router]);
 
   return (
     <div className="space-y-6">
@@ -58,11 +60,7 @@ export function OrdersPageClient() {
       </div>
 
       {loading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-14 animate-pulse rounded-md bg-neutral-border/50" />
-          ))}
-        </div>
+        <OrdersTableSkeleton />
       ) : error ? (
         <EmptyState title="Could not load orders" description={error} />
       ) : orders.length === 0 ? (
@@ -74,7 +72,7 @@ export function OrdersPageClient() {
         />
       ) : (
         <div className="space-y-4">
-          <OrdersTable orders={orders} onViewOrder={(id) => router.push(`/orders/${id}`)} />
+          <OrdersTable orders={orders} onViewOrder={handleViewOrder} />
           <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-neutral-muted">{totalCount} Total Count</p>
             <Pagination page={page} totalPages={totalPages} onChange={setPage} />

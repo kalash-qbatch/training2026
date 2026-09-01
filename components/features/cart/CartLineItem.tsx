@@ -1,5 +1,7 @@
 "use client";
 
+import { memo, useMemo } from "react";
+
 import { Trash2 } from "lucide-react";
 import Image from "next/image";
 
@@ -17,15 +19,27 @@ type Props = {
   variant: "table" | "card";
 };
 
-export function CartLineItem({ item, selected, onSelect, onQtyChange, onRemove, variant }: Props) {
+function cartLineItemPropsAreEqual(prev: Props, next: Props) {
+  return (
+    prev.variant === next.variant && prev.selected === next.selected && prev.item === next.item
+  );
+}
+
+export const CartLineItem = memo(function CartLineItem({
+  item,
+  selected,
+  onSelect,
+  onQtyChange,
+  onRemove,
+  variant,
+}: Props) {
   const lineTotal = item.price * item.qty;
 
-  /** Pick the image that matches the selected color; fall back to imageUrl. */
-  const resolvedImage = (() => {
+  const resolvedImage = useMemo(() => {
     if (!item.color || !item.images?.length) return item.imageUrl;
     const match = item.images.find((img) => img.color?.toLowerCase() === item.color?.toLowerCase());
     return match?.url ?? item.imageUrl;
-  })();
+  }, [item.color, item.images, item.imageUrl]);
 
   if (variant === "card") {
     return (
@@ -128,4 +142,4 @@ export function CartLineItem({ item, selected, onSelect, onQtyChange, onRemove, 
       </td>
     </tr>
   );
-}
+}, cartLineItemPropsAreEqual);

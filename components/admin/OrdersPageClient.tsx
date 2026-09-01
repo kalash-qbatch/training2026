@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 
 import { ArrowUpRight, Boxes, DollarSign, Package, Search } from "lucide-react";
 import Link from "next/link";
 
 import { Pagination } from "@/components/ui/Pagination";
+import { AdminTableBodySkeleton } from "@/components/ui/skeletons/AdminTableBodySkeleton";
 import {
   Table,
   TableBody,
@@ -24,7 +25,19 @@ import type { AdminOrderStats, Order } from "@/types";
 const inputClass =
   "h-10 w-full rounded-md border border-[#d0d5dd] bg-white px-3 text-[13px] text-neutral-text outline-none placeholder:text-neutral-muted focus:border-[#2563EB]";
 
-function StatCard({
+const StatCardSkeleton = memo(function StatCardSkeleton() {
+  return (
+    <div className="flex animate-pulse items-center justify-between rounded-lg border border-[#e5e7eb] bg-white p-5">
+      <div>
+        <div className="h-3 w-20 rounded bg-neutral-border/50" />
+        <div className="mt-2 h-7 w-16 rounded bg-neutral-border/60" />
+      </div>
+      <div className="h-10 w-10 rounded-full bg-neutral-border/40" />
+    </div>
+  );
+});
+
+const StatCard = memo(function StatCard({
   label,
   value,
   icon: Icon,
@@ -46,7 +59,37 @@ function StatCard({
       </div>
     </div>
   );
-}
+});
+
+const AdminOrderRow = memo(function AdminOrderRow({ order }: { order: Order }) {
+  const productCount = useMemo(() => order.items.reduce((sum, i) => sum + i.qty, 0), [order.items]);
+
+  return (
+    <TableRow>
+      <TableCell>{formatDate(order.date)}</TableCell>
+      <TableCell className="font-medium">{order.id}</TableCell>
+      <TableCell>{order.userName}</TableCell>
+      <TableCell>{productCount}</TableCell>
+      <TableCell className="font-medium tabular-nums">{formatCurrency(order.amount)}</TableCell>
+      <TableCell>
+        <span
+          className={`inline-flex rounded px-2.5 py-1 text-[11px] font-semibold ${orderStatusClass(order.status)}`}
+        >
+          {orderStatusLabel(order.status)}
+        </span>
+      </TableCell>
+      <TableCell className="pr-0">
+        <Link
+          href={`/admin/orders/${order.id}`}
+          className="inline-flex rounded p-1.5 text-[#6b7280] transition hover:bg-brand-50 hover:text-[#2563EB]"
+          aria-label="View order"
+        >
+          <ArrowUpRight className="h-4 w-4" />
+        </Link>
+      </TableCell>
+    </TableRow>
+  );
+});
 
 export function OrdersPageClient() {
   const { toast } = useToast();
@@ -65,8 +108,6 @@ export function OrdersPageClient() {
   const queryKey = `${debounced}|${page}`;
   const [prevQueryKey, setPrevQueryKey] = useState(queryKey);
 
-  // Adjust state during render instead of inside effects
-  // (https://react.dev/learn/you-might-not-need-an-effect)
   if (debounced !== prevDebounced) {
     setPrevDebounced(debounced);
     if (page !== TABLE_INITIAL_PAGE) setPage(TABLE_INITIAL_PAGE);
@@ -102,17 +143,26 @@ export function OrdersPageClient() {
     load();
   }, [load]);
 
+  const statCards = useMemo(
+    () => [
+      { label: "Total Orders", value: String(stats.totalOrders), icon: Package },
+      { label: "Total Units", value: String(stats.totalUnits), icon: Boxes },
+      {
+        label: "Total Amount",
+        value: formatCurrency(stats.totalAmount),
+        icon: DollarSign,
+        valueClassName: "text-[#2563EB]",
+      },
+    ],
+    [stats.totalAmount, stats.totalOrders, stats.totalUnits]
+  );
+
   return (
     <div>
       <div className="mb-5 grid gap-4 sm:grid-cols-3">
-        <StatCard label="Total Orders" value={String(stats.totalOrders)} icon={Package} />
-        <StatCard label="Total Units" value={String(stats.totalUnits)} icon={Boxes} />
-        <StatCard
-          label="Total Amount"
-          value={formatCurrency(stats.totalAmount)}
-          icon={DollarSign}
-          valueClassName="text-[#2563EB]"
-        />
+        {loading
+          ? Array.from({ length: 3 }).map((_, i) => <StatCardSkeleton key={i} />)
+          : statCards.map((card) => <StatCard key={card.label} {...card} />)}
       </div>
 
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -142,42 +192,11 @@ export function OrdersPageClient() {
         </TableHeader>
         <TableBody>
           {loading ? (
-            <TableEmpty colSpan={7}>Loading…</TableEmpty>
+            <AdminTableBodySkeleton rows={6} columns={7} />
           ) : !orders.length ? (
             <TableEmpty colSpan={7}>No orders found</TableEmpty>
           ) : (
-            orders.map((o) => {
-              const productCount = o.items.reduce((sum, i) => sum + i.qty, 0);
-              return (
-                <TableRow key={o.id}>
-                  <TableCell>{formatDate(o.date)}</TableCell>
-                  {/* will uncomment after short id creation */}
-                  {/* <TableCell className="font-medium">{o.id.slice(0, 8)}</TableCell> */}
-                  <TableCell className="font-medium">{o.id}</TableCell>
-                  <TableCell>{o.userName}</TableCell>
-                  <TableCell>{productCount}</TableCell>
-                  <TableCell className="font-medium tabular-nums">
-                    {formatCurrency(o.amount)}
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`inline-flex rounded px-2.5 py-1 text-[11px] font-semibold ${orderStatusClass(o.status)}`}
-                    >
-                      {orderStatusLabel(o.status)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="pr-0">
-                    <Link
-                      href={`/admin/orders/${o.id}`}
-                      className="inline-flex rounded p-1.5 text-[#6b7280] transition hover:bg-brand-50 hover:text-[#2563EB]"
-                      aria-label="View order"
-                    >
-                      <ArrowUpRight className="h-4 w-4" />
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              );
-            })
+            orders.map((o) => <AdminOrderRow key={o.id} order={o} />)
           )}
         </TableBody>
       </Table>
