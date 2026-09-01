@@ -1,4 +1,4 @@
-export const PRODUCTION_APP_URL = "https://bhai-ka-store.vercel.app";
+export const PRODUCTION_APP_URL = "https://bhaikastore.com";
 
 function isLocalhostUrl(url: string): boolean {
   try {

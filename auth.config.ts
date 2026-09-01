@@ -2,6 +2,10 @@ import type { NextAuthConfig } from "next-auth";
 import Facebook from "next-auth/providers/facebook";
 import Google from "next-auth/providers/google";
 
+import { ensureAuthEnvUrl } from "@/lib/app-url";
+
+ensureAuthEnvUrl();
+
 const authPages = ["/login", "/register", "/signup", "/forgot-password", "/reset-password"];
 
 function postLoginPath(role?: string | null) {
