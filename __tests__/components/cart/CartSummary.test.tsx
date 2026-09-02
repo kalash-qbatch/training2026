@@ -15,18 +15,18 @@ describe("CartSummary", () => {
     expect(screen.getByText("Sub Total")).toBeInTheDocument();
     expect(screen.getByText("Tax")).toBeInTheDocument();
     expect(screen.getByText("Total")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /place order/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /proceed to checkout/i })).toBeInTheDocument();
   });
 
-  it("disables place order button when disabled", () => {
+  it("disables checkout button when disabled", () => {
     renderWithProviders(
       <CartSummary subtotal={59.98} tax={6} total={65.98} disabled onPlaceOrder={jest.fn()} />
     );
 
-    expect(screen.getByRole("button", { name: /place order/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /proceed to checkout/i })).toBeDisabled();
   });
 
-  it("calls onPlaceOrder when button is clicked", async () => {
+  it("calls onPlaceOrder when checkout button is clicked", async () => {
     const user = userEvent.setup();
     const onPlaceOrder = jest.fn();
 
@@ -34,7 +34,7 @@ describe("CartSummary", () => {
       <CartSummary subtotal={59.98} tax={6} total={65.98} onPlaceOrder={onPlaceOrder} />
     );
 
-    await user.click(screen.getByRole("button", { name: /place order/i }));
+    await user.click(screen.getByRole("button", { name: /proceed to checkout/i }));
 
     expect(onPlaceOrder).toHaveBeenCalledTimes(1);
   });

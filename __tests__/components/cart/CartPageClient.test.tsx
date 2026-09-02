@@ -1,26 +1,18 @@
 /** @jest-environment jsdom */
 
-import { screen, waitFor } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { mockCartItem } from "@/__tests__/mocks/data/cart";
-import { mockOrder } from "@/__tests__/mocks/data/orders";
 import { mockPush } from "@/__tests__/mocks/next-navigation";
 import { renderWithProviders } from "@/__tests__/mocks/render";
 import { CartPageClient } from "@/components/features/cart/CartPageClient";
-import { placeOrder as placeOrderApi } from "@/lib/api/orders";
 import { useAuthStore } from "@/lib/store/useAuthStore";
 import { useCartStore } from "@/lib/store/useCartStore";
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush, refresh: jest.fn() }),
 }));
-
-jest.mock("../../../lib/api/orders", () => ({
-  placeOrder: jest.fn(),
-}));
-
-const mockedPlaceOrder = placeOrderApi as jest.MockedFunction<typeof placeOrderApi>;
 
 describe("CartPageClient", () => {
   beforeEach(() => {
@@ -51,19 +43,18 @@ describe("CartPageClient", () => {
     );
   });
 
-  it("redirects unauthenticated users to login when placing order", async () => {
+  it("redirects unauthenticated users to login when proceeding to checkout", async () => {
     const user = userEvent.setup();
     useCartStore.setState({ items: [mockCartItem] });
 
     renderWithProviders(<CartPageClient />);
 
-    await user.click(screen.getByRole("button", { name: /place order/i }));
+    await user.click(screen.getByRole("button", { name: /proceed to checkout/i }));
 
-    expect(mockPush).toHaveBeenCalledWith("/login?next=/cart");
-    expect(mockedPlaceOrder).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith("/login?next=/checkout");
   });
 
-  it("places order for authenticated user and opens success modal", async () => {
+  it("redirects authenticated users to checkout", async () => {
     const user = userEvent.setup();
     useAuthStore.setState({
       isAuthenticated: true,
@@ -75,44 +66,11 @@ describe("CartPageClient", () => {
       },
     });
     useCartStore.setState({ items: [mockCartItem] });
-    mockedPlaceOrder.mockResolvedValue(mockOrder);
 
     renderWithProviders(<CartPageClient />);
 
-    await user.click(screen.getByRole("button", { name: /place order/i }));
+    await user.click(screen.getByRole("button", { name: /proceed to checkout/i }));
 
-    await waitFor(() => {
-      expect(mockedPlaceOrder).toHaveBeenCalledWith([
-        {
-          productId: mockCartItem.productId,
-          specificationId: mockCartItem.specificationId,
-          quantity: mockCartItem.qty,
-        },
-      ]);
-    });
-
-    expect(await screen.findByText(/your order has been successfully placed/i)).toBeInTheDocument();
-    expect(useCartStore.getState().removeItems).toHaveBeenCalled();
-  });
-
-  it("shows error toast when order placement fails", async () => {
-    const user = userEvent.setup();
-    useAuthStore.setState({
-      isAuthenticated: true,
-      user: {
-        id: "user-1",
-        fullName: "Jane Doe",
-        email: "jane@example.com",
-        role: "USER",
-      },
-    });
-    useCartStore.setState({ items: [mockCartItem] });
-    mockedPlaceOrder.mockRejectedValue(new Error("Not enough stock"));
-
-    renderWithProviders(<CartPageClient />);
-
-    await user.click(screen.getByRole("button", { name: /place order/i }));
-
-    expect(await screen.findByText(/not enough stock/i)).toBeInTheDocument();
+    expect(mockPush).toHaveBeenCalledWith("/checkout");
   });
 });

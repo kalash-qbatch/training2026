@@ -5,9 +5,10 @@ import {
 } from "@/__tests__/mocks/data/orders";
 import { mockAdmin, mockUser } from "@/__tests__/mocks/data/users";
 import { apiBody, getRequest, jsonRequest, parseJson } from "@/__tests__/mocks/helpers";
+import { GET as getOrderRoute } from "@/app/api/orders/[id]/route";
 import { GET as listOrdersRoute, POST as placeOrderRoute } from "@/app/api/orders/route";
 import { requireUser } from "@/lib/controllers/http";
-import { listOrders, placeOrder } from "@/lib/controllers/orders";
+import { getOrder, listOrders, placeOrder } from "@/lib/controllers/orders";
 import * as orderService from "@/lib/services/orders";
 
 jest.mock("../../lib/controllers/http", () => ({
@@ -102,7 +103,8 @@ describe("Orders — place order controller", () => {
     expect(apiBody<{ order: typeof mockOrder }>(result.body).order).toEqual(mockOrder);
     expect(mockedOrders.createOrder).toHaveBeenCalledWith(
       mockUser.id,
-      validPlaceOrderPayload.items
+      validPlaceOrderPayload.items,
+      expect.objectContaining({ paymentMethod: "CARD", paymentStatus: "PENDING" })
     );
   });
 
@@ -179,6 +181,51 @@ describe("Orders — API routes", () => {
 
     expect(response.status).toBe(401);
     expect(body.error).toBe("Unauthorized");
+  });
+});
+
+describe("Orders — get order controller", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockAuthenticatedUser(mockUser.id);
+  });
+
+  it("returns 404 when order is not found", async () => {
+    mockedOrders.findOrderById.mockResolvedValue(null);
+
+    const result = await getOrder("missing-order");
+
+    expect(result.status).toBe(404);
+    expect(apiBody<{ error: string }>(result.body).error).toBe("Order not found");
+  });
+
+  it("returns order for authenticated user", async () => {
+    mockedOrders.findOrderById.mockResolvedValue(mockOrder);
+
+    const result = await getOrder(mockOrder.id);
+
+    expect(result.status).toBe(200);
+    expect(apiBody<{ order: typeof mockOrder }>(result.body).order).toEqual(mockOrder);
+    expect(mockedOrders.findOrderById).toHaveBeenCalledWith(mockOrder.id, mockUser.id);
+  });
+});
+
+describe("Orders — GET /api/orders/[id] route", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockAuthenticatedUser(mockUser.id);
+    mockedOrders.findOrderById.mockResolvedValue(mockOrder);
+  });
+
+  it("returns order detail", async () => {
+    const response = await getOrderRoute(getRequest("http://localhost/api/orders/order-001"), {
+      params: Promise.resolve({ id: "order-001" }),
+    });
+    const body = await parseJson<{ success: boolean; order: typeof mockOrder }>(response);
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.order.id).toBe(mockOrder.id);
   });
 });
 
