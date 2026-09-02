@@ -193,6 +193,7 @@ async function main() {
 
   await prisma.order.create({
     data: {
+      orderNumber: 4_353_452,
       userId: user.id,
       status: "DELIVERED",
       subTotal: 178,
