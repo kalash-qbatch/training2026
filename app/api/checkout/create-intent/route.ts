@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
+import { restoreCartFromOrderItems } from "@/lib/services/cart";
 import {
   attachPaymentIntentToOrder,
   createOrder,
@@ -19,13 +20,14 @@ function errorMessage(err: unknown): string {
 
 export async function POST(request: Request) {
   let pendingOrderId: string | undefined;
+  let userId: string | undefined;
 
   try {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
-    const userId = session.user.id;
+    userId = session.user.id;
 
     const body = await request.json();
     const { items, paymentMethodId, savePaymentMethod, orderId, shipping } = body as {
@@ -118,9 +120,20 @@ export async function POST(request: Request) {
       amount: order.amount,
     });
   } catch (err) {
-    if (pendingOrderId) {
+    if (pendingOrderId && userId) {
       try {
         await updateOrderStatus(pendingOrderId, "CANCELLED");
+        const order = await findOrderById(pendingOrderId, userId);
+        if (order) {
+          await restoreCartFromOrderItems(
+            userId,
+            order.items.map((item) => ({
+              productId: item.productId,
+              specificationId: item.specificationId,
+              quantity: item.qty,
+            }))
+          );
+        }
       } catch (rollbackErr) {
         console.error("create-intent rollback error:", rollbackErr);
       }

@@ -110,7 +110,7 @@ export function CheckoutForm({
   const stripe = useStripe();
   const elements = useElements();
   const { toast } = useToast();
-  const removeItems = useCartStore((s) => s.removeItems);
+  const fetchCart = useCartStore((s) => s.fetchCart);
 
   const [paymentOption, setPaymentOption] = useState<"COD" | "CARD">("COD");
   const [selectedPmId, setSelectedPmId] = useState<string>(
@@ -143,9 +143,7 @@ export function CheckoutForm({
       if (!data.success) throw new Error(data.error || "Order failed");
 
       if (!retryOrderId) {
-        await removeItems(
-          selectedItems.map((i) => ({ productId: i.productId, specificationId: i.specificationId }))
-        );
+        await fetchCart();
       }
       onSuccess(orderRouteId(data.order), "COD");
     } catch (err) {
@@ -205,6 +203,10 @@ export function CheckoutForm({
           }),
         });
 
+        if (!retryOrderId) {
+          await fetchCart();
+        }
+
         onError({
           title: "Payment Failed",
           message: confirmResult.error.message || "Your payment could not be processed.",
@@ -226,6 +228,9 @@ export function CheckoutForm({
       });
       const confirmData = await confirmRes.json();
       if (!confirmData.success) {
+        if (!retryOrderId) {
+          await fetchCart();
+        }
         onError(
           confirmData.errorInfo
             ? { ...confirmData.errorInfo, orderId }
@@ -241,14 +246,15 @@ export function CheckoutForm({
       }
 
       if (!retryOrderId) {
-        await removeItems(
-          selectedItems.map((i) => ({ productId: i.productId, specificationId: i.specificationId }))
-        );
+        await fetchCart();
       }
       onSuccess(orderRouteId(confirmData.order), "CARD");
     } catch (err) {
       const orderId = pendingOrderId ?? retryOrderId;
       if (orderId) {
+        if (!retryOrderId) {
+          await fetchCart();
+        }
         onError({
           title: "Payment Error",
           message: err instanceof Error ? err.message : "An unexpected error occurred.",

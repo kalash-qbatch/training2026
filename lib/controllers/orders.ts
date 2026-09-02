@@ -1,6 +1,12 @@
 import { auth } from "@/auth";
 import { requireUser } from "@/lib/controllers/http";
-import { createOrder, findOrderById, findOrders, OrderError } from "@/lib/services/orders";
+import {
+  createOrder,
+  findOrderById,
+  findOrders,
+  OrderError,
+  reorderCancelledOrder,
+} from "@/lib/services/orders";
 import type { PlaceOrderItemInput } from "@/types";
 
 export async function listOrders(request: Request) {
@@ -70,4 +76,71 @@ export async function getOrder(id: string) {
     };
   }
   return { status: 200, body: { success: true, order } };
+}
+
+export async function reorderCancelled(id: string) {
+  const { userId, error } = await requireUser();
+  if (error || !userId) return error!;
+
+  try {
+    const result = await reorderCancelledOrder(id, userId);
+    return {
+      status: 200,
+      body: { success: true, items: result.cart },
+    };
+  } catch (err) {
+    if (OrderError.is(err)) {
+      return {
+        status: err.status,
+        body: { success: false, error: err.message },
+      };
+    }
+    throw err;
+  }
+}
+
+export async function retryOrderForCheckout(id: string) {
+  const { userId, error } = await requireUser();
+  if (error || !userId) return error!;
+
+  const order = await findOrderById(id, userId);
+  if (!order) {
+    return {
+      status: 404,
+      body: { success: false, error: "Order not found" },
+    };
+  }
+  if (order.status === "cancelled") {
+    return {
+      status: 400,
+      body: { success: false, error: "This order has been cancelled." },
+    };
+  }
+  if (order.paymentStatus === "SUCCEEDED" || order.paymentStatus === "PAID") {
+    return {
+      status: 400,
+      body: { success: false, error: "This order has already been paid." },
+    };
+  }
+  if (order.paymentMethod !== "CARD") {
+    return {
+      status: 400,
+      body: { success: false, error: "This order does not require card payment retry." },
+    };
+  }
+  if (order.paymentStatus === "PROCESSING") {
+    return {
+      status: 400,
+      body: { success: false, error: "Payment is still processing." },
+    };
+  }
+
+  return {
+    status: 200,
+    body: {
+      success: true,
+      orderId: order.id,
+      checkoutUrl: `/checkout?orderId=${order.id}`,
+    },
+  };
 }

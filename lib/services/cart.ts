@@ -215,7 +215,62 @@ export async function removeCartItems(
   return getCart(userId);
 }
 
+/** Put order line items back in the cart when a pending order is cancelled. */
+export async function restoreCartFromOrderItems(
+  userId: string,
+  items: Array<{ productId: string; specificationId?: string | null; quantity: number }>
+): Promise<CartItem[]> {
+  for (const item of items) {
+    const specId = item.specificationId?.trim() || null;
+    const existing = await prisma.cartItem.findFirst({
+      where: {
+        userId,
+        productId: item.productId,
+        specificationId: specId,
+      },
+    });
+    if (!existing) {
+      await addToCart(userId, {
+        productId: item.productId,
+        specificationId: specId,
+        quantity: item.quantity,
+      });
+    }
+  }
+  return getCart(userId);
+}
+
 export async function clearCart(userId: string): Promise<CartItem[]> {
   await prisma.cartItem.deleteMany({ where: { userId } });
   return [];
+}
+
+export async function syncOrderItemsToCart(
+  userId: string,
+  items: Array<{ productId: string; specificationId?: string | null; quantity: number }>
+): Promise<CartItem[]> {
+  for (const item of items) {
+    const specId = item.specificationId?.trim() || null;
+    const existing = await prisma.cartItem.findFirst({
+      where: {
+        userId,
+        productId: item.productId,
+        specificationId: specId,
+      },
+    });
+    if (existing) {
+      await updateCartItem(userId, {
+        productId: item.productId,
+        specificationId: specId,
+        quantity: item.quantity,
+      });
+    } else {
+      await addToCart(userId, {
+        productId: item.productId,
+        specificationId: specId,
+        quantity: item.quantity,
+      });
+    }
+  }
+  return getCart(userId);
 }

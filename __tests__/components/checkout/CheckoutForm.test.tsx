@@ -9,6 +9,7 @@ import { mockOrder } from "@/__tests__/mocks/data/orders";
 import { renderWithProviders } from "@/__tests__/mocks/render";
 import { CheckoutForm } from "@/components/features/checkout/CheckoutForm";
 import { useCartStore } from "@/lib/store/useCartStore";
+import { orderRouteId } from "@/lib/utils";
 
 const mockConfirmCardPayment = jest.fn();
 const mockGetElement = jest.fn();
@@ -32,7 +33,7 @@ describe("CheckoutForm", () => {
     jest.clearAllMocks();
     useCartStore.setState({
       items: [mockCartItem],
-      removeItems: jest.fn().mockResolvedValue(undefined),
+      fetchCart: jest.fn().mockResolvedValue(undefined),
     } as never);
   });
 
@@ -90,7 +91,7 @@ describe("CheckoutForm", () => {
           shipping: mockShippingInfo,
         }),
       });
-      expect(onSuccess).toHaveBeenCalledWith(mockOrder.id, "COD");
+      expect(onSuccess).toHaveBeenCalledWith(orderRouteId(mockOrder), "COD");
     });
   });
 
@@ -122,12 +123,14 @@ describe("CheckoutForm", () => {
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith("/api/checkout/create-intent", expect.any(Object));
       expect(mockConfirmCardPayment).toHaveBeenCalled();
-      expect(onSuccess).toHaveBeenCalledWith(mockOrder.id, "CARD");
+      expect(onSuccess).toHaveBeenCalledWith(orderRouteId(mockOrder), "CARD");
     });
   });
 
   it("calls onError when card confirmation fails on client", async () => {
     const user = userEvent.setup();
+    const fetchCart = jest.fn().mockResolvedValue(undefined);
+    useCartStore.setState({ fetchCart } as never);
     mockGetElement.mockReturnValue({});
     mockConfirmCardPayment.mockResolvedValue({
       error: { message: "Your card was declined." },
@@ -161,6 +164,7 @@ describe("CheckoutForm", () => {
           recoverable: true,
         })
       );
+      expect(fetchCart).toHaveBeenCalled();
     });
   });
 

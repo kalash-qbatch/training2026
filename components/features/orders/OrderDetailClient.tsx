@@ -6,6 +6,7 @@ import { ArrowLeft, CreditCard } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
+import { OrderAgainButton } from "@/components/features/orders/OrderAgainButton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { OrderDetailSkeleton } from "@/components/ui/skeletons/OrderDetailSkeleton";
 import { getOrderById } from "@/lib/api/orders";
@@ -80,6 +81,8 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
     order.paymentStatus !== "PAID" &&
     order.paymentStatus !== "PROCESSING";
 
+  const isCancelled = order.status === "cancelled";
+
   return (
     <div className="space-y-6">
       <Link
@@ -105,6 +108,18 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
             <CreditCard className="h-4 w-4" />
             Retry Payment
           </Link>
+        </div>
+      ) : null}
+
+      {isCancelled ? (
+        <div className="flex flex-col gap-3 rounded-xl border border-neutral-200 bg-neutral-bg/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-neutral-text">Order cancelled</p>
+            <p className="mt-0.5 text-sm text-neutral-muted">
+              Want these items again? We&apos;ll check stock and take you to checkout.
+            </p>
+          </div>
+          <OrderAgainButton orderId={order.id} />
         </div>
       ) : null}
 

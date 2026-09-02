@@ -1,4 +1,4 @@
-import type { ColorFilter, Order, SizeFilter } from "@/types";
+import type { CartItem, ColorFilter, Order, SizeFilter } from "@/types";
 
 /** Browser-safe: loads orders from `/api/orders` (Postgres). */
 export async function getOrders(
@@ -78,4 +78,20 @@ export async function placeOrder(
     throw new Error(data.error || "Failed to place order");
   }
   return data.order;
+}
+
+/** Validate stock for a cancelled order and add items to cart for checkout. */
+export async function reorderCancelledOrder(orderId: string): Promise<CartItem[]> {
+  const res = await fetch(`/api/orders/${orderId}/reorder`, {
+    method: "POST",
+  });
+  const data = (await res.json()) as {
+    success?: boolean;
+    items?: CartItem[];
+    error?: string;
+  };
+  if (!res.ok || !data.success || !data.items) {
+    throw new Error(data.error || "Failed to reorder");
+  }
+  return data.items;
 }

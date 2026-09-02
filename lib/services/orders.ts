@@ -10,8 +10,13 @@ import {
   parseOrderRef,
 } from "@/lib/order-id";
 import { ensureOrderNumberInfrastructure } from "@/lib/order-number-setup";
+import {
+  removeCartItems,
+  restoreCartFromOrderItems,
+  syncOrderItemsToCart,
+} from "@/lib/services/cart";
 import { notifyOrderPlaced, notifyOrderStatusChange } from "@/lib/services/notifications";
-import type { AdminOrderFilters, Order, PlaceOrderItemInput } from "@/types";
+import type { AdminOrderFilters, Order, OrderItem, PlaceOrderItemInput } from "@/types";
 
 export type { AdminOrderFilters, PlaceOrderItemInput };
 export type { PaymentStatus };
@@ -228,6 +233,16 @@ export async function createOrder(
       });
 
       await notifyOrderPlaced(tx, userId, order.id, order.orderNumber);
+
+      for (const line of lineData) {
+        await tx.cartItem.deleteMany({
+          where: {
+            userId,
+            productId: line.productId,
+            specificationId: line.specificationId ?? null,
+          },
+        });
+      }
 
       return mapOrder(order);
     },
@@ -721,6 +736,14 @@ export async function switchOrderToCod(orderId: string, userId: string) {
     },
   });
 
+  await removeCartItems(
+    userId,
+    updated.items.map((item) => ({
+      productId: item.productId,
+      specificationId: item.specificationId,
+    }))
+  );
+
   return mapOrder(updated);
 }
 
@@ -732,7 +755,7 @@ function daysUntilNextRetry(attemptCount: number): number {
  * Handle a failed payment: increment attempts, schedule auto-retry, or cancel + restock.
  */
 export async function handlePaymentFailure(orderId: string, paymentIntentId?: string) {
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const existing = await tx.order.findUnique({
       where: { id: orderId },
       include: {
@@ -800,6 +823,19 @@ export async function handlePaymentFailure(orderId: string, paymentIntentId?: st
 
     return { action: "retry_scheduled" as const, order: mapOrder(row) };
   });
+
+  if (result?.action === "cancelled" && result.order) {
+    await restoreCartFromOrderItems(
+      result.order.userId,
+      result.order.items.map((item) => ({
+        productId: item.productId,
+        specificationId: item.specificationId,
+        quantity: item.qty,
+      }))
+    );
+  }
+
+  return result;
 }
 
 /**
@@ -859,5 +895,97 @@ export async function confirmExistingOrderPayment(
     },
   });
 
+  await removeCartItems(
+    userId,
+    updated.items.map((item) => ({
+      productId: item.productId,
+      specificationId: item.specificationId,
+    }))
+  );
+
   return mapOrder(updated);
+}
+
+async function validateReorderLine(item: OrderItem): Promise<PlaceOrderItemInput> {
+  const product = await prisma.product.findUnique({
+    where: { id: item.productId },
+    include: { specifications: true },
+  });
+  if (!product || !product.isActive) {
+    throw new OrderError(`"${item.title}" is no longer available.`);
+  }
+
+  const hasSpecs = product.specifications.length > 0;
+  const specificationId = item.specificationId?.trim() || undefined;
+
+  if (hasSpecs) {
+    let spec = specificationId
+      ? product.specifications.find((s) => s.id === specificationId)
+      : undefined;
+    if (!spec && (item.color || item.size)) {
+      spec = product.specifications.find(
+        (s) =>
+          s.color.toLowerCase() === (item.color?.trim() ?? "").toLowerCase() &&
+          s.size.toLowerCase() === (item.size?.trim() ?? "").toLowerCase()
+      );
+    }
+    if (!spec) {
+      throw new OrderError(`"${item.title}" variant is no longer available.`);
+    }
+    if (spec.qty < item.qty) {
+      throw new OrderError(`Not enough stock for "${item.title}". Only ${spec.qty} left.`);
+    }
+    return {
+      productId: product.id,
+      specificationId: spec.id,
+      quantity: item.qty,
+      color: spec.color,
+      size: spec.size,
+    };
+  }
+
+  if (product.stock < item.qty) {
+    throw new OrderError(`Not enough stock for "${item.title}". Only ${product.stock} left.`);
+  }
+
+  return {
+    productId: product.id,
+    quantity: item.qty,
+  };
+}
+
+/** Validate stock for a cancelled order and add its items to the cart for checkout. */
+export async function reorderCancelledOrder(orderId: string, userId: string) {
+  const order = await findOrderById(orderId, userId);
+  if (!order) {
+    throw new OrderError("Order not found", 404);
+  }
+  if (order.status !== "cancelled") {
+    throw new OrderError("Only cancelled orders can be reordered.", 400);
+  }
+  if (!order.items.length) {
+    throw new OrderError("This order has no items to reorder.", 400);
+  }
+
+  const errors: string[] = [];
+  const lines: PlaceOrderItemInput[] = [];
+
+  for (const item of order.items) {
+    try {
+      lines.push(await validateReorderLine(item));
+    } catch (err) {
+      if (OrderError.is(err)) {
+        errors.push(err.message);
+      } else {
+        errors.push(`Could not reorder "${item.title}".`);
+      }
+    }
+  }
+
+  if (errors.length) {
+    throw new OrderError(errors.join(" "));
+  }
+
+  const cart = await syncOrderItemsToCart(userId, lines);
+  return { cart };
 }
