@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { ArrowLeft } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -17,10 +17,6 @@ import type { CartItem } from "@/types";
 import { CartLineItem } from "./CartLineItem";
 import { CartSummary } from "./CartSummary";
 
-const OrderPlacedModal = dynamic(
-  () => import("./OrderPlacedModal").then((m) => ({ default: m.OrderPlacedModal })),
-  { loading: () => null }
-);
 const RemoveProductModal = dynamic(
   () => import("./RemoveProductModal").then((m) => ({ default: m.RemoveProductModal })),
   { loading: () => null }
@@ -40,15 +36,11 @@ export function CartPageClient() {
   const items = useCartStore((s) => s.items);
   const updateQty = useCartStore((s) => s.updateQty);
   const removeItem = useCartStore((s) => s.removeItem);
-  const removeItems = useCartStore((s) => s.removeItems);
   const clearCart = useCartStore((s) => s.clearCart);
 
   const [pendingRemove, setPendingRemove] = useState<CartItem | null>(null);
   const [pendingClearAll, setPendingClearAll] = useState(false);
-  const [placing, setPlacing] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(() => new Set(items.map(itemKey)));
-  const [successOpen, setSuccessOpen] = useState(false);
-  const [placedOrderId, setPlacedOrderId] = useState<string | null>(null);
   const [prevItems, setPrevItems] = useState(items);
 
   // Sync selection with cart items during render
@@ -62,36 +54,12 @@ export function CartPageClient() {
     });
   }
 
-  const selectedItems = useMemo(
-    () => items.filter((i) => selected.has(itemKey(i))),
-    [items, selected]
-  );
+  const selectedItems = items.filter((i) => selected.has(itemKey(i)));
 
   const subtotal = selectedItems.reduce((sum, i) => sum + i.price * i.qty, 0);
   const tax = Number((subtotal * TAX_RATE).toFixed(2));
   const total = Number((subtotal + tax).toFixed(2));
   const allSelected = items.length > 0 && selected.size === items.length;
-
-  const overlays = useMemo(
-    () => (
-      <OrderPlacedModal
-        open={successOpen}
-        onDetails={() => {
-          setSuccessOpen(false);
-          if (placedOrderId) {
-            router.push(`/orders/${placedOrderId}`);
-          } else {
-            router.push("/orders");
-          }
-        }}
-        onHome={() => {
-          setSuccessOpen(false);
-          router.push("/products");
-        }}
-      />
-    ),
-    [placedOrderId, router, successOpen]
-  );
 
   if (!items.length) {
     return (
@@ -111,7 +79,6 @@ export function CartPageClient() {
           ctaHref="/products"
           ctaLabel="Browse products"
         />
-        {overlays}
       </section>
     );
   }
@@ -273,7 +240,6 @@ export function CartPageClient() {
             );
         }}
       />
-      {overlays}
     </section>
   );
 }

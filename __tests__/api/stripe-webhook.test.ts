@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 
-import { mockCardOrder } from "@/__tests__/mocks/data/checkout";
+import { mockCardOrder, mockDbOrderRow } from "@/__tests__/mocks/data/checkout";
 import { parseJson } from "@/__tests__/mocks/helpers";
 import { POST as stripeWebhookRoute } from "@/app/api/stripe/webhook/route";
 import * as orderService from "@/lib/services/orders";
@@ -46,7 +46,7 @@ describe("Stripe — POST /api/stripe/webhook", () => {
     mockedGetStripe.mockReturnValue({
       webhooks: { constructEvent: mockConstructEvent },
     } as never);
-    mockedOrders.findOrderByPaymentIntentId.mockResolvedValue(mockCardOrder);
+    mockedOrders.findOrderByPaymentIntentId.mockResolvedValue(mockDbOrderRow as never);
   });
 
   afterAll(() => {
@@ -105,7 +105,7 @@ describe("Stripe — POST /api/stripe/webhook", () => {
       type: "payment_intent.payment_failed",
       data: { object: { id: "pi_test_123" } },
     });
-    mockedOrders.handlePaymentFailure.mockResolvedValue(undefined);
+    mockedOrders.handlePaymentFailure.mockResolvedValue(null);
 
     const response = await stripeWebhookRoute(webhookRequest());
 
@@ -118,7 +118,7 @@ describe("Stripe — POST /api/stripe/webhook", () => {
       type: "payment_intent.processing",
       data: { object: { id: "pi_test_123" } },
     });
-    mockedOrders.updateOrderPaymentStatus.mockResolvedValue(undefined);
+    mockedOrders.updateOrderPaymentStatus.mockResolvedValue(mockCardOrder);
 
     await stripeWebhookRoute(webhookRequest());
 
@@ -133,7 +133,7 @@ describe("Stripe — POST /api/stripe/webhook", () => {
       type: "payment_intent.canceled",
       data: { object: { id: "pi_test_123" } },
     });
-    mockedOrders.updateOrderStatus.mockResolvedValue(undefined);
+    mockedOrders.updateOrderStatus.mockResolvedValue(mockCardOrder);
 
     await stripeWebhookRoute(webhookRequest());
 

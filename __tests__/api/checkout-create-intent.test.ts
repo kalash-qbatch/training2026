@@ -41,7 +41,7 @@ describe("Checkout — POST /api/checkout/create-intent", () => {
     jest.clearAllMocks();
     mockedAuth.mockResolvedValue(mockAuthSession(mockUser) as never);
     mockedOrders.createOrder.mockResolvedValue(mockOrder);
-    mockedOrders.attachPaymentIntentToOrder.mockResolvedValue(undefined);
+    mockedOrders.attachPaymentIntentToOrder.mockResolvedValue(mockCardOrder);
     mockedStripe.createPaymentIntentForCart.mockResolvedValue(mockStripeIntentResponse);
   });
 

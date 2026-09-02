@@ -165,7 +165,7 @@ describe("Checkout — POST /api/checkout/confirm", () => {
       status: "requires_payment_method",
       last_payment_error: { decline_code: "insufficient_funds", code: "card_declined" },
     });
-    mockedOrders.handlePaymentFailure.mockResolvedValue(undefined);
+    mockedOrders.handlePaymentFailure.mockResolvedValue(null);
 
     const response = await confirmCheckoutRoute(
       jsonRequest("http://localhost/api/checkout/confirm", {

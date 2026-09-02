@@ -17,6 +17,16 @@ export const mockCardOrder = {
   stripePaymentIntentId: "pi_test_123",
 };
 
+/** Prisma row shape returned by findOrderByPaymentIntentId */
+export const mockDbOrderRow = {
+  id: mockOrder.id,
+  userId: mockOrder.userId,
+  orderNumber: mockOrder.orderNumber,
+  stripePaymentIntentId: "pi_test_123",
+  user: { fullName: "Jane Doe", name: "Jane Doe", email: "jane@example.com" },
+  items: [],
+};
+
 export const mockPaymentIntent = {
   id: "pi_test_123",
   client_secret: "pi_test_123_secret",
