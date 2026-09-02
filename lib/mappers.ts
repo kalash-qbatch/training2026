@@ -6,6 +6,7 @@ import type {
   Product as DbProduct,
 } from "@prisma/client";
 
+import { displayOrderRef } from "@/lib/order-id";
 import type { Category, Order, OrderItem, OrderStatus, Product, ProductVariant } from "@/types";
 
 type DbSpecification = {
@@ -92,11 +93,31 @@ function mapStatus(status: DbOrderStatus): OrderStatus {
   return map[status];
 }
 
+function resolvePaymentStatus(
+  status: DbOrderStatus,
+  paymentStatus: Order["paymentStatus"] | undefined
+): Order["paymentStatus"] {
+  const current = paymentStatus ?? "PENDING";
+  if (status !== "DELIVERED") return current;
+  if (
+    current === "SUCCEEDED" ||
+    current === "PAID" ||
+    current === "FAILED" ||
+    current === "REFUNDED"
+  ) {
+    return current;
+  }
+  return "SUCCEEDED";
+}
+
 export function mapOrder(row: DbOrderWithRelations): Order {
   const subTotal = Number(row.subTotal);
   const tax = Number(row.tax);
+  const rawPaymentStatus = (row as { paymentStatus?: Order["paymentStatus"] }).paymentStatus;
   return {
     id: row.id,
+    orderNumber: row.orderNumber,
+    orderRef: displayOrderRef({ id: row.id, orderNumber: row.orderNumber }),
     date: row.createdAt.toISOString(),
     userId: row.userId,
     userName: row.user.fullName || row.user.name || "Customer",
@@ -106,7 +127,7 @@ export function mapOrder(row: DbOrderWithRelations): Order {
     tax,
     status: mapStatus(row.status),
     paymentMethod: (row as { paymentMethod?: string }).paymentMethod === "COD" ? "COD" : "CARD",
-    paymentStatus: (row as { paymentStatus?: Order["paymentStatus"] }).paymentStatus ?? "PENDING",
+    paymentStatus: resolvePaymentStatus(row.status, rawPaymentStatus),
     paymentAttemptCount: (row as { paymentAttemptCount?: number }).paymentAttemptCount ?? 0,
     maxPaymentAttempts: (row as { maxPaymentAttempts?: number }).maxPaymentAttempts ?? 3,
     shipping: (row as { shippingFullName?: string | null }).shippingFullName

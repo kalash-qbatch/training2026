@@ -6,6 +6,8 @@ import { CreditCard, RefreshCw, Truck, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
+import { formatOrderRefDisplay } from "@/lib/utils";
+
 function FailedContent() {
   const params = useSearchParams();
   const title = params.get("title") ?? "Payment Failed";
@@ -37,7 +39,8 @@ function FailedContent() {
               <p className="text-sm text-red-700">{suggestion}</p>
               {orderId ? (
                 <p className="text-xs text-red-600">
-                  Order #{orderId.slice(0, 8)} — items are reserved while payment is pending.
+                  Order {formatOrderRefDisplay(orderId)} — items are reserved while payment is
+                  pending.
                 </p>
               ) : null}
             </div>

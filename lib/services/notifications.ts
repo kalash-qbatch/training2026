@@ -1,16 +1,13 @@
 import type { OrderStatus, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db";
+import { displayOrderRef } from "@/lib/order-id";
 import { emitNotificationToUser, emitUnreadCountToUser } from "@/lib/socket/server";
 import type { AppNotification } from "@/types";
 
 export type { AppNotification };
 
 type TxClient = Prisma.TransactionClient;
-
-function shortOrderId(orderId: string) {
-  return orderId.slice(0, 8).toUpperCase();
-}
 
 export function statusNotificationCopy(status: OrderStatus): {
   title: string;
@@ -88,13 +85,14 @@ export async function createNotification(
 export async function notifyOrderPlaced(
   tx: TxClient | typeof prisma,
   userId: string,
-  orderId: string
+  orderId: string,
+  orderNumber: number
 ) {
-  const ref = shortOrderId(orderId);
+  const ref = displayOrderRef({ id: orderId, orderNumber });
   return await createNotification(tx, {
     userId,
     title: "Order placed",
-    message: `Your order #${ref} has been placed successfully.`,
+    message: `Your order ${ref} has been placed successfully.`,
     orderId,
   });
 }
@@ -103,14 +101,18 @@ export async function notifyOrderStatusChange(
   tx: TxClient | typeof prisma,
   userId: string,
   orderId: string,
-  status: OrderStatus
+  status: OrderStatus,
+  orderNumber?: number
 ) {
   const copy = statusNotificationCopy(status);
-  const ref = shortOrderId(orderId);
+  const ref =
+    orderNumber != null
+      ? displayOrderRef({ id: orderId, orderNumber })
+      : displayOrderRef({ id: orderId, orderNumber: 0 });
   return createNotification(tx, {
     userId,
     title: copy.title,
-    message: `${copy.message} (Order #${ref})`,
+    message: `${copy.message} (Order ${ref})`,
     orderId,
   });
 }

@@ -19,7 +19,14 @@ import {
 import { useToast } from "@/components/ui/Toast";
 import { fetchAdminOrders } from "@/lib/api/admin";
 import { TABLE_INITIAL_PAGE, TABLE_PAGE_SIZE } from "@/lib/constants";
-import { formatCurrency, formatDate, orderStatusClass, orderStatusLabel } from "@/lib/utils";
+import {
+  displayOrderRef,
+  formatCurrency,
+  formatDate,
+  orderRouteId,
+  orderStatusClass,
+  orderStatusLabel,
+} from "@/lib/utils";
 import type { AdminOrderStats, Order } from "@/types";
 
 const inputClass =
@@ -67,7 +74,7 @@ const AdminOrderRow = memo(function AdminOrderRow({ order }: { order: Order }) {
   return (
     <TableRow>
       <TableCell>{formatDate(order.date)}</TableCell>
-      <TableCell className="font-medium">{order.id}</TableCell>
+      <TableCell className="font-medium">{order.orderRef ?? displayOrderRef(order)}</TableCell>
       <TableCell>{order.userName}</TableCell>
       <TableCell>{productCount}</TableCell>
       <TableCell className="font-medium tabular-nums">{formatCurrency(order.amount)}</TableCell>
@@ -80,7 +87,7 @@ const AdminOrderRow = memo(function AdminOrderRow({ order }: { order: Order }) {
       </TableCell>
       <TableCell className="pr-0">
         <Link
-          href={`/admin/orders/${order.id}`}
+          href={`/admin/orders/${orderRouteId(order)}`}
           className="inline-flex rounded p-1.5 text-[#6b7280] transition hover:bg-brand-50 hover:text-[#2563EB]"
           aria-label="View order"
         >

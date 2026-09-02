@@ -3,6 +3,13 @@ import type { OrderStatus, PaymentStatus, Prisma } from "@prisma/client";
 import { TAX_RATE } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 import { mapOrder } from "@/lib/mappers";
+import {
+  allocateOrderNumber,
+  buildOrderUniqueWhere,
+  hasValidOrderNumber,
+  parseOrderRef,
+} from "@/lib/order-id";
+import { ensureOrderNumberInfrastructure } from "@/lib/order-number-setup";
 import { notifyOrderPlaced, notifyOrderStatusChange } from "@/lib/services/notifications";
 import type { AdminOrderFilters, Order, PlaceOrderItemInput } from "@/types";
 
@@ -17,6 +24,30 @@ export type ShippingInfo = {
   city: string;
   postalCode: string;
 };
+
+const orderInclude = {
+  user: { select: { fullName: true, name: true, email: true } },
+  items: { include: { product: true } },
+} as const;
+
+async function backfillOrderNumberIfMissing<
+  T extends { id: string; orderNumber: number | null | undefined },
+>(row: T): Promise<T> {
+  if (hasValidOrderNumber(row.orderNumber)) return row;
+
+  try {
+    const orderNumber = await prisma.$transaction(async (tx) => allocateOrderNumber(tx));
+    const updated = await prisma.order.update({
+      where: { id: row.id },
+      data: { orderNumber },
+      include: orderInclude,
+    });
+    return updated as unknown as T;
+  } catch (err) {
+    console.error("orderNumber backfill error:", err);
+    return row;
+  }
+}
 
 // Error handling component with status code as well
 export class OrderError extends Error {
@@ -48,6 +79,8 @@ export async function createOrder(
   if (!items.length) {
     throw new OrderError("Cart is empty");
   }
+
+  await ensureOrderNumberInfrastructure();
 
   return prisma.$transaction(
     async (tx) => {
@@ -157,9 +190,11 @@ export async function createOrder(
       const paymentMethod = opts?.paymentMethod ?? "CARD";
       const paymentStatus = opts?.paymentStatus ?? "PENDING";
       const orderStatus = opts?.orderStatus ?? "PROCESSING";
+      const orderNumber = await allocateOrderNumber(tx);
 
       const order = await tx.order.create({
         data: {
+          orderNumber,
           userId,
           status: orderStatus,
           paymentMethod,
@@ -192,7 +227,7 @@ export async function createOrder(
         },
       });
 
-      await notifyOrderPlaced(tx, userId, order.id);
+      await notifyOrderPlaced(tx, userId, order.id, order.orderNumber);
 
       return mapOrder(order);
     },
@@ -210,21 +245,22 @@ export async function findOrders(
   page: number;
   pageSize: number;
 }> {
+  await ensureOrderNumberInfrastructure();
+
   const where = userId ? { userId } : {};
   const total = await prisma.order.count({ where });
   const rows = await prisma.order.findMany({
     where,
-    include: {
-      user: { select: { fullName: true, name: true, email: true } },
-      items: { include: { product: true } },
-    },
+    include: orderInclude,
     orderBy: { createdAt: "desc" },
     skip: (page - 1) * pageSize,
     take: pageSize,
   });
 
+  const hydrated = await Promise.all(rows.map((row) => backfillOrderNumberIfMissing(row)));
+
   return {
-    orders: rows.map(mapOrder),
+    orders: hydrated.map(mapOrder),
     total,
     page,
     pageSize,
@@ -232,14 +268,35 @@ export async function findOrders(
 }
 
 export async function findOrderById(id: string, userId?: string): Promise<Order | null> {
-  const row = await prisma.order.findFirst({
-    where: { id, ...(userId ? { userId } : {}) },
-    include: {
-      user: { select: { fullName: true, name: true, email: true } },
-      items: { include: { product: true } },
-    },
+  await ensureOrderNumberInfrastructure();
+
+  let row = await prisma.order.findFirst({
+    where: buildOrderUniqueWhere(id, userId),
+    include: orderInclude,
   });
-  return row ? mapOrder(row) : null;
+  if (!row) return null;
+
+  row = await backfillOrderNumberIfMissing(row);
+
+  if (
+    row.status === "DELIVERED" &&
+    row.paymentStatus !== "SUCCEEDED" &&
+    row.paymentStatus !== "PAID" &&
+    row.paymentStatus !== "FAILED" &&
+    row.paymentStatus !== "REFUNDED"
+  ) {
+    const updated = await prisma.order.update({
+      where: { id: row.id },
+      data: { paymentStatus: "SUCCEEDED", nextPaymentRetryAt: null },
+      include: {
+        user: { select: { fullName: true, name: true, email: true } },
+        items: { include: { product: true } },
+      },
+    });
+    return mapOrder(updated);
+  }
+
+  return mapOrder(row);
 }
 
 const ALLOWED_STATUS_UPDATES = new Set<OrderStatus>([
@@ -445,14 +502,21 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
 
     const row = await tx.order.update({
       where: { id },
-      data: { status },
+      data: {
+        status,
+        ...(status === "DELIVERED" &&
+        existing.paymentStatus !== "SUCCEEDED" &&
+        existing.paymentStatus !== "PAID"
+          ? { paymentStatus: "SUCCEEDED" as PaymentStatus, nextPaymentRetryAt: null }
+          : {}),
+      },
       include: {
         user: { select: { fullName: true, name: true, email: true } },
         items: { include: { product: true } },
       },
     });
 
-    await notifyOrderStatusChange(tx, existing.userId, id, status);
+    await notifyOrderStatusChange(tx, existing.userId, id, status, row.orderNumber);
 
     return mapOrder(row);
   });
@@ -477,6 +541,9 @@ function buildOrderWhere(opts: AdminOrderFilters): Prisma.OrderWhereInput {
       q
         ? {
             OR: [
+              ...(/^\d+$/.test(parseOrderRef(q))
+                ? [{ orderNumber: Number(parseOrderRef(q)) }]
+                : []),
               { id: { contains: q, mode: "insensitive" } },
               { user: { fullName: { contains: q, mode: "insensitive" } } },
               { user: { email: { contains: q, mode: "insensitive" } } },
@@ -489,6 +556,8 @@ function buildOrderWhere(opts: AdminOrderFilters): Prisma.OrderWhereInput {
 }
 
 export async function findAdminOrders(opts: AdminOrderFilters = {}) {
+  await ensureOrderNumberInfrastructure();
+
   const page = opts.page ?? 1;
   const pageSize = opts.pageSize ?? 8;
   const where = buildOrderWhere(opts);
@@ -497,10 +566,7 @@ export async function findAdminOrders(opts: AdminOrderFilters = {}) {
     prisma.order.count({ where }),
     prisma.order.findMany({
       where,
-      include: {
-        user: { select: { fullName: true, name: true, email: true } },
-        items: { include: { product: true } },
-      },
+      include: orderInclude,
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -516,8 +582,10 @@ export async function findAdminOrders(opts: AdminOrderFilters = {}) {
     }),
   ]);
 
+  const hydrated = await Promise.all(rows.map((row) => backfillOrderNumberIfMissing(row)));
+
   return {
-    orders: rows.map(mapOrder),
+    orders: hydrated.map(mapOrder),
     total,
     page,
     pageSize,
@@ -703,7 +771,13 @@ export async function handlePaymentFailure(orderId: string, paymentIntentId?: st
           items: { include: { product: true } },
         },
       });
-      await notifyOrderStatusChange(tx, existing.userId, orderId, "CANCELLED");
+      await notifyOrderStatusChange(
+        tx,
+        existing.userId,
+        orderId,
+        "CANCELLED",
+        existing.orderNumber
+      );
       return { action: "cancelled" as const, order: mapOrder(row) };
     }
 

@@ -10,7 +10,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import { getOrderById, getOrders } from "@/lib/api/orders";
 import { TABLE_INITIAL_PAGE, TABLE_PAGE_SIZE, TAX_RATE } from "@/lib/constants";
 import { formatLineColor, formatLineSize } from "@/lib/product";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { displayOrderRef, formatCurrency, formatDate } from "@/lib/utils";
 import type { Order } from "@/types";
 
 import { OrdersTable } from "./OrdersTable";
@@ -172,7 +172,7 @@ function OrderDetailsContent({ order }: { order: Order | null | undefined }) {
     <div className="space-y-6">
       <div className="grid gap-4 border-b border-neutral-border pb-5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
         <Meta label="Date" value={formatDate(order.date)} />
-        <Meta label="Order #" value={order.id.slice(0, 8)} />
+        <Meta label="Order #" value={order.orderRef ?? displayOrderRef(order)} />
         <Meta label="User" value={order.userName} />
         <Meta label="Products" value={String(productCount).padStart(2, "0")} />
         <Meta label="Sub Total" value={formatCurrency(subTotal)} />

@@ -18,7 +18,7 @@ import {
 import { fetchAdminOrder } from "@/lib/api/admin";
 import { TAX_RATE } from "@/lib/constants";
 import { formatLineColor, formatLineSize } from "@/lib/product";
-import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { cn, displayOrderRef, formatCurrency, formatDate } from "@/lib/utils";
 import type { Order, OrderItem } from "@/types";
 
 const OrderStatusSelect = dynamic(
@@ -124,7 +124,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-[#e5e7eb] pb-5">
         <div className="grid flex-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
           <Meta label="Date" value={formatDate(order.date)} />
-          <Meta label="Order #" value={order.id.slice(0, 8)} />
+          <Meta label="Order #" value={order.orderRef ?? displayOrderRef(order)} />
           <Meta label="User" value={order.userName} />
           <Meta label="Number of Products" value={String(summary.units).padStart(2, "0")} />
           <Meta label="Sub Total" value={formatCurrency(summary.subTotal)} />
@@ -137,10 +137,10 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
             <span
               className={cn(
                 "inline-flex w-fit items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium",
-                order.paymentMethod === "COD"
-                  ? "bg-amber-50 text-amber-700 border-amber-200"
-                  : order.paymentStatus === "SUCCEEDED" || order.paymentStatus === "PAID"
-                    ? "bg-green-50 text-green-700 border-green-200"
+                order.paymentStatus === "SUCCEEDED" || order.paymentStatus === "PAID"
+                  ? "bg-green-50 text-green-700 border-green-200"
+                  : order.paymentMethod === "COD"
+                    ? "bg-amber-50 text-amber-700 border-amber-200"
                     : "bg-orange-50 text-orange-700 border-orange-200"
               )}
             >

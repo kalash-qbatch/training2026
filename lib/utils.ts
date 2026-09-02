@@ -135,3 +135,11 @@ export function orderStatusClass(status: string) {
 export function delay(ms = 600) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+export {
+  displayOrderRef,
+  formatOrderRef,
+  formatOrderRefDisplay,
+  orderRouteId,
+  parseOrderRef,
+} from "@/lib/order-id";

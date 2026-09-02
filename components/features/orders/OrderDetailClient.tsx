@@ -11,7 +11,14 @@ import { OrderDetailSkeleton } from "@/components/ui/skeletons/OrderDetailSkelet
 import { getOrderById } from "@/lib/api/orders";
 import { TAX_RATE } from "@/lib/constants";
 import { formatLineColor, formatLineSize } from "@/lib/product";
-import { formatCurrency, formatDate, orderStatusClass, orderStatusLabel } from "@/lib/utils";
+import {
+  displayOrderRef,
+  formatCurrency,
+  formatDate,
+  orderRouteId,
+  orderStatusClass,
+  orderStatusLabel,
+} from "@/lib/utils";
 import type { Order } from "@/types";
 
 export function OrderDetailClient({ orderId }: { orderId: string }) {
@@ -92,7 +99,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
             </p>
           </div>
           <Link
-            href={`/checkout?orderId=${order.id}`}
+            href={`/checkout?orderId=${orderRouteId(order)}`}
             className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
           >
             <CreditCard className="h-4 w-4" />
@@ -104,7 +111,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-neutral-border pb-5">
         <div className="grid flex-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
           <Meta label="Date" value={formatDate(order.date)} />
-          <Meta label="Order #" value={order.id.slice(0, 8)} />
+          <Meta label="Order #" value={order.orderRef ?? displayOrderRef(order)} />
           <Meta label="User" value={order.userName} />
           <Meta label="Products" value={String(productCount).padStart(2, "0")} />
           <Meta label="Sub Total" value={formatCurrency(subTotal)} />

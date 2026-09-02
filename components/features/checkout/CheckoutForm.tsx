@@ -8,7 +8,7 @@ import { ArrowLeft, CreditCard, Lock, MapPin, Plus, Star, Truck } from "lucide-r
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useCartStore } from "@/lib/store/useCartStore";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, orderRouteId } from "@/lib/utils";
 import type { CartItem, PaymentErrorInfo, SavedPM, UserInfo } from "@/types";
 
 const CARD_ELEMENT_OPTIONS = {
@@ -147,7 +147,7 @@ export function CheckoutForm({
           selectedItems.map((i) => ({ productId: i.productId, specificationId: i.specificationId }))
         );
       }
-      onSuccess(data.order.id, "COD");
+      onSuccess(orderRouteId(data.order), "COD");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to place order");
     } finally {
@@ -245,7 +245,7 @@ export function CheckoutForm({
           selectedItems.map((i) => ({ productId: i.productId, specificationId: i.specificationId }))
         );
       }
-      onSuccess(confirmData.order.id, "CARD");
+      onSuccess(orderRouteId(confirmData.order), "CARD");
     } catch (err) {
       const orderId = pendingOrderId ?? retryOrderId;
       if (orderId) {

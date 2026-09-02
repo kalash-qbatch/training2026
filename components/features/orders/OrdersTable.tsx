@@ -12,7 +12,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/Table";
-import { formatCurrency, formatDate, orderStatusClass, orderStatusLabel } from "@/lib/utils";
+import {
+  displayOrderRef,
+  formatCurrency,
+  formatDate,
+  orderRouteId,
+  orderStatusClass,
+  orderStatusLabel,
+} from "@/lib/utils";
 import type { Order } from "@/types";
 
 const OrderTableRow = memo(function OrderTableRow({
@@ -27,7 +34,9 @@ const OrderTableRow = memo(function OrderTableRow({
   return (
     <TableRow className="border-b border-neutral-border">
       <TableCell className="py-4 text-sm">{formatDate(order.date)}</TableCell>
-      <TableCell className="py-4 text-sm font-medium">{order.id.slice(0, 8)}</TableCell>
+      <TableCell className="py-4 text-sm font-medium">
+        {order.orderRef ?? displayOrderRef(order)}
+      </TableCell>
       <TableCell className="py-4 text-sm">{productCount}</TableCell>
       <TableCell className="py-4 text-sm font-semibold tabular-nums">
         {formatCurrency(order.amount)}
@@ -42,9 +51,9 @@ const OrderTableRow = memo(function OrderTableRow({
       <TableCell className="py-4 pr-0 text-right">
         <button
           type="button"
-          onClick={() => onViewOrder?.(order.id)}
+          onClick={() => onViewOrder?.(orderRouteId(order))}
           className="inline-flex cursor-pointer rounded-md p-2 text-neutral-muted hover:bg-brand-50 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-          aria-label={`View order ${order.id}`}
+          aria-label={`View order ${order.orderRef ?? displayOrderRef(order)}`}
         >
           <ArrowUpRight className="h-4 w-4" strokeWidth={2} />
         </button>
@@ -66,7 +75,9 @@ const OrderMobileCard = memo(function OrderMobileCard({
     <li className="rounded-lg border border-neutral-border bg-neutral-surface p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-neutral-text">{order.id.slice(0, 8)}</p>
+          <p className="text-sm font-semibold text-neutral-text">
+            {order.orderRef ?? displayOrderRef(order)}
+          </p>
           <p className="mt-1 text-xs text-neutral-muted">{formatDate(order.date)}</p>
           <p className="mt-1 text-xs text-neutral-muted">
             {productCount} product{productCount === 1 ? "" : "s"}
@@ -82,9 +93,9 @@ const OrderMobileCard = memo(function OrderMobileCard({
         </div>
         <button
           type="button"
-          onClick={() => onViewOrder?.(order.id)}
+          onClick={() => onViewOrder?.(orderRouteId(order))}
           className="rounded-md p-2 text-neutral-muted hover:bg-brand-50 hover:text-brand-600"
-          aria-label={`View order ${order.id}`}
+          aria-label={`View order ${order.orderRef ?? displayOrderRef(order)}`}
         >
           <ArrowUpRight className="h-4 w-4" />
         </button>

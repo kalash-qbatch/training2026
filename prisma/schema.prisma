@@ -118,6 +118,7 @@ model CartItem {
 
 model Order {
   id                    String        @id @default(uuid())
+  orderNumber           Int           @unique
   userId                String
   status                OrderStatus   @default(PENDING)
   paymentMethod         String        @default("CARD")

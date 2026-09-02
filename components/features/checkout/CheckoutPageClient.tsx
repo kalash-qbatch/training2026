@@ -11,6 +11,7 @@ import { CheckoutFormSkeleton } from "@/components/ui/skeletons/CheckoutFormSkel
 import { TAX_RATE } from "@/lib/constants";
 import { useAuthStore } from "@/lib/store/useAuthStore";
 import { useCartStore } from "@/lib/store/useCartStore";
+import { displayOrderRef } from "@/lib/utils";
 import type { CartItem, CheckoutStep, Order, SavedPM, UserInfo } from "@/types";
 
 import { CheckoutOrderSummary } from "./CheckoutOrderSummary";
@@ -119,7 +120,7 @@ export function CheckoutPageClient({
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
           <div className="text-sm text-amber-800">
             <p className="font-semibold">
-              Payment required for order #{retryOrder!.id.slice(0, 8)}
+              Payment required for order {retryOrder!.orderRef ?? displayOrderRef(retryOrder!)}
             </p>
             <p className="mt-0.5">
               Your order is placed and items are reserved. Choose a payment method below to complete
