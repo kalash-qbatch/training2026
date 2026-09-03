@@ -83,7 +83,7 @@ export function mapProduct(row: DbProductRow): Product {
 
 function mapStatus(status: DbOrderStatus): OrderStatus {
   const map: Record<DbOrderStatus, OrderStatus> = {
-    PENDING: "processing",
+    PENDING: "pending",
     PROCESSING: "processing",
     SHIPPED: "shipped",
     DELIVERED: "delivered",
@@ -114,6 +114,16 @@ export function mapOrder(row: DbOrderWithRelations): Order {
   const subTotal = Number(row.subTotal);
   const tax = Number(row.tax);
   const rawPaymentStatus = (row as { paymentStatus?: Order["paymentStatus"] }).paymentStatus;
+  const paymentStatus = resolvePaymentStatus(row.status, rawPaymentStatus);
+  let status = mapStatus(row.status);
+  // Unpaid / failed card payment → show Pending (not In Progress)
+  if (
+    status === "processing" &&
+    (paymentStatus === "FAILED" || paymentStatus === "PENDING" || paymentStatus === "UNPAID") &&
+    (row as { paymentMethod?: string }).paymentMethod !== "COD"
+  ) {
+    status = "pending";
+  }
   return {
     id: row.id,
     orderNumber: row.orderNumber,
@@ -125,9 +135,9 @@ export function mapOrder(row: DbOrderWithRelations): Order {
     amount: Number(row.total),
     subTotal,
     tax,
-    status: mapStatus(row.status),
+    status,
     paymentMethod: (row as { paymentMethod?: string }).paymentMethod === "COD" ? "COD" : "CARD",
-    paymentStatus: resolvePaymentStatus(row.status, rawPaymentStatus),
+    paymentStatus,
     paymentAttemptCount: (row as { paymentAttemptCount?: number }).paymentAttemptCount ?? 0,
     maxPaymentAttempts: (row as { maxPaymentAttempts?: number }).maxPaymentAttempts ?? 3,
     shipping: (row as { shippingFullName?: string | null }).shippingFullName

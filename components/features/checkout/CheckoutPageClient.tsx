@@ -40,10 +40,12 @@ export function CheckoutPageClient({
   selectedItems: propItems,
   savedPMs,
   retryOrder,
+  savedShipping,
 }: {
   selectedItems: CartItem[];
   savedPMs: SavedPM[];
   retryOrder?: Order | null;
+  savedShipping?: UserInfo | null;
 }) {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
@@ -60,13 +62,25 @@ export function CheckoutPageClient({
   const total = isRetry ? retryOrder!.amount : Number((subtotal + tax).toFixed(2));
 
   const [step, setStep] = useState<CheckoutStep>(isRetry ? 2 : 1);
-  const [userInfo, setUserInfo] = useState<UserInfo>({
-    fullName: retryOrder?.shipping?.fullName ?? user?.fullName ?? "",
-    email: retryOrder?.shipping?.email ?? user?.email ?? "",
-    phone: retryOrder?.shipping?.phone ?? user?.mobile ?? "",
-    address: retryOrder?.shipping?.address ?? "",
-    city: retryOrder?.shipping?.city ?? "",
-    postalCode: retryOrder?.shipping?.postalCode ?? "",
+  const [userInfo, setUserInfo] = useState<UserInfo>(() => {
+    if (isRetry && retryOrder) {
+      return {
+        fullName: retryOrder.shipping?.fullName ?? user?.fullName ?? "",
+        email: retryOrder.shipping?.email ?? user?.email ?? "",
+        phone: retryOrder.shipping?.phone ?? user?.mobile ?? "",
+        address: retryOrder.shipping?.address ?? "",
+        city: retryOrder.shipping?.city ?? "",
+        postalCode: retryOrder.shipping?.postalCode ?? "",
+      };
+    }
+    return {
+      fullName: savedShipping?.fullName || user?.fullName || "",
+      email: savedShipping?.email || user?.email || "",
+      phone: savedShipping?.phone || user?.mobile || "",
+      address: savedShipping?.address || "",
+      city: savedShipping?.city || "",
+      postalCode: savedShipping?.postalCode || "",
+    };
   });
 
   if (!user) {

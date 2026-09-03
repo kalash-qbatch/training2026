@@ -116,7 +116,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
           <div>
             <p className="text-sm font-semibold text-neutral-text">Order cancelled</p>
             <p className="mt-0.5 text-sm text-neutral-muted">
-              Want these items again? We&apos;ll check stock and take you to checkout.
+              Want these items again? We&apos;ll check stock and add them to your cart.
             </p>
           </div>
           <OrderAgainButton orderId={order.id} />

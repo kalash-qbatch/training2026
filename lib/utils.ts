@@ -95,6 +95,8 @@ export function orderStatusLabel(status: string) {
       return "Approved";
     case "cancelled":
       return "Cancelled";
+    case "pending":
+      return "Pending";
     default:
       return "In Progress";
   }
@@ -127,6 +129,8 @@ export function orderStatusClass(status: string) {
       return "bg-[#2563EB] text-white";
     case "cancelled":
       return "bg-[#EF4444] text-white";
+    case "pending":
+      return "bg-[#F59E0B] text-white";
     default:
       return "bg-[#F59E0B] text-white";
   }

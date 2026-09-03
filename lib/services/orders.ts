@@ -194,7 +194,8 @@ export async function createOrder(
 
       const paymentMethod = opts?.paymentMethod ?? "CARD";
       const paymentStatus = opts?.paymentStatus ?? "PENDING";
-      const orderStatus = opts?.orderStatus ?? "PROCESSING";
+      // Card orders stay PENDING until payment succeeds; COD starts as PROCESSING.
+      const orderStatus = opts?.orderStatus ?? (paymentMethod === "COD" ? "PROCESSING" : "PENDING");
       const orderNumber = await allocateOrderNumber(tx);
 
       const order = await tx.order.create({
@@ -279,6 +280,37 @@ export async function findOrders(
     total,
     page,
     pageSize,
+  };
+}
+
+/** Last delivery address the user submitted (any order with shipping filled). */
+export async function findLatestShippingForUser(userId: string): Promise<ShippingInfo | null> {
+  const row = await prisma.order.findFirst({
+    where: {
+      userId,
+      shippingFullName: { not: null },
+      NOT: { shippingFullName: "" },
+    },
+    orderBy: { createdAt: "desc" },
+    select: {
+      shippingFullName: true,
+      shippingEmail: true,
+      shippingPhone: true,
+      shippingAddress: true,
+      shippingCity: true,
+      shippingPostalCode: true,
+    },
+  });
+
+  if (!row?.shippingFullName) return null;
+
+  return {
+    fullName: row.shippingFullName,
+    email: row.shippingEmail ?? "",
+    phone: row.shippingPhone ?? "",
+    address: row.shippingAddress ?? "",
+    city: row.shippingCity ?? "",
+    postalCode: row.shippingPostalCode ?? "",
   };
 }
 
@@ -810,6 +842,7 @@ export async function handlePaymentFailure(orderId: string, paymentIntentId?: st
     const row = await tx.order.update({
       where: { id: orderId },
       data: {
+        status: "PENDING",
         paymentStatus: "FAILED",
         paymentAttemptCount: newAttemptCount,
         nextPaymentRetryAt: nextRetry,

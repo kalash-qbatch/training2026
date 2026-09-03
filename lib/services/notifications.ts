@@ -34,6 +34,11 @@ export function statusNotificationCopy(status: OrderStatus): {
         title: "Order in progress",
         message: "Your order is in progress.",
       };
+    case "PENDING":
+      return {
+        title: "Payment pending",
+        message: "Your order is pending payment.",
+      };
     default:
       return {
         title: "Order updated",

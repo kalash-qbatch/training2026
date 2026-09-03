@@ -21,7 +21,7 @@ export function OrderAgainButton({ orderId }: { orderId: string }) {
     try {
       const items = await reorderCancelledOrder(orderId);
       setItems(items);
-      router.push("/checkout");
+      router.push("/cart");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not reorder");
     } finally {
