@@ -81,9 +81,9 @@ const AdminOrderRow = memo(function AdminOrderRow({ order }: { order: Order }) {
       <TableCell>{productCount}</TableCell>
       <TableCell className="font-medium tabular-nums">{formatCurrency(order.amount)}</TableCell>
       <TableCell>
-        <div className="flex flex-col gap-1">
-          <span className="text-[11px] text-neutral-muted">
-            {order.paymentMethod === "COD" ? "COD" : "Card"}
+        <div className="flex items-center gap-1">
+          <span className="text-[13px] font-bold text-neutral-600">
+            {order.paymentMethod === "COD" ? "COD" : "Card"}:
           </span>
           <span
             className={`inline-flex w-fit rounded border px-2 py-0.5 text-[11px] font-semibold ${paymentStatusClass(order.paymentStatus)}`}
