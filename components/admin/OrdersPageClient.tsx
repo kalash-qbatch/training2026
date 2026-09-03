@@ -26,6 +26,8 @@ import {
   orderRouteId,
   orderStatusClass,
   orderStatusLabel,
+  paymentStatusClass,
+  paymentStatusLabel,
 } from "@/lib/utils";
 import type { AdminOrderStats, Order } from "@/types";
 
@@ -78,6 +80,18 @@ const AdminOrderRow = memo(function AdminOrderRow({ order }: { order: Order }) {
       <TableCell>{order.userName}</TableCell>
       <TableCell>{productCount}</TableCell>
       <TableCell className="font-medium tabular-nums">{formatCurrency(order.amount)}</TableCell>
+      <TableCell>
+        <div className="flex flex-col gap-1">
+          <span className="text-[11px] text-neutral-muted">
+            {order.paymentMethod === "COD" ? "COD" : "Card"}
+          </span>
+          <span
+            className={`inline-flex w-fit rounded border px-2 py-0.5 text-[11px] font-semibold ${paymentStatusClass(order.paymentStatus)}`}
+          >
+            {paymentStatusLabel(order.paymentStatus)}
+          </span>
+        </div>
+      </TableCell>
       <TableCell>
         <span
           className={`inline-flex rounded px-2.5 py-1 text-[11px] font-semibold ${orderStatusClass(order.status)}`}
@@ -193,15 +207,16 @@ export function OrdersPageClient() {
             <TableHead>User</TableHead>
             <TableHead>Number of Product(s)</TableHead>
             <TableHead>Amount</TableHead>
+            <TableHead>Payment</TableHead>
             <TableHead>Status</TableHead>
             <TableHead className="pr-0">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {loading ? (
-            <AdminTableBodySkeleton rows={6} columns={7} />
+            <AdminTableBodySkeleton rows={6} columns={8} />
           ) : !orders.length ? (
-            <TableEmpty colSpan={7}>No orders found</TableEmpty>
+            <TableEmpty colSpan={8}>No orders found</TableEmpty>
           ) : (
             orders.map((o) => <AdminOrderRow key={o.id} order={o} />)
           )}

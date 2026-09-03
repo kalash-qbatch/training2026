@@ -520,8 +520,7 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
       throw new OrderError("Order not found", 404);
     }
 
-    // Block status changes for card orders where payment is not yet completed,
-    // except cancellation (e.g. after all payment retries fail).
+    // Card unpaid/failed → Cancel only
     if (
       existing.paymentMethod === "CARD" &&
       existing.paymentStatus !== "SUCCEEDED" &&
@@ -532,6 +531,15 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
         "Cannot update order status for card payments until payment is successfully completed.",
         400
       );
+    }
+
+    // Card paid → Approve/Deliver only (no Cancel)
+    if (
+      existing.paymentMethod === "CARD" &&
+      (existing.paymentStatus === "SUCCEEDED" || existing.paymentStatus === "PAID") &&
+      status === "CANCELLED"
+    ) {
+      throw new OrderError("Cannot cancel a card order after payment has succeeded.", 400);
     }
 
     const wasCancelled = existing.status === "CANCELLED";

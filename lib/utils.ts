@@ -136,6 +136,40 @@ export function orderStatusClass(status: string) {
   }
 }
 
+export function paymentStatusLabel(status: string) {
+  switch (status) {
+    case "SUCCEEDED":
+    case "PAID":
+      return "Paid";
+    case "FAILED":
+      return "Failed";
+    case "PROCESSING":
+      return "Processing";
+    case "REFUNDED":
+      return "Refunded";
+    case "UNPAID":
+      return "Unpaid";
+    default:
+      return "Pending";
+  }
+}
+
+export function paymentStatusClass(status: string) {
+  switch (status) {
+    case "SUCCEEDED":
+    case "PAID":
+      return "bg-green-50 text-green-700 border-green-200";
+    case "FAILED":
+      return "bg-red-50 text-red-700 border-red-200";
+    case "PROCESSING":
+      return "bg-blue-50 text-blue-700 border-blue-200";
+    case "REFUNDED":
+      return "bg-gray-100 text-gray-600 border-gray-200";
+    default:
+      return "bg-amber-50 text-amber-700 border-amber-200";
+  }
+}
+
 export function delay(ms = 600) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

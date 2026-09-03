@@ -5,8 +5,7 @@ import { useState } from "react";
 import { Select } from "@/components/ui/Select";
 import { useToast } from "@/components/ui/Toast";
 import { type AdminOrderStatusUpdate, updateAdminOrderStatus } from "@/lib/api/admin";
-import { toAdminOrderStatus } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { cn, toAdminOrderStatus } from "@/lib/utils";
 import type { Order } from "@/types";
 
 type Props = {
@@ -16,24 +15,19 @@ type Props = {
 };
 
 /**
- * Status step workflow (admin-only):
+ * Status workflow:
+ *  PROCESSING/PENDING ──Approve──▶ SHIPPED ──Deliver──▶ DELIVERED
+ *         │                          │
+ *         └──────────Cancel──────────┘ (COD always; card only if unpaid/failed)
  *
- *  PROCESSING ──Approve──▶ SHIPPED ──Deliver──▶ DELIVERED  (terminal)
- *       │                     │
- *       └──Cancel──▶ CANCELLED (terminal)
- *
- * Rules:
- *  - PROCESSING : Approve + Cancel enabled
- *  - SHIPPED    : Deliver + Cancel enabled; Approve disabled
- *  - DELIVERED  : all actions disabled
- *  - CANCELLED  : all actions disabled
+ * Card unpaid/failed → Cancel only
+ * Card paid → Approve + Deliver (no Cancel)
+ * COD → Approve + Deliver + Cancel
  */
 
 type Step = {
-  /** The Prisma status this step transitions TO */
   value: AdminOrderStatusUpdate;
   label: string;
-  /** Which current statuses allow clicking this action */
   enabledFrom: AdminOrderStatusUpdate[];
 };
 
@@ -69,6 +63,24 @@ const STATUS_BADGE: Record<AdminOrderStatusUpdate, string> = {
   CANCELLED: "bg-red-50 text-red-700 border-red-200",
 };
 
+function isCardPaid(order: Order) {
+  return (
+    order.paymentMethod === "CARD" &&
+    (order.paymentStatus === "SUCCEEDED" || order.paymentStatus === "PAID")
+  );
+}
+
+function isCardUnpaid(order: Order) {
+  return order.paymentMethod === "CARD" && !isCardPaid(order);
+}
+
+function isStepAllowed(order: Order, current: AdminOrderStatusUpdate, step: Step): boolean {
+  if (!step.enabledFrom.includes(current)) return false;
+  if (isCardUnpaid(order)) return step.value === "CANCELLED";
+  if (isCardPaid(order)) return step.value !== "CANCELLED";
+  return true;
+}
+
 export function OrderStatusSelect({ order, onUpdated, className }: Props) {
   const { toast } = useToast();
   const [value, setValue] = useState<AdminOrderStatusUpdate>(toAdminOrderStatus(order.status));
@@ -76,8 +88,6 @@ export function OrderStatusSelect({ order, onUpdated, className }: Props) {
   const [prevStatus, setPrevStatus] = useState(order.status);
   const [prevOrderId, setPrevOrderId] = useState(order.id);
 
-  // Sync value during render when the order prop changes
-  // (https://react.dev/learn/you-might-not-need-an-effect)
   if (order.status !== prevStatus || order.id !== prevOrderId) {
     setPrevStatus(order.status);
     setPrevOrderId(order.id);
@@ -85,14 +95,16 @@ export function OrderStatusSelect({ order, onUpdated, className }: Props) {
   }
 
   const isTerminal = value === "DELIVERED" || value === "CANCELLED";
-  const isCardPayment = order.paymentMethod === "CARD";
-  const isPaymentSuccessful = order.paymentStatus === "SUCCEEDED" || order.paymentStatus === "PAID";
-  const isCardPaymentLocked = isCardPayment && !isPaymentSuccessful;
+  const showPendingBadge = order.status === "pending" && value === "PROCESSING";
+
+  const options = STEPS.map((step) => ({
+    ...step,
+    disabled: saving || !isStepAllowed(order, value, step),
+  }));
 
   async function handleStep(step: Step) {
-    if (saving || isCardPaymentLocked) return;
-    const isEnabled = step.enabledFrom.includes(value);
-    if (!isEnabled || isTerminal) return;
+    if (saving || isTerminal) return;
+    if (!isStepAllowed(order, value, step)) return;
 
     const prev = value;
     setValue(step.value);
@@ -115,48 +127,41 @@ export function OrderStatusSelect({ order, onUpdated, className }: Props) {
       <span
         className={cn(
           "inline-flex w-fit items-center rounded-full border px-3 py-1 text-[11px] font-semibold",
-          STATUS_BADGE[value]
+          showPendingBadge ? "bg-amber-50 text-amber-700 border-amber-200" : STATUS_BADGE[value]
         )}
       >
-        {STATUS_LABEL[value]}
-        {saving && (
+        {showPendingBadge ? "Pending" : STATUS_LABEL[value]}
+        {saving ? (
           <span className="ml-1.5 inline-block h-2.5 w-2.5 animate-spin rounded-full border border-current border-t-transparent" />
-        )}
+        ) : null}
       </span>
 
-      {isCardPaymentLocked && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800">
-          ⚠️ Card payment is <span className="font-semibold">{order.paymentStatus}</span>. Order
-          status change is locked until payment succeeds.
-        </div>
-      )}
-
-      {!isTerminal && !isCardPaymentLocked && (
+      {!isTerminal ? (
         <Select
           value=""
           placeholder="Update status"
           ariaLabel="Change order status"
           disabled={saving}
           className="min-w-40"
-          options={STEPS.map((step) => ({
+          options={options.map((step) => ({
             value: step.value,
             label: step.label,
-            disabled: !step.enabledFrom.includes(value) || saving,
+            disabled: step.disabled,
           }))}
           onChange={(next) => {
-            const step = STEPS.find((s) => s.value === next);
-            if (step) handleStep(step);
+            const step = options.find((s) => s.value === next);
+            if (step && !step.disabled) handleStep(step);
           }}
         />
-      )}
+      ) : null}
 
-      {isTerminal && (
+      {isTerminal ? (
         <p className="text-[11px] text-neutral-muted">
           {value === "DELIVERED"
             ? "Order has been delivered. No further actions available."
             : "Order has been cancelled. No further actions available."}
         </p>
-      )}
+      ) : null}
     </div>
   );
 }

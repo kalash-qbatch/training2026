@@ -18,7 +18,14 @@ import {
 import { fetchAdminOrder } from "@/lib/api/admin";
 import { TAX_RATE } from "@/lib/constants";
 import { formatLineColor, formatLineSize } from "@/lib/product";
-import { cn, displayOrderRef, formatCurrency, formatDate } from "@/lib/utils";
+import {
+  cn,
+  displayOrderRef,
+  formatCurrency,
+  formatDate,
+  paymentStatusClass,
+  paymentStatusLabel,
+} from "@/lib/utils";
 import type { Order, OrderItem } from "@/types";
 
 const OrderStatusSelect = dynamic(
@@ -137,14 +144,11 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
             <span
               className={cn(
                 "inline-flex w-fit items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium",
-                order.paymentStatus === "SUCCEEDED" || order.paymentStatus === "PAID"
-                  ? "bg-green-50 text-green-700 border-green-200"
-                  : order.paymentMethod === "COD"
-                    ? "bg-amber-50 text-amber-700 border-amber-200"
-                    : "bg-orange-50 text-orange-700 border-orange-200"
+                paymentStatusClass(order.paymentStatus)
               )}
             >
-              {order.paymentMethod === "COD" ? "COD" : "CARD"}: {order.paymentStatus || "PENDING"}
+              {order.paymentMethod === "COD" ? "COD" : "Card"} ·{" "}
+              {paymentStatusLabel(order.paymentStatus)}
             </span>
           </div>
           <div className="flex flex-col gap-2">
