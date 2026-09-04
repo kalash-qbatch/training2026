@@ -13,18 +13,29 @@ import type { Category, Product } from "@/types";
 import { ProductCard } from "./ProductCard";
 import { ProductGridSkeleton } from "./ProductGridSkeleton";
 
-export function ProductListing() {
-  const [products, setProducts] = useState<Product[]>([]);
+export function ProductListing({
+  initialProducts = [],
+  initialTotalPages = 1,
+  initialCategories = [],
+  hydrateFromServer = false,
+}: {
+  initialProducts?: Product[];
+  initialTotalPages?: number;
+  initialCategories?: Category[];
+  /** When true, skip client refetch for the default listing (SSR already loaded it). */
+  hydrateFromServer?: boolean;
+} = {}) {
+  const [products, setProducts] = useState<Product[]>(initialProducts);
   const [startPage, setStartPage] = useState(1);
   const [endPage, setEndPage] = useState(1);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [sort, setSort] = useState<ProductSort>("name-asc");
   const [categoryId, setCategoryId] = useState("");
 
-  const [totalPages, setTotalPages] = useState(1);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [totalPages, setTotalPages] = useState(initialTotalPages);
+  const [initialLoading, setInitialLoading] = useState(!hydrateFromServer);
   const [loadingMoreDown, setLoadingMoreDown] = useState(false);
   const [loadingMoreUp, setLoadingMoreUp] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,12 +55,13 @@ export function ProductListing() {
     return () => window.clearTimeout(t);
   }, [search]);
 
-  // Load categories once
+  // Load categories only if server did not provide them
   useEffect(() => {
+    if (initialCategories.length > 0) return;
     void getCategories()
       .then(setCategories)
       .catch(() => setCategories([]));
-  }, []);
+  }, [initialCategories.length]);
 
   // Fetch a page of products
   const fetchPage = useCallback(
@@ -188,13 +200,17 @@ export function ProductListing() {
     setEndPage(1);
   }
 
-  // When filters change: trigger fetch for first page and reset page state
+  // Fetch when filters change. If SSR already seeded the default listing, don't refetch it.
   useEffect(() => {
+    const isDefaultListing = debounced === "" && sort === "name-asc" && categoryId === "";
+    if (hydrateFromServer && isDefaultListing) {
+      return;
+    }
     const id = window.setTimeout(() => {
       void fetchPage(CARD_INITIAL_PAGE, true);
     }, 0);
     return () => window.clearTimeout(id);
-  }, [debounced, sort, categoryId, fetchPage]);
+  }, [debounced, sort, categoryId, fetchPage, hydrateFromServer]);
 
   // Scroll anchoring adjustment
   useLayoutEffect(() => {

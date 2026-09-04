@@ -54,7 +54,11 @@ export function Navbar() {
       <div
         className={`mx-auto flex items-center justify-between px-4 sm:px-6 h-12 lg:px-8 ${showLoggedInChrome ? "py-1" : "py-3.5"}`}
       >
-        <Link href="/products" className="text-[15px] font-semibold tracking-tight text-[#333333]">
+        <Link
+          href="/products"
+          prefetch={false}
+          className="text-[15px] font-semibold tracking-tight text-[#333333]"
+        >
           Bhai ka Store
         </Link>
 

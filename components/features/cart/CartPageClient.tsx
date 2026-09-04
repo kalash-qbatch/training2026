@@ -67,6 +67,7 @@ export function CartPageClient() {
         <div className="mb-6 flex items-center gap-2">
           <Link
             href="/products"
+            prefetch={false}
             className="inline-flex items-center gap-2 text-lg font-semibold text-brand-600 hover:text-brand-700"
           >
             <ArrowLeft className="h-5 w-5" strokeWidth={2.25} />
@@ -78,6 +79,7 @@ export function CartPageClient() {
           description="Browse products and add items to your cart."
           ctaHref="/products"
           ctaLabel="Browse products"
+          ctaPrefetch={false}
         />
       </section>
     );
@@ -88,6 +90,7 @@ export function CartPageClient() {
       <div className="mb-6 flex items-center justify-between gap-2">
         <Link
           href="/products"
+          prefetch={false}
           className="inline-flex items-center gap-2 text-lg font-semibold text-brand-600 hover:text-brand-700"
         >
           <ArrowLeft className="h-5 w-5" strokeWidth={2.25} />

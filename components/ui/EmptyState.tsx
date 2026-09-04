@@ -8,11 +8,13 @@ export function EmptyState({
   description,
   ctaHref,
   ctaLabel,
+  ctaPrefetch = true,
 }: {
   title: string;
   description?: string;
   ctaHref?: string;
   ctaLabel?: string;
+  ctaPrefetch?: boolean;
 }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-neutral-border bg-neutral-surface px-6 py-16 text-center">
@@ -22,7 +24,7 @@ export function EmptyState({
         <p className="mt-1 max-w-sm text-sm text-neutral-muted">{description}</p>
       ) : null}
       {ctaHref && ctaLabel ? (
-        <Link href={ctaHref} className="mt-5 w-full max-w-xs">
+        <Link href={ctaHref} prefetch={ctaPrefetch} className="mt-5 w-full max-w-xs">
           <Button type="button">{ctaLabel}</Button>
         </Link>
       ) : null}
