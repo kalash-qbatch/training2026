@@ -126,9 +126,35 @@ export function CheckoutForm({
     quantity: i.qty,
   }));
 
+  /** Refresh cart and ensure each line still has enough stock before placing. */
+  async function assertStockAvailable() {
+    if (retryOrderId) return; // stock already reserved for retry orders
+    await fetchCart();
+    const fresh = useCartStore.getState().items;
+    for (const line of selectedItems) {
+      const match = fresh.find(
+        (i) =>
+          i.productId === line.productId &&
+          (i.specificationId || "") === (line.specificationId || "")
+      );
+      if (!match) {
+        throw new Error(`"${line.name}" is no longer in your cart`);
+      }
+      const stock = match.stock ?? 0;
+      if (line.qty > stock) {
+        throw new Error(
+          stock <= 0
+            ? `"${line.name}" is out of stock`
+            : `Not enough stock for "${line.name}". Only ${stock} left.`
+        );
+      }
+    }
+  }
+
   async function handleCOD() {
     setPlacing(true);
     try {
+      await assertStockAvailable();
       const res = await fetch("/api/checkout/confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -160,6 +186,7 @@ export function CheckoutForm({
     const activeOrderId = pendingOrderId ?? retryOrderId;
 
     try {
+      await assertStockAvailable();
       const useExistingPm = selectedPmId !== "new" && selectedPmId !== "";
 
       const intentRes = await fetch("/api/checkout/create-intent", {

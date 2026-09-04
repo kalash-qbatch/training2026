@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { mockCartItem } from "@/__tests__/mocks/data/cart";
@@ -23,7 +23,7 @@ describe("CartPageClient", () => {
       loaded: true,
       setItems: useCartStore.getState().setItems,
       clearLocal: useCartStore.getState().clearLocal,
-      fetchCart: useCartStore.getState().fetchCart,
+      fetchCart: jest.fn().mockResolvedValue(undefined),
       getCartQty: useCartStore.getState().getCartQty,
       addItem: useCartStore.getState().addItem,
       updateQty: jest.fn().mockResolvedValue(undefined),
@@ -65,12 +65,19 @@ describe("CartPageClient", () => {
         role: "USER",
       },
     });
-    useCartStore.setState({ items: [mockCartItem] });
+    useCartStore.setState({
+      items: [mockCartItem],
+      fetchCart: jest.fn().mockImplementation(async () => {
+        useCartStore.setState({ items: [mockCartItem] });
+      }),
+    });
 
     renderWithProviders(<CartPageClient />);
 
     await user.click(screen.getByRole("button", { name: /proceed to checkout/i }));
 
-    expect(mockPush).toHaveBeenCalledWith("/checkout");
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith("/checkout");
+    });
   });
 });

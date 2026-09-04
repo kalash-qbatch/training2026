@@ -36,10 +36,12 @@ export function CartPageClient() {
   const items = useCartStore((s) => s.items);
   const updateQty = useCartStore((s) => s.updateQty);
   const removeItem = useCartStore((s) => s.removeItem);
-  const clearCart = useCartStore((s) => s.clearCart);
+  const removeItems = useCartStore((s) => s.removeItems);
+  const fetchCart = useCartStore((s) => s.fetchCart);
 
   const [pendingRemove, setPendingRemove] = useState<CartItem | null>(null);
-  const [pendingClearAll, setPendingClearAll] = useState(false);
+  const [pendingClearSelected, setPendingClearSelected] = useState(false);
+  const [checkingOut, setCheckingOut] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(() => new Set(items.map(itemKey)));
   const [prevItems, setPrevItems] = useState(items);
 
@@ -96,13 +98,13 @@ export function CartPageClient() {
           <ArrowLeft className="h-5 w-5" strokeWidth={2.25} />
           Your Shopping Bag
         </Link>
-        {items.length > 1 ? (
+        {selectedItems.length > 0 ? (
           <button
             type="button"
-            onClick={() => setPendingClearAll(true)}
+            onClick={() => setPendingClearSelected(true)}
             className="text-sm font-medium text-[#EF4444] hover:underline"
           >
-            Remove all
+            {allSelected ? "Remove all" : "Remove selected"}
           </button>
         ) : null}
       </div>
@@ -199,8 +201,8 @@ export function CartPageClient() {
           subtotal={subtotal}
           tax={tax}
           total={total}
-          disabled={selectedItems.length === 0}
-          loading={false}
+          disabled={selectedItems.length === 0 || checkingOut}
+          loading={checkingOut}
           onPlaceOrder={() => {
             if (!user) {
               router.push("/login?next=/checkout");
@@ -210,7 +212,38 @@ export function CartPageClient() {
               toast.error("Select at least one item to proceed to checkout");
               return;
             }
-            router.push("/checkout");
+            setCheckingOut(true);
+            void (async () => {
+              try {
+                await fetchCart();
+                const fresh = useCartStore.getState().items;
+                for (const item of selectedItems) {
+                  const match = fresh.find(
+                    (i) =>
+                      i.productId === item.productId &&
+                      (i.specificationId || "") === (item.specificationId || "")
+                  );
+                  if (!match) {
+                    toast.error(`"${item.name}" is no longer in your bag`);
+                    return;
+                  }
+                  const stock = match.stock ?? 0;
+                  if (item.qty > stock) {
+                    toast.error(
+                      stock <= 0
+                        ? `"${item.name}" is out of stock`
+                        : `Not enough stock for "${item.name}". Only ${stock} left.`
+                    );
+                    return;
+                  }
+                }
+                router.push("/checkout");
+              } catch (err: unknown) {
+                toast.error(err instanceof Error ? err.message : "Failed to validate stock");
+              } finally {
+                setCheckingOut(false);
+              }
+            })();
           }}
         />
       </div>
@@ -230,16 +263,30 @@ export function CartPageClient() {
         }}
       />
       <RemoveProductModal
-        open={pendingClearAll}
-        onClose={() => setPendingClearAll(false)}
-        title="Remove all products?"
-        description="Are you sure you want to remove all items from your bag?"
+        open={pendingClearSelected}
+        onClose={() => setPendingClearSelected(false)}
+        title={allSelected ? "Remove all products?" : "Remove selected products?"}
+        description={
+          allSelected
+            ? "Are you sure you want to remove all items from your bag?"
+            : `Are you sure you want to remove ${selectedItems.length} selected item${selectedItems.length === 1 ? "" : "s"}? Unselected items will stay in your bag.`
+        }
         onConfirm={() => {
-          setPendingClearAll(false);
-          void clearCart()
-            .then(() => toast.success("Bag cleared"))
+          const toRemove = selectedItems.map((i) => ({
+            productId: i.productId,
+            specificationId: i.specificationId,
+          }));
+          setPendingClearSelected(false);
+          void removeItems(toRemove)
+            .then(() =>
+              toast.success(
+                allSelected
+                  ? "Bag cleared"
+                  : `${toRemove.length} item${toRemove.length === 1 ? "" : "s"} removed`
+              )
+            )
             .catch((err: unknown) =>
-              toast.error(err instanceof Error ? err.message : "Failed to clear bag")
+              toast.error(err instanceof Error ? err.message : "Failed to remove items")
             );
         }}
       />

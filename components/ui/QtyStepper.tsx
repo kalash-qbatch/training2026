@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Minus, Plus } from "lucide-react";
 
@@ -17,19 +17,30 @@ type QtyStepperProps = {
 
 export function QtyStepper({ value, onChange, min = 1, max, className }: QtyStepperProps) {
   const { toast } = useToast();
+  const [local, setLocal] = useState(value);
   const [draft, setDraft] = useState<string | null>(null);
+
+  useEffect(() => {
+    setTimeout(() => {
+      setLocal(value);
+    }, 0);
+  }, [value]);
+
+  const display = draft ?? local;
   const cell =
     "flex h-8.5 w-8.5 shrink-0 items-center justify-center border border-neutral-border bg-white text-[13px]";
-  const atMin = value <= min;
-  const atMax = max != null && value >= max;
+  const atMin = local <= min;
+  const atMax = max != null && local >= max;
 
   function apply(next: number) {
     if (max != null && next > max) {
       toast.error(`Only ${max} in stock`);
+      setLocal(max);
       onChange(max);
       return max;
     }
     const clamped = Math.max(min, next);
+    setLocal(clamped);
     onChange(clamped);
     return clamped;
   }
@@ -42,22 +53,26 @@ export function QtyStepper({ value, onChange, min = 1, max, className }: QtyStep
     if (max != null && next > max) {
       toast.error(`Only ${max} in stock`);
       setDraft(String(max));
+      setLocal(max);
       onChange(max);
       return;
     }
     if (next < min) {
       toast.error("Quantity must be at least 1");
       setDraft(String(min));
+      setLocal(min);
       onChange(min);
       return;
     }
+    setLocal(next);
     onChange(next);
   }
 
   function handleBlur() {
-    const next = Number(draft ?? value);
     if (draft == null) return;
+    const next = Number(draft);
     if (draft.trim() === "" || !Number.isFinite(next)) {
+      setLocal(min);
       onChange(min);
     } else {
       apply(next);
@@ -77,7 +92,7 @@ export function QtyStepper({ value, onChange, min = 1, max, className }: QtyStep
         disabled={atMin}
         onClick={() => {
           setDraft(null);
-          onChange(Math.max(min, value - 1));
+          apply(local - 1);
         }}
       >
         <Minus className="h-3.5 w-3.5" strokeWidth={2.5} />
@@ -86,7 +101,7 @@ export function QtyStepper({ value, onChange, min = 1, max, className }: QtyStep
         type="number"
         min={min}
         max={max}
-        value={draft ?? value}
+        value={display}
         onChange={(e) => handleInputChange(e.target.value)}
         onBlur={handleBlur}
         onKeyDown={(e) => {
@@ -107,8 +122,7 @@ export function QtyStepper({ value, onChange, min = 1, max, className }: QtyStep
         disabled={atMax}
         onClick={() => {
           setDraft(null);
-          const next = value + 1;
-          onChange(max != null ? Math.min(max, next) : next);
+          apply(local + 1);
         }}
       >
         <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />

@@ -17,6 +17,14 @@ function matchesLine(item: CartItem, productId: string, specificationId?: string
   return item.productId === productId && (item.specificationId || "") === (specificationId || "");
 }
 
+function lineKey(productId: string, specificationId?: string) {
+  return `${productId}::${specificationId || ""}`;
+}
+
+/** One queued PATCH per click (sequential, no coalesce). */
+const qtyQueues = new Map<string, number[]>();
+const inflightQty = new Set<string>();
+
 export const useCartStore = create<CartState>()((set, get) => ({
   items: [],
   loaded: false,
@@ -54,12 +62,50 @@ export const useCartStore = create<CartState>()((set, get) => ({
   },
   updateQty: async (productId, qty, specificationId) => {
     const specId = specificationId?.trim() || undefined;
-    const items = await updateCartItemApi({
-      productId,
-      specificationId: specId,
-      quantity: qty,
+    const key = lineKey(productId, specId);
+
+    // Instant UI — each click updates local qty immediately
+    set({
+      items: get().items.map((i) => (matchesLine(i, productId, specId) ? { ...i, qty } : i)),
     });
-    set({ items, loaded: true });
+
+    const queue = qtyQueues.get(key) ?? [];
+    queue.push(qty);
+    qtyQueues.set(key, queue);
+
+    if (inflightQty.has(key)) return;
+    inflightQty.add(key);
+
+    try {
+      while ((qtyQueues.get(key)?.length ?? 0) > 0) {
+        const nextQty = qtyQueues.get(key)!.shift()!;
+        try {
+          const items = await updateCartItemApi({
+            productId,
+            specificationId: specId,
+            quantity: nextQty,
+          });
+          // Keep optimistic qty if more clicks are still queued
+          if ((qtyQueues.get(key)?.length ?? 0) === 0) {
+            set({ items, loaded: true });
+          }
+        } catch (err) {
+          qtyQueues.delete(key);
+          try {
+            const items = await fetchCart();
+            set({ items, loaded: true });
+          } catch {
+            /* keep optimistic state if refetch fails */
+          }
+          throw err;
+        }
+      }
+    } finally {
+      inflightQty.delete(key);
+      if ((qtyQueues.get(key)?.length ?? 0) === 0) {
+        qtyQueues.delete(key);
+      }
+    }
   },
   removeItem: async (productId, specificationId) => {
     const specId = specificationId?.trim() || undefined;
