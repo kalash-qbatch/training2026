@@ -419,20 +419,20 @@ export async function deleteProduct(id: string): Promise<{ deactivated: boolean 
 
   const ordered = await prisma.orderItem.count({ where: { productId: id } });
   if (ordered > 0) {
-    await prisma.$transaction([
-      prisma.cartItem.deleteMany({ where: { productId: id } }),
-      prisma.product.update({
+    await prisma.$transaction(async (tx) => {
+      await tx.cartItem.deleteMany({ where: { productId: id } });
+      await tx.product.update({
         where: { id },
         data: { isActive: false },
-      }),
-    ]);
+      });
+    });
     return { deactivated: true };
   }
 
-  await prisma.$transaction([
-    prisma.cartItem.deleteMany({ where: { productId: id } }),
-    prisma.product.delete({ where: { id } }),
-  ]);
+  await prisma.$transaction(async (tx) => {
+    await tx.cartItem.deleteMany({ where: { productId: id } });
+    await tx.product.delete({ where: { id } });
+  });
   return { deactivated: false };
 }
 
