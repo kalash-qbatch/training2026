@@ -30,7 +30,10 @@ export function AuthSessionSync() {
     if (
       !current.isAuthenticated ||
       current.user?.id !== authUser.id ||
-      current.user?.email !== authUser.email
+      current.user?.email !== authUser.email ||
+      current.user?.role !== authUser.role ||
+      current.user?.fullName !== authUser.fullName ||
+      current.user?.image !== authUser.image
     ) {
       login(authUser);
     }

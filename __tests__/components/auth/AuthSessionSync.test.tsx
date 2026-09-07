@@ -97,4 +97,33 @@ describe("AuthSessionSync", () => {
     expect(useAuthStore.getState().user).toEqual(existingUser);
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
   });
+
+  it("updates auth store when session role changes for the same user", () => {
+    useAuthStore.setState({
+      user: {
+        id: mockUser.id,
+        email: mockUser.email,
+        fullName: mockUser.fullName,
+        role: "USER",
+      },
+      isAuthenticated: true,
+    });
+    mockedUseSession.mockReturnValue({
+      data: {
+        user: {
+          id: mockUser.id,
+          email: mockUser.email,
+          name: mockUser.fullName,
+          role: "ADMIN",
+        },
+        expires: new Date(Date.now() + 3600_000).toISOString(),
+      },
+      status: "authenticated",
+      update: jest.fn(),
+    });
+
+    render(<AuthSessionSync />);
+
+    expect(useAuthStore.getState().user?.role).toBe("ADMIN");
+  });
 });

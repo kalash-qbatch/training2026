@@ -97,6 +97,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
+    // Keep `authorized` from auth.config (admin ↔ storefront redirects).
+    ...authConfig.callbacks,
     async signIn({ user, account }) {
       if (account?.provider && SOCIAL_PROVIDERS.has(account.provider)) {
         const email =
