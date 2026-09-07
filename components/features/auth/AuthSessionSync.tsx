@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 
 import { sessionToAuthUser } from "@/lib/session-user";
 import { useAuthStore } from "@/lib/store/useAuthStore";
@@ -17,14 +17,23 @@ export function AuthSessionSync() {
     if (status === "loading") return;
 
     if (status === "unauthenticated") {
+      const wasLoggedIn = useAuthStore.getState().isAuthenticated;
       logout();
+      // Clear stale JWT cookie when DB user was deleted (or session expired)
+      if (wasLoggedIn) {
+        void signOut({ redirect: false });
+      }
       return;
     }
 
     if (!session) return;
 
     const authUser = sessionToAuthUser(session);
-    if (!authUser) return;
+    if (!authUser) {
+      logout();
+      void signOut({ redirect: false });
+      return;
+    }
 
     const current = useAuthStore.getState();
     if (

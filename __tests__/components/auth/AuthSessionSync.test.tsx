@@ -8,11 +8,13 @@ import { useAuthStore } from "@/lib/store/useAuthStore";
 
 jest.mock("next-auth/react", () => ({
   useSession: jest.fn(),
+  signOut: jest.fn().mockResolvedValue(undefined),
 }));
 
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 
 const mockedUseSession = useSession as jest.MockedFunction<typeof useSession>;
+const mockedSignOut = signOut as jest.MockedFunction<typeof signOut>;
 
 describe("AuthSessionSync", () => {
   beforeEach(() => {
@@ -47,6 +49,7 @@ describe("AuthSessionSync", () => {
 
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
     expect(useAuthStore.getState().user).toBeNull();
+    expect(mockedSignOut).toHaveBeenCalledWith({ redirect: false });
   });
 
   it("syncs authenticated session into auth store", () => {

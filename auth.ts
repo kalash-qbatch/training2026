@@ -8,6 +8,7 @@ import Google from "next-auth/providers/google";
 
 import { SESSION_EXPIRY_DEFAULT, SESSION_EXPIRY_REMEMBER_ME } from "@/lib/constants";
 import { prisma } from "@/lib/db";
+import { upsertOAuthAccount } from "@/lib/services/auth";
 import { isStripeConfigured } from "@/lib/stripe";
 
 import authConfig from "./auth.config";
@@ -110,12 +111,33 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         const dbUser = await prisma.user.upsert({
           where: { email },
-          update: {},
+          update: {
+            ...(user.image ? { image: user.image } : {}),
+            ...(user.name ? { fullName, name: fullName } : {}),
+          },
           create: {
             email,
             fullName,
+            name: fullName,
             phone: "",
             passwordHash: "",
+            image: user.image ?? null,
+          },
+        });
+
+        await upsertOAuthAccount({
+          userId: dbUser.id,
+          account: {
+            type: account.type,
+            provider: account.provider,
+            providerAccountId: account.providerAccountId,
+            refresh_token: account.refresh_token,
+            access_token: account.access_token,
+            expires_at: account.expires_at,
+            token_type: account.token_type,
+            scope: account.scope,
+            id_token: account.id_token,
+            session_state: account.session_state as string | null | undefined,
           },
         });
 
@@ -195,6 +217,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           token.id = user.id;
           token.role = user.role;
         }
+      } else if (token.id) {
+        // Subsequent requests: drop session if user was deleted from DB
+        const dbUser = await prisma.user.findUnique({
+          where: { id: String(token.id) },
+          select: { id: true, role: true, email: true },
+        });
+        if (!dbUser) {
+          return null;
+        }
+        token.role = dbUser.role;
+        token.email = dbUser.email;
       } else if (account?.provider && SOCIAL_PROVIDERS.has(account.provider) && token.email) {
         const dbUser = await prisma.user.findUnique({
           where: { email: token.email },
@@ -207,7 +240,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
       if (token.email && (!token.id || !token.role)) {
         const dbUser = await prisma.user.findUnique({
-          where: { email: token.email },
+          where: { email: token.email as string },
         });
         if (dbUser) {
           token.id = dbUser.id;
@@ -217,12 +250,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return token;
     },
     async session({ session, token }) {
-      if (token.id) {
-        session.user.id = token.id as string;
-        (session.user as { role?: string; provider?: string }).role = token.role as string;
-        (session.user as { role?: string; provider?: string }).provider = token.provider as string;
-        (session.user as { rememberMe?: boolean }).rememberMe = token.rememberMe as boolean;
+      if (!token?.id) {
+        return { ...session, user: undefined as unknown as typeof session.user };
       }
+      session.user.id = token.id as string;
+      (session.user as { role?: string; provider?: string }).role = token.role as string;
+      (session.user as { role?: string; provider?: string }).provider = token.provider as string;
+      (session.user as { rememberMe?: boolean }).rememberMe = token.rememberMe as boolean;
       if (token.email) {
         session.user.email = token.email as string;
       }
