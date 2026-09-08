@@ -119,17 +119,6 @@ export async function updateAdminProduct(id: string, body: AdminProductBody) {
   return data.product;
 }
 
-export async function deleteAdminProduct(id: string) {
-  const res = await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
-  const data = await parseJson<{
-    success: boolean;
-    deactivated?: boolean;
-    message?: string;
-  }>(res);
-  if (!res.ok || !data.success) throw new Error(data.error || "Delete failed");
-  return data;
-}
-
 export async function bulkUploadProducts(file: File) {
   const form = new FormData();
   form.append("file", file);

@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db";
-import { duplicateProductError, productNotFoundError } from "@/lib/errors/products";
+import { duplicateProductError } from "@/lib/errors/products";
 import { mapProduct } from "@/lib/mappers";
 import { resolveCategoryId } from "@/lib/services/categories";
 import type { ColorFilter, Product, ProductSort, SizeFilter } from "@/types";
@@ -406,34 +406,6 @@ export async function updateProduct(
     include: productInclude,
   });
   return mapProduct(full!);
-}
-
-export async function deleteProduct(id: string): Promise<{ deactivated: boolean }> {
-  const existing = await prisma.product.findUnique({
-    where: { id },
-    select: { id: true },
-  });
-  if (!existing) {
-    throw productNotFoundError();
-  }
-
-  const ordered = await prisma.orderItem.count({ where: { productId: id } });
-  if (ordered > 0) {
-    await prisma.$transaction(async (tx) => {
-      await tx.cartItem.deleteMany({ where: { productId: id } });
-      await tx.product.update({
-        where: { id },
-        data: { isActive: false },
-      });
-    });
-    return { deactivated: true };
-  }
-
-  await prisma.$transaction(async (tx) => {
-    await tx.cartItem.deleteMany({ where: { productId: id } });
-    await tx.product.delete({ where: { id } });
-  });
-  return { deactivated: false };
 }
 
 export async function createProductsBulk(

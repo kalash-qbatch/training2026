@@ -2,20 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { Eye, Pencil, Search, Trash2 } from "lucide-react";
+import { Eye, Pencil, Search } from "lucide-react";
 import dynamic from "next/dynamic";
 
 const AddMultipleProductsModal = dynamic(
   () =>
     import("@/components/admin/AddMultipleProductsModal").then((m) => ({
       default: m.AddMultipleProductsModal,
-    })),
-  { loading: () => null }
-);
-const DeleteConfirmModal = dynamic(
-  () =>
-    import("@/components/admin/DeleteConfirmModal").then((m) => ({
-      default: m.DeleteConfirmModal,
     })),
   { loading: () => null }
 );
@@ -49,7 +42,6 @@ import {
 import { useToast } from "@/components/ui/Toast";
 import {
   createAdminProduct,
-  deleteAdminProduct,
   fetchAdminCategories,
   fetchAdminProducts,
   updateAdminProduct,
@@ -119,8 +111,6 @@ export function ProductsPageClient() {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [previewProduct, setPreviewProduct] = useState<Product | null>(null);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebounced(search), 300);
@@ -296,14 +286,6 @@ export function ProductsPageClient() {
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteId(p.id)}
-                      className="rounded p-1.5 text-[#EF4444] transition hover:bg-red-50"
-                      aria-label="Delete"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -348,42 +330,6 @@ export function ProductsPageClient() {
           onDone={async () => {
             toast.success("Products uploaded successfully");
             await load();
-          }}
-        />
-      ) : null}
-      {deleteId ? (
-        <DeleteConfirmModal
-          open={!!deleteId}
-          loading={deleting}
-          onClose={() => setDeleteId(null)}
-          onConfirm={async () => {
-            if (!deleteId) return;
-            setDeleting(true);
-            try {
-              const result = await deleteAdminProduct(deleteId);
-              setDeleteId(null);
-              toast.success(
-                result.deactivated
-                  ? "Product set to Inactive because it appears in past orders"
-                  : "Product deleted successfully"
-              );
-              const data = await fetchAdminProducts({
-                search: debounced,
-                categoryId: categoryId || undefined,
-                status,
-                page,
-              });
-              if (data.page > data.totalPages) {
-                setPage(data.totalPages);
-              } else {
-                setProducts(data.products);
-                setTotalPages(data.totalPages);
-              }
-            } catch (err) {
-              toast.error(err instanceof Error ? err.message : "Delete failed");
-            } finally {
-              setDeleting(false);
-            }
           }}
         />
       ) : null}

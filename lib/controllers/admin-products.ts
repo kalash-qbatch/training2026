@@ -6,7 +6,6 @@ import { getProductError, productErrorStatus } from "@/lib/errors/products";
 import {
   createProduct,
   createProductsBulk,
-  deleteProduct,
   findAdminProducts,
   updateProduct,
 } from "@/lib/services/products";
@@ -200,29 +199,6 @@ export async function updateAdminProduct(id: string, request: Request) {
         success: true,
         product,
         message: "Product updated successfully",
-      },
-    };
-  } catch (err) {
-    const mapped = productErrorResult(err);
-    if (mapped) return mapped;
-    throw err;
-  }
-}
-
-export async function deleteAdminProduct(id: string) {
-  const { error } = await requireAdminUser();
-  if (error) return error;
-
-  try {
-    const result = await deleteProduct(id);
-    return {
-      status: 200,
-      body: {
-        success: true,
-        deactivated: result.deactivated,
-        message: result.deactivated
-          ? "Product set to Inactive because it appears in past orders"
-          : "Product deleted successfully",
       },
     };
   } catch (err) {

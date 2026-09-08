@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { Check, ChevronDown } from "lucide-react";
 
@@ -8,6 +8,44 @@ import { cn } from "@/lib/utils";
 import type { SelectOption, SelectProps } from "@/types";
 
 export type { SelectOption };
+
+const DROPDOWN_MAX_HEIGHT = 240;
+const DROPDOWN_GAP = 4;
+const ITEM_HEIGHT = 36;
+const LIST_PADDING = 8;
+
+function getClipBounds(el: HTMLElement) {
+  let parent = el.parentElement;
+  let top = 0;
+  let bottom = window.innerHeight;
+
+  while (parent) {
+    const { overflow, overflowY } = getComputedStyle(parent);
+    if (/(auto|scroll|hidden|overlay)/.test(overflow + overflowY)) {
+      const rect = parent.getBoundingClientRect();
+      top = Math.max(top, rect.top);
+      bottom = Math.min(bottom, rect.bottom);
+    }
+    parent = parent.parentElement;
+  }
+
+  return { top, bottom };
+}
+
+function getDropdownPlacement(trigger: HTMLElement, listHeight: number) {
+  const rect = trigger.getBoundingClientRect();
+  const clip = getClipBounds(trigger);
+  const spaceBelow = clip.bottom - rect.bottom - DROPDOWN_GAP;
+  const spaceAbove = rect.top - clip.top - DROPDOWN_GAP;
+  const needed = Math.min(listHeight, DROPDOWN_MAX_HEIGHT);
+  const openUpward = spaceBelow < needed && spaceAbove > spaceBelow;
+  const available = openUpward ? spaceAbove : spaceBelow;
+
+  return {
+    openUpward,
+    maxHeight: Math.max(0, Math.min(DROPDOWN_MAX_HEIGHT, available)),
+  };
+}
 
 export function Select({
   value,
@@ -22,24 +60,61 @@ export function Select({
   buttonClass,
 }: SelectProps) {
   const [open, setOpen] = useState(false);
+  const [openUpward, setOpenUpward] = useState(false);
+  const [listMaxHeight, setListMaxHeight] = useState(DROPDOWN_MAX_HEIGHT);
   const rootRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
   const selected = options.find((o) => o.value === value);
+
+  const updatePlacement = () => {
+    const trigger = rootRef.current;
+    if (!trigger) return;
+
+    const estimated = listRef.current?.scrollHeight ?? options.length * ITEM_HEIGHT + LIST_PADDING;
+    const { openUpward: nextOpenUpward, maxHeight } = getDropdownPlacement(trigger, estimated);
+    setOpenUpward(nextOpenUpward);
+    setListMaxHeight(maxHeight);
+  };
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    updatePlacement();
+  }, [open, options]);
 
   useEffect(() => {
     if (!open) return;
+
     const onPointerDown = (e: MouseEvent | TouchEvent) => {
       if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
+
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("touchstart", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
+    window.addEventListener("resize", updatePlacement);
+
+    const overflowParent = rootRef.current?.parentElement
+      ? (() => {
+          let parent: HTMLElement | null = rootRef.current!.parentElement;
+          while (parent) {
+            const { overflow, overflowY } = getComputedStyle(parent);
+            if (/(auto|scroll|hidden|overlay)/.test(overflow + overflowY)) return parent;
+            parent = parent.parentElement;
+          }
+          return null;
+        })()
+      : null;
+    overflowParent?.addEventListener("scroll", updatePlacement, { passive: true });
+
     return () => {
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("touchstart", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("resize", updatePlacement);
+      overflowParent?.removeEventListener("scroll", updatePlacement);
     };
   }, [open]);
 
@@ -51,10 +126,14 @@ export function Select({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={ariaLabel}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          if (!open) updatePlacement();
+          setOpen((o) => !o);
+        }}
         onKeyDown={(e) => {
           if (e.key === "ArrowDown" || e.key === "ArrowUp") {
             e.preventDefault();
+            if (!open) updatePlacement();
             setOpen(true);
           }
         }}
@@ -85,8 +164,13 @@ export function Select({
 
       {open ? (
         <ul
+          ref={listRef}
           role="listbox"
-          className="absolute left-0 pb-0 right-0 z-50 mt-1 max-h-60 overflow-auto rounded-lg border border-[#e5e7eb] bg-white py-1 shadow-lg"
+          className={cn(
+            "absolute left-0 right-0 z-50 overflow-auto rounded-lg border border-[#e5e7eb] bg-white py-1 shadow-lg",
+            openUpward ? "bottom-full mb-1" : "top-full mt-1"
+          )}
+          style={{ maxHeight: listMaxHeight }}
         >
           {options.map((opt) => {
             const isSelected = opt.value === value;
