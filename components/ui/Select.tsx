@@ -167,8 +167,8 @@ export function Select({
           ref={listRef}
           role="listbox"
           className={cn(
-            "absolute left-0 right-0 z-50 overflow-auto rounded-lg border border-[#e5e7eb] bg-white py-1 shadow-lg",
-            openUpward ? "bottom-full mb-1" : "top-full mt-1"
+            "absolute left-0 right-0 z-50 overflow-auto rounded-lg border border-[#e5e7eb] bg-white pt-1 shadow-lg",
+            openUpward ? "bottom-full mb-2" : "top-full mt-2"
           )}
           style={{ maxHeight: listMaxHeight }}
         >
