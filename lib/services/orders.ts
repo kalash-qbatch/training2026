@@ -1,5 +1,6 @@
 import type { OrderStatus, PaymentStatus, Prisma } from "@prisma/client";
 
+import { cartExpiryCutoff } from "@/lib/cart-expiration";
 import { TAX_RATE } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 import { mapOrder } from "@/lib/mappers";
@@ -30,9 +31,13 @@ export type ShippingInfo = {
   postalCode: string;
 };
 
+const orderItemsInclude = {
+  include: { product: { include: { images: true } } },
+} as const;
+
 const orderInclude = {
   user: { select: { fullName: true, name: true, email: true } },
-  items: { include: { product: true } },
+  items: orderItemsInclude,
 } as const;
 
 async function backfillOrderNumberIfMissing<
@@ -101,6 +106,23 @@ export async function createOrder(
       for (const item of items) {
         if (item.quantity < 1) {
           throw new OrderError("Invalid quantity");
+        }
+
+        // Claim the live cart line atomically; rollback restores it if checkout fails.
+        const claimed = await tx.cartItem.deleteMany({
+          where: {
+            userId,
+            productId: item.productId,
+            specificationId: item.specificationId?.trim() || null,
+            quantity: { gte: item.quantity },
+            createdAt: { gt: cartExpiryCutoff() },
+          },
+        });
+        if (claimed.count === 0) {
+          throw new OrderError(
+            "Your cart has expired or changed. Please add the items again.",
+            409
+          );
         }
 
         const product = await tx.product.findUnique({
@@ -229,21 +251,11 @@ export async function createOrder(
         },
         include: {
           user: { select: { fullName: true, name: true, email: true } },
-          items: { include: { product: true } },
+          items: orderItemsInclude,
         },
       });
 
       await notifyOrderPlaced(tx, userId, order.id, order.orderNumber);
-
-      for (const line of lineData) {
-        await tx.cartItem.deleteMany({
-          where: {
-            userId,
-            productId: line.productId,
-            specificationId: line.specificationId ?? null,
-          },
-        });
-      }
 
       return mapOrder(order);
     },
@@ -337,7 +349,7 @@ export async function findOrderById(id: string, userId?: string): Promise<Order 
       data: { paymentStatus: "SUCCEEDED", nextPaymentRetryAt: null },
       include: {
         user: { select: { fullName: true, name: true, email: true } },
-        items: { include: { product: true } },
+        items: orderItemsInclude,
       },
     });
     return mapOrder(updated);
@@ -567,7 +579,7 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
       },
       include: {
         user: { select: { fullName: true, name: true, email: true } },
-        items: { include: { product: true } },
+        items: orderItemsInclude,
       },
     });
 
@@ -577,8 +589,15 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
   });
 }
 
-function buildOrderWhere(opts: AdminOrderFilters): Prisma.OrderWhereInput {
+async function buildOrderWhere(opts: AdminOrderFilters): Promise<Prisma.OrderWhereInput> {
   const q = opts.search?.trim();
+  const ref = q ? parseOrderRef(q) : "";
+  const matches = /^\d+$/.test(ref)
+    ? await prisma.$queryRaw<{ id: string }[]>`
+        SELECT "id" FROM "Order"
+        WHERE CAST("orderNumber" AS TEXT) LIKE ${`%${ref}%`}
+      `
+    : [];
   return {
     AND: [
       opts.userId ? { userId: opts.userId } : {},
@@ -596,10 +615,7 @@ function buildOrderWhere(opts: AdminOrderFilters): Prisma.OrderWhereInput {
       q
         ? {
             OR: [
-              ...(/^\d+$/.test(parseOrderRef(q))
-                ? [{ orderNumber: Number(parseOrderRef(q)) }]
-                : []),
-              { id: { contains: q, mode: "insensitive" } },
+              { id: { in: matches.map((order) => order.id) } },
               { user: { fullName: { contains: q, mode: "insensitive" } } },
               { user: { email: { contains: q, mode: "insensitive" } } },
               { user: { name: { contains: q, mode: "insensitive" } } },
@@ -615,7 +631,7 @@ export async function findAdminOrders(opts: AdminOrderFilters = {}) {
 
   const page = opts.page ?? 1;
   const pageSize = opts.pageSize ?? 8;
-  const where = buildOrderWhere(opts);
+  const where = await buildOrderWhere(opts);
 
   const [total, rows, aggregates, unitsAgg] = await Promise.all([
     prisma.order.count({ where }),
@@ -677,7 +693,7 @@ export async function findOrderByPaymentIntentId(paymentIntentId: string) {
     where: { stripePaymentIntentId: paymentIntentId },
     include: {
       user: { select: { fullName: true, name: true, email: true } },
-      items: { include: { product: true } },
+      items: orderItemsInclude,
     },
   });
 }
@@ -696,7 +712,7 @@ export async function updateOrderPaymentStatus(orderId: string, paymentStatus: P
     },
     include: {
       user: { select: { fullName: true, name: true, email: true } },
-      items: { include: { product: true } },
+      items: orderItemsInclude,
     },
   });
 
@@ -736,7 +752,7 @@ export async function attachPaymentIntentToOrder(
     },
     include: {
       user: { select: { fullName: true, name: true, email: true } },
-      items: { include: { product: true } },
+      items: orderItemsInclude,
     },
   });
 
@@ -772,7 +788,7 @@ export async function switchOrderToCod(orderId: string, userId: string) {
     },
     include: {
       user: { select: { fullName: true, name: true, email: true } },
-      items: { include: { product: true } },
+      items: orderItemsInclude,
     },
   });
 
@@ -831,7 +847,7 @@ export async function handlePaymentFailure(orderId: string, paymentIntentId?: st
         },
         include: {
           user: { select: { fullName: true, name: true, email: true } },
-          items: { include: { product: true } },
+          items: orderItemsInclude,
         },
       });
       await notifyOrderStatusChange(
@@ -858,7 +874,7 @@ export async function handlePaymentFailure(orderId: string, paymentIntentId?: st
       },
       include: {
         user: { select: { fullName: true, name: true, email: true } },
-        items: { include: { product: true } },
+        items: orderItemsInclude,
       },
     });
 
@@ -895,7 +911,7 @@ export async function findOrdersDueForPaymentRetry() {
       user: {
         select: { id: true, email: true, fullName: true, name: true, stripeCustomerId: true },
       },
-      items: { include: { product: true } },
+      items: orderItemsInclude,
     },
   });
 }
@@ -932,7 +948,7 @@ export async function confirmExistingOrderPayment(
     },
     include: {
       user: { select: { fullName: true, name: true, email: true } },
-      items: { include: { product: true } },
+      items: orderItemsInclude,
     },
   });
 

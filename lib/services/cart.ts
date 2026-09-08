@@ -1,3 +1,4 @@
+import { CART_TTL_MS, cartExpiryCutoff } from "@/lib/cart-expiration";
 import { prisma } from "@/lib/db";
 import type { CartItem } from "@/types";
 
@@ -14,6 +15,7 @@ export class CartError extends Error {
 function mapCartItem(row: {
   id: string;
   quantity: number;
+  createdAt: Date;
   productId: string;
   specificationId: string | null;
   product: {
@@ -33,6 +35,7 @@ function mapCartItem(row: {
 }): CartItem {
   return {
     id: row.id,
+    expiresAt: new Date(row.createdAt.getTime() + CART_TTL_MS).toISOString(),
     productId: row.product.id,
     specificationId: row.specificationId ?? undefined,
     name: row.product.title,
@@ -76,9 +79,16 @@ async function resolveLine(
   return { title: product.title, stock: product.stock };
 }
 
+export async function expireCartItems(userId?: string) {
+  return prisma.cartItem.deleteMany({
+    where: { ...(userId ? { userId } : {}), createdAt: { lte: cartExpiryCutoff() } },
+  });
+}
+
 export async function getCart(userId: string): Promise<CartItem[]> {
+  await expireCartItems(userId);
   const rows = await prisma.cartItem.findMany({
-    where: { userId },
+    where: { userId, createdAt: { gt: cartExpiryCutoff() } },
     include: {
       product: { include: { images: true } },
       specification: true,
@@ -109,6 +119,7 @@ export async function addToCart(
     throw new CartError(`"${title}" is out of stock`);
   }
 
+  await expireCartItems(userId);
   const existing = await prisma.cartItem.findFirst({
     where: {
       userId,
@@ -171,6 +182,7 @@ export async function updateCartItem(
       userId,
       productId: input.productId,
       specificationId: specId,
+      createdAt: { gt: cartExpiryCutoff() },
     },
     data: { quantity: qty },
   });
@@ -202,6 +214,7 @@ export async function removeCartItems(
   userId: string,
   items: Array<{ productId: string; specificationId?: string | null }>
 ): Promise<CartItem[]> {
+  await expireCartItems(userId);
   for (const item of items) {
     const specId = item.specificationId?.trim() || null;
     await prisma.cartItem.deleteMany({
@@ -220,6 +233,7 @@ export async function restoreCartFromOrderItems(
   userId: string,
   items: Array<{ productId: string; specificationId?: string | null; quantity: number }>
 ): Promise<CartItem[]> {
+  await expireCartItems(userId);
   for (const item of items) {
     const specId = item.specificationId?.trim() || null;
     const existing = await prisma.cartItem.findFirst({
@@ -249,6 +263,7 @@ export async function syncOrderItemsToCart(
   userId: string,
   items: Array<{ productId: string; specificationId?: string | null; quantity: number }>
 ): Promise<CartItem[]> {
+  await expireCartItems(userId);
   for (const item of items) {
     const specId = item.specificationId?.trim() || null;
     const existing = await prisma.cartItem.findFirst({

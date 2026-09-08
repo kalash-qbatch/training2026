@@ -148,6 +148,7 @@ export type ProductServiceError = Error & { code: ProductErrorCode };
    ========================================================================== */
 
 export type CartItem = {
+  expiresAt?: string;
   id?: string;
   productId: string;
   specificationId?: string;
