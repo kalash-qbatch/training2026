@@ -20,6 +20,25 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Cart expiration
+
+Cart lines expire 15 minutes after their database `createdAt` timestamp. Quantity
+changes do not extend this deadline. The TTL is defined in `lib/cart-expiration.ts`;
+no schema migration is required. Cart responses include `expiresAt` so open pages
+can refresh from the backend when a line expires.
+
+The Node server starts a cleanup worker through `instrumentation.ts`. It sweeps on
+startup and once per second after each completed sweep, including when browsers
+are closed. Reads and checkout also enforce the deadline, independently of cleanup.
+Checkout claims live cart lines inside its order transaction; existing orders and
+their payment retries are unaffected by cart expiration.
+
+Run a continuously running Node server (`npm run dev` or `npm start`) for background
+cleanup. Restart the server after introducing the instrumentation file. A suspended
+or serverless process cannot run the worker while idle; such deployments need an
+external scheduled worker calling `expireCartItems`. Expired lines remain unusable
+on reads and checkout even while background cleanup is stopped.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

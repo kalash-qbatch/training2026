@@ -29,7 +29,7 @@ type DbProductRow = DbProduct & {
 };
 type DbOrderWithRelations = DbOrder & {
   user: { fullName: string; name?: string | null; email?: string | null };
-  items: (DbOrderItem & { product: DbProduct })[];
+  items: (DbOrderItem & { product: DbProductRow })[];
 };
 
 function mapVariants(row: DbProductRow): ProductVariant[] {
@@ -155,7 +155,15 @@ export function mapOrder(row: DbOrderWithRelations): Order {
       specificationId: item.specificationId ?? undefined,
       title: item.product.title,
       description: item.product.description,
-      imageUrl: item.product.image,
+      imageUrl:
+        (item.color?.trim()
+          ? item.product.images
+              ?.slice()
+              .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+              .find(
+                (image) => image.color.trim().toLowerCase() === item.color?.trim().toLowerCase()
+              )?.url
+          : undefined) ?? item.product.image,
       price: Number(item.price),
       qty: item.quantity,
       color: item.color || undefined,

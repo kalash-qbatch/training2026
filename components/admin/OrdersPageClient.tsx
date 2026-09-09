@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 
 import { ArrowUpRight, Boxes, DollarSign, Package, Search } from "lucide-react";
 import Link from "next/link";
@@ -139,30 +139,34 @@ export function OrdersPageClient() {
   }
 
   useEffect(() => {
-    const t = window.setTimeout(() => setDebounced(search), 300);
+    const t = window.setTimeout(() => setDebounced(search.trim()), 300);
     return () => window.clearTimeout(t);
   }, [search]);
 
-  const load = useCallback(() => {
+  useEffect(() => {
+    let cancelled = false;
     fetchAdminOrders({
       search: debounced,
       page,
       pageSize: TABLE_PAGE_SIZE,
     })
       .then((data) => {
+        if (cancelled) return;
         setOrders(data.orders);
         setStats(data.stats);
         setTotalPages(data.totalPages);
       })
       .catch((err) => {
+        if (cancelled) return;
         toast.error(err instanceof Error ? err.message : "Failed to load orders");
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [debounced, page, toast]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   const statCards = useMemo(
     () => [
@@ -191,8 +195,9 @@ export function OrdersPageClient() {
         <div className="relative w-full sm:w-72">
           <input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by user & order ID"
+            onChange={(e) => setSearch(e.target.value.trimStart())}
+            onBlur={() => setSearch((value) => value.trim())}
+            placeholder="Search by user or order number"
             className={`${inputClass} pr-10`}
           />
           <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-muted" />
