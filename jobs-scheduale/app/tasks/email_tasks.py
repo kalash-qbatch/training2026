@@ -22,10 +22,10 @@ BASE_STYLE = """
   .copy{color:#6b7280;font-size:14px;margin:0 0 18px;line-height:1.6}
   .bdg{display:inline-block;padding:5px 12px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.02em}
   .tbl{background:#f8fafc;border:1px solid #eef2f7;border-radius:12px;padding:6px 18px;margin:0 0 18px}
-  .row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #eef2f7;font-size:14px}
+  .row{display:table;width:100%;padding:12px 0;border-bottom:1px solid #eef2f7;font-size:14px}
   .row:last-child{border-bottom:none}
-  .lbl{color:#6b7280}
-  .val{font-weight:650;color:#111827;text-align:right}
+  .lbl{display:table-cell;width:50%;color:#6b7280;padding-right:16px;vertical-align:middle;text-align:left}
+  .val{display:table-cell;width:50%;font-weight:650;color:#111827;text-align:right;vertical-align:middle}
   .ibox{border-radius:12px;padding:14px 16px;margin:0 0 8px;font-size:13px;line-height:1.55}
   .btn{display:block;text-align:center;text-decoration:none;padding:14px 24px;border-radius:12px;font-size:14px;font-weight:700;margin-top:18px}
   .ftr{padding:18px 32px;text-align:center;font-size:12px;color:#9ca3af;border-top:1px solid #f1f5f9;line-height:1.5}
