@@ -24,9 +24,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 
     return (
       <div className="w-full space-y-2">
-        <label htmlFor={inputId} className="block text-sm font-normal text-neutral-text">
+        <label htmlFor={inputId} className="block text-sm font-medium text-neutral-text">
           {label}
-          {showStar ? <span className="text-red-500">*</span> : null}
+          {showStar ? <span className="ml-0.5 text-status-error-fg">*</span> : null}
         </label>
         <div className="relative">
           <input
