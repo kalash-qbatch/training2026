@@ -92,7 +92,7 @@ export async function POST(request: Request) {
     }
 
     // Payment failed or requires action — order already exists with stock deducted.
-    // Call handlePaymentFailure to record attempt, calculate next retry (2 or 3 days), or cancel + restock after max attempts.
+    // Record unpaid attempt, email user, and schedule 5-min auto-cancel on first failure only.
     await handlePaymentFailure(orderId, paymentIntentId);
     const errorInfo = mapStripeError({
       type: "StripeCardError",

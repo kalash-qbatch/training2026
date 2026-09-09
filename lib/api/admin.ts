@@ -126,7 +126,32 @@ export async function bulkUploadProducts(file: File) {
     method: "POST",
     body: form,
   });
-  const data = await parseJson<{ success: boolean; message?: string }>(res);
+  const data = await parseJson<{ success: boolean; message?: string; jobId?: string }>(res);
+  if (!res.ok || !data.success) throw new Error(data.error || "Bulk upload failed");
+  return data;
+}
+
+export async function bulkUploadProductsJson(
+  products: Array<{
+    title: string;
+    description?: string;
+    price: number;
+    stock: number;
+    image?: string;
+    images?: Array<{ url: string; color?: string }>;
+    color?: string;
+    size?: string;
+    category?: string;
+    categoryName?: string;
+    variants?: Array<{ color: string; size: string; qty: number }>;
+  }>
+) {
+  const res = await fetch("/api/admin/products/bulk", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ products }),
+  });
+  const data = await parseJson<{ success: boolean; message?: string; jobId?: string }>(res);
   if (!res.ok || !data.success) throw new Error(data.error || "Bulk upload failed");
   return data;
 }

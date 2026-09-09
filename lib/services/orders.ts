@@ -3,6 +3,7 @@ import type { OrderStatus, PaymentStatus, Prisma } from "@prisma/client";
 import { cartExpiryCutoff } from "@/lib/cart-expiration";
 import { TAX_RATE } from "@/lib/constants";
 import { prisma } from "@/lib/db";
+import { buildInvoiceEmailPayload, selectInvoiceProductImage } from "@/lib/email-payloads";
 import { mapOrder } from "@/lib/mappers";
 import {
   allocateOrderNumber,
@@ -11,11 +12,7 @@ import {
   parseOrderRef,
 } from "@/lib/order-id";
 import { ensureOrderNumberInfrastructure } from "@/lib/order-number-setup";
-import {
-  removeCartItems,
-  restoreCartFromOrderItems,
-  syncOrderItemsToCart,
-} from "@/lib/services/cart";
+import { removeCartItems, syncOrderItemsToCart } from "@/lib/services/cart";
 import { notifyOrderPlaced, notifyOrderStatusChange } from "@/lib/services/notifications";
 import type { AdminOrderFilters, Order, OrderItem, PlaceOrderItemInput } from "@/types";
 
@@ -92,11 +89,13 @@ export async function createOrder(
 
   await ensureOrderNumberInfrastructure();
 
-  return prisma.$transaction(
+  const created = await prisma.$transaction(
     async (tx) => {
       const lineData: Array<{
         productId: string;
         specificationId?: string;
+        title: string;
+        imageUrl: string;
         quantity: number;
         price: number;
         color?: string;
@@ -127,7 +126,10 @@ export async function createOrder(
 
         const product = await tx.product.findUnique({
           where: { id: item.productId },
-          include: { specifications: true },
+          include: {
+            specifications: true,
+            images: { orderBy: { sortOrder: "asc" } },
+          },
         });
         if (!product) {
           throw new OrderError("Product not found", 404);
@@ -200,9 +202,13 @@ export async function createOrder(
           size = undefined;
         }
 
+        const imageUrl = selectInvoiceProductImage(product, color);
+
         lineData.push({
           productId: product.id,
           specificationId,
+          title: product.title,
+          imageUrl,
           quantity: item.quantity,
           price: Number(product.price),
           color,
@@ -257,10 +263,58 @@ export async function createOrder(
 
       await notifyOrderPlaced(tx, userId, order.id, order.orderNumber);
 
-      return mapOrder(order);
+      for (const line of lineData) {
+        await tx.cartItem.deleteMany({
+          where: {
+            userId,
+            productId: line.productId,
+            specificationId: line.specificationId ?? null,
+          },
+        });
+      }
+
+      return {
+        mapped: mapOrder(order),
+        mail: {
+          to: order.shippingEmail || order.user?.email || null,
+          name: order.shippingFullName || order.user?.fullName || order.user?.name || "Customer",
+          orderNumber: order.orderNumber,
+          orderId: order.id,
+          subTotal: Number(order.subTotal),
+          tax: Number(order.tax),
+          total: Number(order.total),
+          paymentMethod,
+          paymentStatus,
+          orderStatus,
+          items: lineData.map((line) => ({
+            title: line.title,
+            imageUrl: line.imageUrl,
+            quantity: line.quantity,
+            unitPrice: line.price,
+            color: line.color,
+            size: line.size,
+          })),
+          shipping: opts?.shipping,
+        },
+      };
     },
     { maxWait: 15_000, timeout: 30_000 }
   );
+
+  if (created.mail.to) {
+    try {
+      const { enqueueEmailJob } = await import("@/lib/job-scheduler");
+      await enqueueEmailJob({
+        emailType: "invoice",
+        to: created.mail.to,
+        payload: buildInvoiceEmailPayload(created.mail),
+      });
+    } catch (mailErr) {
+      console.error("Failed to enqueue order invoice email:", mailErr);
+    }
+  }
+
+  return created.mapped;
 }
 
 export async function findOrders(
@@ -513,7 +567,7 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
     throw new OrderError("Invalid order status");
   }
 
-  return prisma.$transaction(async (tx) => {
+  const mapped = await prisma.$transaction(async (tx) => {
     const existing = await tx.order.findUnique({
       where: { id },
       include: {
@@ -585,8 +639,62 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
 
     await notifyOrderStatusChange(tx, existing.userId, id, status, row.orderNumber);
 
-    return mapOrder(row);
+    return {
+      order: mapOrder(row),
+      mail: {
+        to: row.shippingEmail || row.user?.email || null,
+        name: row.shippingFullName || row.user?.fullName || row.user?.name || "Customer",
+        orderNumber: row.orderNumber,
+        total: Number(row.total).toFixed(2),
+        status,
+        justCancelled: willCancel && !wasCancelled,
+      },
+    };
   });
+
+  if (mapped.mail.to) {
+    try {
+      const { enqueueEmailJob } = await import("@/lib/job-scheduler");
+      if (mapped.mail.status === "SHIPPED") {
+        await enqueueEmailJob({
+          emailType: "order_approved",
+          to: mapped.mail.to,
+          payload: {
+            order_number: mapped.mail.orderNumber,
+            name: mapped.mail.name,
+            total: mapped.mail.total,
+            subject: `Order #${mapped.mail.orderNumber} Approved — On the way!`,
+          },
+        });
+      } else if (mapped.mail.status === "DELIVERED") {
+        await enqueueEmailJob({
+          emailType: "order_delivered",
+          to: mapped.mail.to,
+          payload: {
+            order_number: mapped.mail.orderNumber,
+            name: mapped.mail.name,
+            total: mapped.mail.total,
+            subject: `Your Order #${mapped.mail.orderNumber} has been Delivered!`,
+          },
+        });
+      } else if (mapped.mail.justCancelled) {
+        await enqueueEmailJob({
+          emailType: "order_cancelled",
+          to: mapped.mail.to,
+          payload: {
+            order_number: mapped.mail.orderNumber,
+            name: mapped.mail.name,
+            reason: "it was cancelled by the store",
+            subject: `Order #${mapped.mail.orderNumber} has been Cancelled`,
+          },
+        });
+      }
+    } catch (mailErr) {
+      console.error("Failed to enqueue order status email:", mailErr);
+    }
+  }
+
+  return mapped.order;
 }
 
 async function buildOrderWhere(opts: AdminOrderFilters): Promise<Prisma.OrderWhereInput> {
@@ -702,21 +810,33 @@ export async function findOrderByPaymentIntentId(paymentIntentId: string) {
  * Update an order's payment status (called by webhooks / checkout confirm).
  */
 export async function updateOrderPaymentStatus(orderId: string, paymentStatus: PaymentStatus) {
-  const order = await prisma.order.update({
-    where: { id: orderId },
-    data: {
-      paymentStatus,
-      ...(paymentStatus === "SUCCEEDED" || paymentStatus === "PAID"
-        ? { nextPaymentRetryAt: null }
-        : {}),
-    },
-    include: {
-      user: { select: { fullName: true, name: true, email: true } },
-      items: orderItemsInclude,
-    },
-  });
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
+    const current = await tx.order.findUnique({ where: { id: orderId }, include: orderInclude });
+    if (!current) throw new OrderError("Order not found", 404);
+    if (
+      paymentStatus === "PROCESSING" &&
+      (current.status === "CANCELLED" ||
+        ["SUCCEEDED", "PAID", "REFUNDED"].includes(current.paymentStatus))
+    ) {
+      return mapOrder(current);
+    }
+    const order = await tx.order.update({
+      where: { id: orderId },
+      data: {
+        paymentStatus,
+        ...(paymentStatus === "SUCCEEDED" || paymentStatus === "PAID"
+          ? { nextPaymentRetryAt: null }
+          : {}),
+      },
+      include: {
+        user: { select: { fullName: true, name: true, email: true } },
+        items: { include: { product: true } },
+      },
+    });
 
-  return mapOrder(order);
+    return mapOrder(order);
+  });
 }
 
 /**
@@ -763,33 +883,36 @@ export async function attachPaymentIntentToOrder(
  * Switch a failed card order to COD (retry with different payment method).
  */
 export async function switchOrderToCod(orderId: string, userId: string) {
-  const order = await prisma.order.findFirst({
-    where: { id: orderId, userId },
-  });
-  if (!order) {
-    throw new OrderError("Order not found", 404);
-  }
-  if (order.status === "CANCELLED") {
-    throw new OrderError("This order has been cancelled.", 400);
-  }
-  if (order.paymentStatus === "SUCCEEDED" || order.paymentStatus === "PAID") {
-    throw new OrderError("This order has already been paid.", 400);
-  }
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
+    const order = await tx.order.findFirst({
+      where: { id: orderId, userId },
+    });
+    if (!order) {
+      throw new OrderError("Order not found", 404);
+    }
+    if (order.status === "CANCELLED") {
+      throw new OrderError("This order has been cancelled.", 400);
+    }
+    if (order.paymentStatus === "SUCCEEDED" || order.paymentStatus === "PAID") {
+      throw new OrderError("This order has already been paid.", 400);
+    }
 
-  const updated = await prisma.order.update({
-    where: { id: orderId },
-    data: {
-      paymentMethod: "COD",
-      paymentStatus: "PENDING",
-      stripePaymentIntentId: null,
-      stripeClientSecret: null,
-      nextPaymentRetryAt: null,
-      status: "PROCESSING",
-    },
-    include: {
-      user: { select: { fullName: true, name: true, email: true } },
-      items: orderItemsInclude,
-    },
+    return tx.order.update({
+      where: { id: orderId },
+      data: {
+        paymentMethod: "COD",
+        paymentStatus: "PENDING",
+        stripePaymentIntentId: null,
+        stripeClientSecret: null,
+        nextPaymentRetryAt: null,
+        status: "PROCESSING",
+      },
+      include: {
+        user: { select: { fullName: true, name: true, email: true } },
+        items: orderItemsInclude,
+      },
+    });
   });
 
   await removeCartItems(
@@ -808,10 +931,14 @@ function daysUntilNextRetry(attemptCount: number): number {
 }
 
 /**
- * Handle a failed payment: increment attempts, schedule auto-retry, or cancel + restock.
+ * Handle a failed payment:
+ * - Keep order PENDING with paymentStatus UNPAID
+ * - Email user on every failed attempt (including retries)
+ * - On first failure only: schedule 5-minute auto-cancel (does not cancel on retry fails)
  */
 export async function handlePaymentFailure(orderId: string, paymentIntentId?: string) {
   const result = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
     const existing = await tx.order.findUnique({
       where: { id: orderId },
       include: {
@@ -826,12 +953,20 @@ export async function handlePaymentFailure(orderId: string, paymentIntentId?: st
         },
       },
     });
-    if (!existing || existing.status === "CANCELLED") return null;
+    if (
+      !existing ||
+      existing.status === "CANCELLED" ||
+      existing.paymentMethod !== "CARD" ||
+      ["SUCCEEDED", "PAID", "REFUNDED"].includes(existing.paymentStatus) ||
+      (paymentIntentId && existing.stripePaymentIntentId !== paymentIntentId)
+    )
+      return null;
 
     if (paymentIntentId && existing.lastFailedPaymentIntentId === paymentIntentId) {
       return null;
     }
 
+    const isFirstFailure = existing.paymentAttemptCount === 0;
     const newAttemptCount = existing.paymentAttemptCount + 1;
 
     if (newAttemptCount >= existing.maxPaymentAttempts) {
@@ -867,7 +1002,7 @@ export async function handlePaymentFailure(orderId: string, paymentIntentId?: st
       where: { id: orderId },
       data: {
         status: "PENDING",
-        paymentStatus: "FAILED",
+        paymentStatus: "UNPAID",
         paymentAttemptCount: newAttemptCount,
         nextPaymentRetryAt: nextRetry,
         lastFailedPaymentIntentId: paymentIntentId ?? existing.lastFailedPaymentIntentId,
@@ -878,18 +1013,49 @@ export async function handlePaymentFailure(orderId: string, paymentIntentId?: st
       },
     });
 
-    return { action: "retry_scheduled" as const, order: mapOrder(row) };
+    return {
+      action: "unpaid_pending" as const,
+      scheduleAutoCancel: isFirstFailure,
+      order: mapOrder(row),
+      mail: {
+        to: row.shippingEmail || row.user?.email || null,
+        name: row.shippingFullName || row.user?.fullName || row.user?.name || "Customer",
+        orderNumber: row.orderNumber,
+        total: Number(row.total).toFixed(2),
+        attempt: newAttemptCount,
+      },
+    };
   });
 
-  if (result?.action === "cancelled" && result.order) {
-    await restoreCartFromOrderItems(
-      result.order.userId,
-      result.order.items.map((item) => ({
-        productId: item.productId,
-        specificationId: item.specificationId,
-        quantity: item.qty,
-      }))
-    );
+  if (result?.mail?.to) {
+    try {
+      const { enqueueEmailJob } = await import("@/lib/job-scheduler");
+      await enqueueEmailJob({
+        emailType: "payment_failed",
+        to: result.mail.to,
+        payload: {
+          order_number: result.mail.orderNumber,
+          name: result.mail.name,
+          total: result.mail.total,
+          attempt: result.mail.attempt,
+          cancel_minutes: 5,
+          retry_url: `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/checkout?orderId=${orderId}`,
+          subject: `Payment Unpaid — Order #${result.mail.orderNumber} is Pending`,
+        },
+      });
+    } catch (mailErr) {
+      console.error("Failed to enqueue payment_failed email:", mailErr);
+    }
+  }
+
+  // Schedule 5-min auto-cancel only once (first failure). Retry failures just re-email.
+  if (result?.scheduleAutoCancel) {
+    try {
+      const { enqueueOrderAutoCancelJob } = await import("@/lib/job-scheduler");
+      await enqueueOrderAutoCancelJob({ orderId, delaySeconds: 300 });
+    } catch (scheduleErr) {
+      console.error("Failed to schedule 5-min order auto-cancel:", scheduleErr);
+    }
   }
 
   return result;
@@ -903,7 +1069,7 @@ export async function findOrdersDueForPaymentRetry() {
     where: {
       status: { not: "CANCELLED" },
       paymentMethod: "CARD",
-      paymentStatus: "FAILED",
+      paymentStatus: { in: ["FAILED", "UNPAID"] },
       nextPaymentRetryAt: { lte: new Date() },
       stripePaymentIntentId: { not: null },
     },
@@ -926,30 +1092,34 @@ export async function confirmExistingOrderPayment(
   stripePaymentIntentId: string,
   stripeClientSecret?: string
 ) {
-  const order = await prisma.order.findFirst({
-    where: { id: orderId, userId },
-  });
-  if (!order) {
-    throw new OrderError("Order not found", 404);
+  if (!["SUCCEEDED", "PAID", "PROCESSING"].includes(paymentStatus)) {
+    throw new OrderError("Invalid payment confirmation status");
   }
-  if (order.status === "CANCELLED") {
-    throw new OrderError("This order has been cancelled.", 400);
-  }
-
-  const updated = await prisma.order.update({
-    where: { id: orderId },
-    data: {
-      paymentStatus,
-      paymentMethod: "CARD",
-      stripePaymentIntentId,
-      stripeClientSecret: stripeClientSecret ?? order.stripeClientSecret,
-      nextPaymentRetryAt: null,
-      status: "PROCESSING",
-    },
-    include: {
-      user: { select: { fullName: true, name: true, email: true } },
-      items: orderItemsInclude,
-    },
+  const { updated, justPaid } = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
+    const order = await tx.order.findFirst({
+      where: { id: orderId, userId },
+      include: orderInclude,
+    });
+    if (!order) throw new OrderError("Order not found", 404);
+    if (order.status === "CANCELLED") throw new OrderError("This order has been cancelled.", 400);
+    if (order.paymentMethod !== "CARD" || order.stripePaymentIntentId !== stripePaymentIntentId) {
+      throw new OrderError("Payment does not match this order.", 409);
+    }
+    if (["SUCCEEDED", "PAID", "REFUNDED"].includes(order.paymentStatus)) {
+      return { updated: order, justPaid: false };
+    }
+    const updated = await tx.order.update({
+      where: { id: orderId },
+      data: {
+        paymentStatus,
+        stripeClientSecret: stripeClientSecret ?? order.stripeClientSecret,
+        nextPaymentRetryAt: null,
+        status: "PROCESSING",
+      },
+      include: orderInclude,
+    });
+    return { updated, justPaid: paymentStatus === "SUCCEEDED" || paymentStatus === "PAID" };
   });
 
   await removeCartItems(
@@ -959,6 +1129,34 @@ export async function confirmExistingOrderPayment(
       specificationId: item.specificationId,
     }))
   );
+
+  // Send payment success email for confirmed card payments
+  if (justPaid) {
+    const recipientEmail = updated.shippingEmail || updated.user?.email;
+    const recipientName =
+      updated.shippingFullName || updated.user?.fullName || updated.user?.name || "Customer";
+    if (recipientEmail) {
+      try {
+        const { enqueueEmailJob } = await import("@/lib/job-scheduler");
+        await enqueueEmailJob({
+          emailType: "payment_success",
+          to: recipientEmail,
+          payload: {
+            order_number: updated.orderNumber,
+            name: recipientName,
+            total: Number(updated.total).toFixed(2),
+            subject: `Payment Confirmed — Order #${updated.orderNumber}`,
+          },
+        });
+      } catch (mailErr) {
+        console.error("Failed to enqueue payment_success email:", mailErr);
+      }
+    } else {
+      console.error(
+        `payment_success email skipped: no recipient for order #${updated.orderNumber}`
+      );
+    }
+  }
 
   return mapOrder(updated);
 }

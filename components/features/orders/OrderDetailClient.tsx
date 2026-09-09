@@ -19,6 +19,8 @@ import {
   orderRouteId,
   orderStatusClass,
   orderStatusLabel,
+  paymentStatusClass,
+  paymentStatusLabel,
 } from "@/lib/utils";
 import type { Order } from "@/types";
 
@@ -133,13 +135,33 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
           <Meta label="Tax" value={formatCurrency(tax)} />
           <Meta label="Total" value={formatCurrency(total)} />
         </div>
-        <div className="flex flex-col gap-1">
-          <p className="text-[12px] text-neutral-muted">Order Status</p>
-          <span
-            className={`inline-flex items-center justify-center rounded px-2.5 py-1 text-[11px] font-semibold ${orderStatusClass(order.status)}`}
-          >
-            {orderStatusLabel(order.status)}
-          </span>
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <p className="text-[12px] text-neutral-muted">Order Status</p>
+            <span
+              className={`inline-flex items-center justify-center rounded px-2.5 py-1 text-[11px] font-semibold ${orderStatusClass(order.status)}`}
+            >
+              {orderStatusLabel(order.status)}
+            </span>
+          </div>
+          {order.paymentStatus && (
+            <div className="flex flex-col gap-1">
+              <p className="text-[12px] text-neutral-muted">Payment Status</p>
+              <span
+                className={`inline-flex items-center justify-center rounded border px-2.5 py-1 text-[11px] font-semibold ${paymentStatusClass(order.paymentStatus)}`}
+              >
+                {paymentStatusLabel(order.paymentStatus)}
+              </span>
+            </div>
+          )}
+          {order.paymentMethod && (
+            <div className="flex flex-col gap-1">
+              <p className="text-[12px] text-neutral-muted">Payment Method</p>
+              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-text">
+                {order.paymentMethod === "COD" ? "💵 Cash on Delivery" : "💳 Card"}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
