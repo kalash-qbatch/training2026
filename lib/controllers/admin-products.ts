@@ -303,24 +303,51 @@ export async function bulkCreateAdminProducts(request: Request) {
       validated.push(parsed.data);
     }
 
-    const products = await createProductsBulk(
-      validated.map((v) => ({
-        title: v.title,
-        description: v.description,
-        price: v.price,
-        stock: v.stock,
-        image: v.image,
-      }))
-    );
+    // Try dispatching to Celery microservice first for background processing
+    try {
+      const { enqueueBulkProductsJob } = await import("@/lib/job-scheduler");
+      const jobRes = await enqueueBulkProductsJob(
+        validated.map((v) => ({
+          title: v.title,
+          description: v.description,
+          price: v.price,
+          stock: v.stock,
+          image: v.image,
+          color: v.color,
+          size: v.size,
+          categoryName: v.categoryName ?? undefined,
+          variants: v.variants,
+        }))
+      );
+      return {
+        status: 202,
+        body: {
+          success: true,
+          jobId: jobRes.job_id,
+          message: `${validated.length} products queued for background processing`,
+        },
+      };
+    } catch (schedErr) {
+      console.warn("Scheduler unavailable, processing directly in NextJS:", schedErr);
+      const products = await createProductsBulk(
+        validated.map((v) => ({
+          title: v.title,
+          description: v.description,
+          price: v.price,
+          stock: v.stock,
+          image: v.image,
+        }))
+      );
 
-    return {
-      status: 200,
-      body: {
-        success: true,
-        products,
-        message: `${products.length} products uploaded successfully`,
-      },
-    };
+      return {
+        status: 200,
+        body: {
+          success: true,
+          products,
+          message: `${products.length} products uploaded successfully`,
+        },
+      };
+    }
   } catch (err) {
     const mapped = productErrorResult(err);
     if (mapped) return mapped;

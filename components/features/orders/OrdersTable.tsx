@@ -19,6 +19,8 @@ import {
   orderRouteId,
   orderStatusClass,
   orderStatusLabel,
+  paymentStatusClass,
+  paymentStatusLabel,
 } from "@/lib/utils";
 import type { Order } from "@/types";
 
@@ -47,6 +49,15 @@ const OrderTableRow = memo(function OrderTableRow({
         >
           {orderStatusLabel(order.status)}
         </span>
+      </TableCell>
+      <TableCell className="py-4">
+        {order.paymentStatus && (
+          <span
+            className={`inline-flex rounded border px-2.5 py-1 text-[11px] font-semibold ${paymentStatusClass(order.paymentStatus)}`}
+          >
+            {paymentStatusLabel(order.paymentStatus)}
+          </span>
+        )}
       </TableCell>
       <TableCell className="py-4 pr-0 text-right">
         <button
@@ -90,6 +101,13 @@ const OrderMobileCard = memo(function OrderMobileCard({
           >
             {orderStatusLabel(order.status)}
           </span>
+          {order.paymentStatus && (
+            <span
+              className={`ml-1 mt-2 inline-flex rounded border px-2.5 py-1 text-[11px] font-semibold ${paymentStatusClass(order.paymentStatus)}`}
+            >
+              {paymentStatusLabel(order.paymentStatus)}
+            </span>
+          )}
         </div>
         <button
           type="button"
@@ -129,6 +147,7 @@ export function OrdersTable({
               <TableHead>Number of Product(s)</TableHead>
               <TableHead>Amount</TableHead>
               <TableHead>Order Status</TableHead>
+              <TableHead>Payment Status</TableHead>
               <TableHead className="pr-0 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>

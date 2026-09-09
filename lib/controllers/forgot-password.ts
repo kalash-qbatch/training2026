@@ -38,12 +38,27 @@ export async function forgotPassword(body: unknown) {
 
   const baseUrl = process.env.AUTH_URL || process.env.NEXTAUTH_URL || "http://localhost:3000";
   const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
+  const fullName = user.fullName || user.name || "User";
 
-  await sendPasswordResetEmail({
-    to: user.email,
-    fullName: user.fullName || user.name || "User",
-    resetUrl,
-  });
+  try {
+    const { enqueueEmailJob } = await import("@/lib/job-scheduler");
+    await enqueueEmailJob({
+      emailType: "forgot_password",
+      to: user.email,
+      payload: {
+        reset_url: resetUrl,
+        name: fullName,
+        subject: "Reset your password",
+      },
+    });
+  } catch (queueErr) {
+    console.warn("FastAPI email job queue unavailable, falling back to local mailer:", queueErr);
+    await sendPasswordResetEmail({
+      to: user.email,
+      fullName,
+      resetUrl,
+    });
+  }
 
   return {
     status: 200,
