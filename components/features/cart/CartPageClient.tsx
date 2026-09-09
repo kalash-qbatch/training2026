@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Clock3 } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -29,6 +29,36 @@ function itemKey(item: CartItem) {
   );
 }
 
+function earliestExpiryMs(items: CartItem[]): number | null {
+  const times = items
+    .map((item) => Date.parse(item.expiresAt ?? ""))
+    .filter((t) => Number.isFinite(t));
+  if (!times.length) return null;
+  return Math.min(...times);
+}
+
+function formatCountdown(msRemaining: number): string {
+  const totalSec = Math.max(0, Math.floor(msRemaining / 1000));
+  const hours = Math.floor(totalSec / 3600);
+  const minutes = Math.floor((totalSec % 3600) / 60);
+  const seconds = totalSec % 60;
+  return `${hours}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
+}
+
+function useEarliestCartExpiry(items: CartItem[]) {
+  const deadline = useMemo(() => earliestExpiryMs(items), [items]);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (deadline == null) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [deadline]);
+
+  if (deadline == null) return null;
+  return Math.max(0, deadline - now);
+}
+
 export function CartPageClient() {
   const router = useRouter();
   const { toast } = useToast();
@@ -44,6 +74,13 @@ export function CartPageClient() {
   const [checkingOut, setCheckingOut] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(() => new Set(items.map(itemKey)));
   const [prevItems, setPrevItems] = useState(items);
+
+  const msUntilExpiry = useEarliestCartExpiry(items);
+
+  // Always sync from server on mount so cancelled-order leftovers don't linger in local state.
+  useEffect(() => {
+    void fetchCart();
+  }, [fetchCart]);
 
   // Sync selection with cart items during render
   if (items !== prevItems) {
@@ -62,6 +99,7 @@ export function CartPageClient() {
   const tax = Number((subtotal * TAX_RATE).toFixed(2));
   const total = Number((subtotal + tax).toFixed(2));
   const allSelected = items.length > 0 && selected.size === items.length;
+  const selectedCount = selectedItems.length;
 
   if (!items.length) {
     return (
@@ -89,25 +127,37 @@ export function CartPageClient() {
 
   return (
     <section>
-      <div className="mb-6 flex items-center justify-between gap-2">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <Link
           href="/products"
           prefetch={false}
-          className="inline-flex items-center gap-2 text-lg font-semibold text-brand-600 hover:text-brand-700"
+          className="inline-flex min-w-0 items-center gap-2 text-base font-semibold text-brand-600 hover:text-brand-700 sm:text-lg"
         >
-          <ArrowLeft className="h-5 w-5" strokeWidth={2.25} />
-          Your Shopping Bag
+          <ArrowLeft className="h-5 w-5 shrink-0" strokeWidth={2.25} />
+          <span className="truncate">Your Shopping Bag</span>
         </Link>
-        {selectedItems.length > 0 ? (
+        {selectedCount > 0 ? (
           <button
             type="button"
             onClick={() => setPendingClearSelected(true)}
-            className="text-sm font-medium text-[#EF4444] hover:underline"
+            className="shrink-0 text-sm font-medium text-[#EF4444] hover:underline"
           >
-            {allSelected ? "Remove all" : "Remove selected"}
+            Delete Items ({selectedCount})
           </button>
         ) : null}
       </div>
+
+      {msUntilExpiry != null ? (
+        <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-brand-100 bg-brand-50 px-3 py-2.5 text-xs text-brand-800 sm:items-center sm:px-3.5 sm:py-3 sm:text-sm">
+          <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-brand-600 sm:mt-0" />
+          <p className="min-w-0 leading-relaxed">
+            Items in your cart are reserved. The earliest item will expire in{" "}
+            <span className="inline-block font-semibold tabular-nums">
+              {formatCountdown(msUntilExpiry)}
+            </span>
+          </p>
+        </div>
+      ) : null}
 
       <div className="overflow-x-auto">
         <table className="hidden w-full min-w-225 border-collapse md:table">
@@ -196,7 +246,7 @@ export function CartPageClient() {
         })}
       </ul>
 
-      <div className="mt-10 flex justify-center md:justify-end">
+      <div className="mt-8 w-full sm:mt-10 md:flex md:justify-end">
         <CartSummary
           subtotal={subtotal}
           tax={tax}
@@ -265,11 +315,11 @@ export function CartPageClient() {
       <RemoveProductModal
         open={pendingClearSelected}
         onClose={() => setPendingClearSelected(false)}
-        title={allSelected ? "Remove all products?" : "Remove selected products?"}
+        title={allSelected ? "Delete all items?" : "Delete selected items?"}
         description={
           allSelected
-            ? "Are you sure you want to remove all items from your bag?"
-            : `Are you sure you want to remove ${selectedItems.length} selected item${selectedItems.length === 1 ? "" : "s"}? Unselected items will stay in your bag.`
+            ? "Are you sure you want to delete all items from your bag?"
+            : `Are you sure you want to delete ${selectedCount} selected item${selectedCount === 1 ? "" : "s"}? Unselected items will stay in your bag.`
         }
         onConfirm={() => {
           const toRemove = selectedItems.map((i) => ({
@@ -282,11 +332,11 @@ export function CartPageClient() {
               toast.success(
                 allSelected
                   ? "Bag cleared"
-                  : `${toRemove.length} item${toRemove.length === 1 ? "" : "s"} removed`
+                  : `${toRemove.length} item${toRemove.length === 1 ? "" : "s"} deleted`
               )
             )
             .catch((err: unknown) =>
-              toast.error(err instanceof Error ? err.message : "Failed to remove items")
+              toast.error(err instanceof Error ? err.message : "Failed to delete items")
             );
         }}
       />

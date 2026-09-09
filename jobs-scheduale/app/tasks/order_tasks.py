@@ -4,7 +4,7 @@ from sqlalchemy import func
 from sqlalchemy.exc import OperationalError
 from app.celery_app import celery_app
 from app.database import SessionLocal
-from app.models import Order, OrderItem, Notification, User, Product, Specification, CartItem
+from app.models import Order, OrderItem, Notification, User, Product, Specification
 from app.config import settings
 
 
@@ -66,36 +66,8 @@ def _restore_stock_for_order(db, order: Order):
         product.stock = (product.stock or 0) + item.quantity
 
 
-def _restore_cart_for_order(db, order: Order):
-    items = db.query(OrderItem).filter(OrderItem.orderId == order.id).all()
-    for item in items:
-        spec_id = item.specificationId or None
-        existing = (
-            db.query(CartItem)
-            .filter(
-                CartItem.userId == order.userId,
-                CartItem.productId == item.productId,
-                CartItem.specificationId == spec_id,
-            )
-            .first()
-        )
-        if existing:
-            continue
-        db.add(
-            CartItem(
-                id=str(uuid.uuid4()),
-                userId=order.userId,
-                productId=item.productId,
-                specificationId=spec_id,
-                quantity=item.quantity,
-                createdAt=datetime.utcnow(),
-                updatedAt=datetime.utcnow(),
-            )
-        )
-
-
 def _cancel_order_and_notify(db, order: Order, reason: str):
-    """Cancel unpaid order, restore stock/cart, notify, and email. Returns True if cancelled."""
+    """Cancel unpaid order, restore stock only (cart stays empty until Order Again)."""
     if order.paymentMethod != "CARD":
         return False
     if order.status == "CANCELLED":
@@ -106,7 +78,6 @@ def _cancel_order_and_notify(db, order: Order, reason: str):
         return False
 
     _restore_stock_for_order(db, order)
-    _restore_cart_for_order(db, order)
 
     order.status = "CANCELLED"
     order.paymentStatus = "UNPAID"

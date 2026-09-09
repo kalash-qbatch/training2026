@@ -19,7 +19,7 @@ export function CartSummary({
   onPlaceOrder: () => void;
 }) {
   return (
-    <div className="md:ml-auto w-full max-w-70">
+    <div className="w-full max-w-none sm:max-w-70 md:ml-auto">
       <dl className="space-y-2.5 text-[13px]">
         <div className="flex justify-between gap-6">
           <dt className="text-neutral-muted">Sub Total</dt>
@@ -36,7 +36,7 @@ export function CartSummary({
       </dl>
       <Button
         type="button"
-        className="mt-5"
+        className="mt-5 w-full"
         disabled={disabled}
         loading={loading}
         onClick={onPlaceOrder}

@@ -13,10 +13,16 @@ import { useCartStore } from "@/lib/store/useCartStore";
 import { cn, colorSwatch, formatCurrency } from "@/lib/utils";
 import type { Product, ProductVariant } from "@/types";
 
+function isBlankSize(size?: string) {
+  const s = size?.trim() ?? "";
+  return !s || s.toLowerCase() === "no size";
+}
+
 function findVariant(variants: ProductVariant[] | undefined, color: string, size: string) {
   return variants?.find(
     (v) =>
-      v.color.toLowerCase() === color.toLowerCase() && v.size.toLowerCase() === size.toLowerCase()
+      v.color.toLowerCase() === color.toLowerCase() &&
+      (v.size || "").toLowerCase() === (size || "").toLowerCase()
   );
 }
 
@@ -27,19 +33,36 @@ function allColors(product: Product): string[] {
   return [];
 }
 
-function allSizes(product: Product): string[] {
-  if (product.variants?.length) {
-    return [...new Set(product.variants.map((v) => v.size).filter(Boolean))];
-  }
-  return [];
+/** Real sizes for a color (or all colors when `color` is empty). */
+function sizesForColor(product: Product, color: string): string[] {
+  if (!product.variants?.length) return [];
+  const rows = color
+    ? product.variants.filter((v) => v.color.toLowerCase() === color.toLowerCase())
+    : product.variants;
+  return [...new Set(rows.map((v) => v.size.trim()).filter((s) => !isBlankSize(s)))];
+}
+
+function pickSizeForColor(product: Product, color: string): string {
+  const rows = product.variants?.filter((v) => v.color.toLowerCase() === color.toLowerCase()) ?? [];
+  const inStockSized = rows.find((v) => v.qty > 0 && !isBlankSize(v.size));
+  if (inStockSized) return inStockSized.size;
+  const anySized = rows.find((v) => !isBlankSize(v.size));
+  if (anySized) return anySized.size;
+  return rows[0]?.size ?? "";
 }
 
 function defaultInStockVariant(product: Product): {
   color: string;
   size: string;
 } {
+  const inStockSized = product.variants?.find((v) => v.qty > 0 && !isBlankSize(v.size));
+  if (inStockSized) return { color: inStockSized.color, size: inStockSized.size };
+
   const inStock = product.variants?.find((v) => v.qty > 0);
   if (inStock) return { color: inStock.color, size: inStock.size };
+
+  const firstSized = product.variants?.find((v) => !isBlankSize(v.size));
+  if (firstSized) return { color: firstSized.color, size: firstSized.size };
 
   const first = product.variants?.[0];
   if (first) return { color: first.color, size: first.size };
@@ -49,33 +72,15 @@ function defaultInStockVariant(product: Product): {
 
 export const ProductCard = memo(function ProductCard({ product }: { product: Product }) {
   const colors = useMemo(() => allColors(product), [product]);
-  const sizes = useMemo(() => allSizes(product), [product]);
   const hasVariants = Boolean(product.variants?.length);
   const freeSize = isFreeSizeProduct(product);
+  const initial = useMemo(() => defaultInStockVariant(product), [product]);
 
-  // function getDefaultInStockVariant(product: Product) {
-  //   const inStock = product.variants?.find((v) => v.qty > 0);
+  const [color, setColor] = useState(initial.color);
+  const [size, setSize] = useState(initial.size);
 
-  //   if (inStock) {
-  //     return {
-  //       color: inStock.color,
-  //       size: inStock.size,
-  //     };
-  //   }
-
-  //   const first = product.variants?.[0];
-
-  //   if (first) {
-  //     return {
-  //       color: first.color,
-  //       size: first.size,
-  //     };
-  //   }
-
-  //   return { color: "", size: "" };
-  // }
-  const [color, setColor] = useState(defaultInStockVariant(product).color);
-  const [size, setSize] = useState(defaultInStockVariant(product).size);
+  // Sizes for the selected color only — this is what makes variant sizes visible/usable.
+  const sizes = useMemo(() => sizesForColor(product, color), [product, color]);
 
   const selectedVariant = findVariant(product.variants, color, size);
   const totalStock = hasVariants
@@ -83,16 +88,21 @@ export const ProductCard = memo(function ProductCard({ product }: { product: Pro
     : (product.stock ?? 0);
   const baseStock = hasVariants ? (selectedVariant?.qty ?? 0) : (product.stock ?? 0);
 
-  // Track how many units of the current variant the user has added to cart
-  // so the displayed stock shrinks optimistically without a server refetch.
-  const [reservedQty, setReservedQty] = useState(0);
+  // Units already in the bag for this exact variant — survives color/size switches.
+  const specId = hasVariants ? selectedVariant?.id : undefined;
+  const reservedQty = useCartStore((s) => {
+    const line = s.items.find(
+      (i) => i.productId === product.id && (i.specificationId || "") === (specId || "")
+    );
+    return line?.qty ?? 0;
+  });
   const stock = Math.max(0, baseStock - reservedQty);
 
   const outOfStock = stock <= 0;
   const productFullyOut = totalStock <= 0;
   const invalidCombo = hasVariants && !selectedVariant;
   const needsSelection =
-    hasVariants && ((colors.length > 0 && !color) || (sizes.length > 0 && !size));
+    hasVariants && ((colors.length > 0 && !color) || (sizes.length > 0 && isBlankSize(size)));
 
   const [qty, setQty] = useState(outOfStock ? 0 : 1);
   const selectedQty = outOfStock ? 0 : Math.min(Math.max(1, qty), stock);
@@ -109,9 +119,14 @@ export const ProductCard = memo(function ProductCard({ product }: { product: Pro
     [slides, colors, color]
   );
 
+  function selectColor(nextColor: string) {
+    setColor(nextColor);
+    setSize(pickSizeForColor(product, nextColor));
+  }
+
   return (
-    <article className="flex h-full flex-col overflow-hidden rounded-[7px] border border-[#e5e7eb] bg-white shadow-sm">
-      <div className="relative aspect-square w-full overflow-hidden bg-[#eef1f4]">
+    <article className="flex h-full flex-col rounded-[7px] border border-[#e5e7eb] bg-white shadow-sm">
+      <div className="relative aspect-square w-full overflow-hidden rounded-t-[7px] bg-[#eef1f4]">
         <div
           className="absolute inset-0 flex transition-transform duration-300 ease-out"
           style={{ transform: `translateX(-${slideIndex * 100}%)` }}
@@ -151,24 +166,24 @@ export const ProductCard = memo(function ProductCard({ product }: { product: Pro
         </p>
 
         {freeSize ? (
-          <div className="mt-3">
+          <div className="mt-3 flex items-center justify-between gap-2">
             <span className="inline-flex h-6 items-center rounded-[3px] border border-neutral-900 bg-neutral-900 px-2 text-[11px] font-medium uppercase text-white">
               {FREE_SIZE_LABEL}
             </span>
+            <p className="rounded-md border border-neutral-muted px-2 py-1 text-[12px] font-bold leading-none tabular-nums text-neutral-muted">
+              {outOfStock ? "0 in stock" : `${stock} in stock`}
+            </p>
           </div>
         ) : (
           <>
-            <div className="mt-3 flex min-h-4 items-center gap-1.5">
+            <div className="mt-3 flex min-h-4 flex-wrap items-center gap-1.5">
               {colors.map((c) => (
                 <button
                   key={c}
                   type="button"
                   aria-label={`Select ${c}`}
                   aria-pressed={color === c}
-                  onClick={() => {
-                    setColor(c);
-                    setReservedQty(0);
-                  }}
+                  onClick={() => selectColor(c)}
                   className={cn(
                     "h-4 w-4 rounded-full border border-[#d9dee7] ring-offset-1",
                     color === c && "ring-1 ring-brand-500"
@@ -177,20 +192,17 @@ export const ProductCard = memo(function ProductCard({ product }: { product: Pro
                 />
               ))}
             </div>
-            <div className="mt-2 flex items-center flex-wrap gap-1.5 justify-between">
-              <div className="mt-2 flex min-h-6 flex-wrap items-center gap-1.5">
+            <div className="mt-2 flex flex-wrap items-start justify-between gap-1.5">
+              <div className="flex min-h-6 min-w-0 flex-1 flex-wrap items-center gap-1.5">
                 {sizes.length ? (
                   sizes.map((s) => (
                     <button
                       key={s}
                       type="button"
                       aria-pressed={size === s}
-                      onClick={() => {
-                        setSize(s);
-                        setReservedQty(0);
-                      }}
+                      onClick={() => setSize(s)}
                       className={cn(
-                        "h-6 min-w-5 sm:min-w-7 rounded-[3px] border border-[#e1e5eb] px-2 text-[11px] font-medium uppercase text-neutral-900",
+                        "h-6 min-w-5 rounded-[3px] border border-[#e1e5eb] px-2 text-[11px] font-medium uppercase text-neutral-900 sm:min-w-7",
                         size === s && "border-neutral-900 bg-neutral-900 text-white"
                       )}
                     >
@@ -198,19 +210,19 @@ export const ProductCard = memo(function ProductCard({ product }: { product: Pro
                     </button>
                   ))
                 ) : (
-                  <span className="inline-flex h-6 items-center rounded-[3px] border border-neutral-900 bg-neutral-900 px-1 sm:px-2 text-[11px] font-medium uppercase text-white">
+                  <span className="inline-flex h-6 items-center rounded-[3px] border border-neutral-900 bg-neutral-900 px-1 text-[11px] font-medium uppercase text-white sm:px-2">
                     {FREE_SIZE_LABEL}
                   </span>
                 )}
               </div>
-              <p className="mt-2 text-[12px] font-bold tabular-nums border border-neutral-muted rounded-md px-2 py-1 leading-none text-neutral-muted">
+              <p className="shrink-0 rounded-md border border-neutral-muted px-2 py-1 text-[12px] font-bold leading-none tabular-nums text-neutral-muted">
                 {invalidCombo || outOfStock ? "0 in stock" : `${stock} in stock`}
               </p>
             </div>
           </>
         )}
 
-        <div className="mt-3 flex items-center flex-wrap justify-center sm:justify-between gap-2">
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-2 sm:justify-between">
           <QtyStepper
             value={selectedQty}
             min={outOfStock ? 0 : 1}
@@ -220,7 +232,7 @@ export const ProductCard = memo(function ProductCard({ product }: { product: Pro
           <button
             type="button"
             disabled={outOfStock || invalidCombo || needsSelection || selectedQty < 1}
-            className=" rounded-[3px] bg-brand-500 w-full px-3 text-[13px] py-2 font-semibold text-white transition hover:bg-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full rounded-[3px] bg-brand-500 px-3 py-2 text-[13px] font-semibold text-white transition hover:bg-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
             onClick={async () => {
               if (!isAuthenticated) {
                 router.push("/login");
@@ -251,8 +263,6 @@ export const ProductCard = memo(function ProductCard({ product }: { product: Pro
                 toast.error(result.error);
                 return;
               }
-              // Optimistically reduce the displayed stock by the added quantity
-              setReservedQty((prev) => prev + selectedQty);
               toast.success("Added into cart");
             }}
           >

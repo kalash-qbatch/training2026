@@ -14,6 +14,11 @@ const nextConfig: NextConfig = {
       new URL("https://*.supabase.co/**"),
       new URL("https://*.supabase.in/**"),
       new URL("https://picsum.photos/**"),
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+        pathname: "/**",
+      },
     ],
   },
   allowedDevOrigins: [

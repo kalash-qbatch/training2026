@@ -11,6 +11,7 @@ export const mockCartItem: CartItem = {
   price: 29.99,
   qty: 2,
   stock: 10,
+  expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
 };
 
 export const mockCartItems: CartItem[] = [mockCartItem];

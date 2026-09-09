@@ -18,7 +18,7 @@ This microservice handles asynchronous and background jobs for the e-commerce pl
 3. **Payment failed → 5-minute auto-cancel**:
    - On first payment failure, Next.js sets order to `PENDING` / `UNPAID`, emails the user, and calls `POST /api/jobs/orders/schedule-cancel` (countdown **300s**).
    - If the user retries and fails again, the same unpaid email is sent again — **order is not cancelled** on retry failure.
-   - After 5 minutes, Celery cancels the order only if still unpaid: restores stock + cart, notifies, and sends `order_cancelled` email.
+   - After 5 minutes, Celery cancels the order only if still unpaid: restores stock (not cart), notifies, and sends `order_cancelled` email.
    - If payment succeeds within 5 minutes, the delayed task is a no-op.
 4. **Cancel stale unpaid orders (Beat backup)**:
    - Celery Beat runs periodically (default every 60 minutes).

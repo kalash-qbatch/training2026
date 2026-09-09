@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
-import { restoreCartFromOrderItems } from "@/lib/services/cart";
 import {
   attachPaymentIntentToOrder,
   createOrder,
@@ -120,20 +119,10 @@ export async function POST(request: Request) {
       amount: order.amount,
     });
   } catch (err) {
-    if (pendingOrderId && userId) {
+    if (pendingOrderId) {
       try {
+        // Cancel + restore stock only — do not refill cart (Order Again does that).
         await updateOrderStatus(pendingOrderId, "CANCELLED");
-        const order = await findOrderById(pendingOrderId, userId);
-        if (order) {
-          await restoreCartFromOrderItems(
-            userId,
-            order.items.map((item) => ({
-              productId: item.productId,
-              specificationId: item.specificationId,
-              quantity: item.qty,
-            }))
-          );
-        }
       } catch (rollbackErr) {
         console.error("create-intent rollback error:", rollbackErr);
       }

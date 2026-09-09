@@ -53,7 +53,12 @@ export function CheckoutPageClient({
 
   const isRetry = Boolean(retryOrder);
   const retryItems = retryOrder ? orderItemsToCartItems(retryOrder) : [];
-  const selectedItems = isRetry ? retryItems : propItems.length > 0 ? propItems : storeItems;
+  const liveItems = isRetry ? retryItems : propItems.length > 0 ? propItems : storeItems;
+
+  // Freeze lines when payment starts so clearing the bag after create-intent
+  // does not unmount checkout before the failed/success redirect.
+  const [lockedItems, setLockedItems] = useState<CartItem[] | null>(isRetry ? retryItems : null);
+  const selectedItems = lockedItems ?? liveItems;
 
   const subtotal = isRetry
     ? retryOrder!.subTotal
@@ -88,7 +93,9 @@ export function CheckoutPageClient({
     return null;
   }
 
-  if (selectedItems.length === 0) {
+  // Never swap to empty-cart UI on the payment step — bag is cleared server-side
+  // when the order is created, and that must not unmount the form before fail/success UI.
+  if (selectedItems.length === 0 && step === 1 && !isRetry) {
     return (
       <div className="flex flex-col items-center py-16 text-center sm:py-24">
         <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-neutral-bg text-neutral-muted">
@@ -155,6 +162,7 @@ export function CheckoutPageClient({
                 initial={userInfo}
                 onContinue={(info) => {
                   setUserInfo(info);
+                  setLockedItems(liveItems);
                   setStep(2);
                 }}
               />
@@ -180,7 +188,10 @@ export function CheckoutPageClient({
                   if (info.orderId) params.set("orderId", info.orderId);
                   router.push(`/checkout/failed?${params.toString()}`);
                 }}
-                onBack={() => setStep(1)}
+                onBack={() => {
+                  setLockedItems(null);
+                  setStep(1);
+                }}
               />
             )}
           </div>

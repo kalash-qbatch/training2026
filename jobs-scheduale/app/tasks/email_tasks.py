@@ -509,7 +509,7 @@ def send_email_task(self, email_type: str, to: str, payload: dict):
                     <span class="bdg" style="background:#fee2e2;color:#991b1b">Unpaid</span></span></div>
                 </div>
                 <div class="ibox" style="background:#fef2f2;border:1px solid #fecaca;color:#7f1d1d">
-                  Reserved stock has been released. You can place a new order anytime from your cart.</div>
+                  Reserved stock has been released back to the store. You can reorder anytime from your order history.</div>
                 """,
             )
 

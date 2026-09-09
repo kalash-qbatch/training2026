@@ -171,6 +171,7 @@ export function CheckoutForm({
       if (!retryOrderId) {
         await fetchCart();
       }
+      toast.success("Order placed successfully");
       onSuccess(orderRouteId(data.order), "COD");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to place order");
@@ -234,9 +235,11 @@ export function CheckoutForm({
           await fetchCart();
         }
 
+        const message = confirmResult.error.message || "Your payment could not be processed.";
+        toast.error(message);
         onError({
           title: "Payment Failed",
-          message: confirmResult.error.message || "Your payment could not be processed.",
+          message,
           suggestion: "Please check your card details or try a different payment method.",
           recoverable: true,
           orderId,
@@ -258,12 +261,15 @@ export function CheckoutForm({
         if (!retryOrderId) {
           await fetchCart();
         }
+        const message =
+          confirmData.errorInfo?.message || confirmData.error || "Failed to confirm payment";
+        toast.error(message);
         onError(
           confirmData.errorInfo
             ? { ...confirmData.errorInfo, orderId }
             : {
                 title: "Payment Failed",
-                message: confirmData.error || "Failed to confirm payment",
+                message,
                 suggestion: "Please try again or use a different payment method.",
                 recoverable: true,
                 orderId,
@@ -275,22 +281,25 @@ export function CheckoutForm({
       if (!retryOrderId) {
         await fetchCart();
       }
+      toast.success("Payment successful");
       onSuccess(orderRouteId(confirmData.order), "CARD");
     } catch (err) {
       const orderId = pendingOrderId ?? retryOrderId;
+      const message = err instanceof Error ? err.message : "An unexpected error occurred.";
       if (orderId) {
         if (!retryOrderId) {
           await fetchCart();
         }
+        toast.error(message);
         onError({
           title: "Payment Error",
-          message: err instanceof Error ? err.message : "An unexpected error occurred.",
+          message,
           suggestion: "Please try again or use a different payment method.",
           recoverable: true,
           orderId,
         });
       } else {
-        toast.error(err instanceof Error ? err.message : "Failed to process payment");
+        toast.error(message);
       }
     } finally {
       setPlacing(false);
