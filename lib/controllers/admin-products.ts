@@ -313,6 +313,7 @@ export async function bulkCreateAdminProducts(request: Request) {
           price: v.price,
           stock: v.stock,
           image: v.image,
+          images: v.images,
           color: v.color,
           size: v.size,
           categoryName: v.categoryName ?? undefined,

@@ -1,3 +1,5 @@
-title,description,price,stock,image
-Sample Hoodie,Warm cotton hoodie,49.99,25,/products/tee.jpg
-Sample Cap,Everyday cap,19.99,40,/products/beanie.jpg
+title,price,category,color,size,qty,image,description
+Denimm Jackettt,1595,Jackets,Blue,M,12,denim-blue.jpg,Classic denim jacket
+Denimm Jackettt,1595,Jackets,Black,L,23,denim-black.jpg,Classic denim jacket
+Gharii,900,Watches,Gray/Silver,Fixed,16,gharii.jpg,Analog wrist watch
+Sample Cap,19.99,Accessories,Black,One Size,40,sample-cap.jpg,Everyday cap

@@ -1,448 +1,342 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import { AlertCircle, CloudUpload, Image as ImageIcon, Plus, Trash2 } from "lucide-react";
+import { CheckCircle2, Download, FileSpreadsheet, FolderOpen, Upload, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import { Modal } from "@/components/ui/Modal";
-import { useToast } from "@/components/ui/Toast";
-import { bulkUploadProductsJson, uploadAdminImage } from "@/lib/api/admin";
+import {
+  type BulkCsvProduct,
+  collectCsvImageFileNames,
+  matchProductImagesFromFolder,
+  parseBulkProductsCsv,
+} from "@/lib/bulk-csv";
+import {
+  type BulkDraftImage,
+  type BulkDraftProduct,
+  emptyBulkProduct,
+  useBulkUploadStore,
+} from "@/lib/bulk-upload-store";
+import { detectColorFromFileName, normalizeColor } from "@/lib/product-options";
+import { cn } from "@/lib/utils";
 
-interface ParsedProduct {
-  id: string;
-  title: string;
-  price: number;
-  stock: number;
-  description: string;
-  category: string;
-  color: string;
-  size: string;
-  image: string;
-  imageUploading?: boolean;
+function toDraftProducts(
+  parsed: BulkCsvProduct[],
+  imagesByTitle: Map<string, File[]>
+): BulkDraftProduct[] {
+  return parsed.map((p) => {
+    const variantColors = p.variants.map((v) => normalizeColor(v.color)).filter(Boolean);
+    const files = imagesByTitle.get(p.title.toLowerCase()) ?? [];
+    const images: BulkDraftImage[] = files.map((file, index) => {
+      const fromName = detectColorFromFileName(file.name);
+      const fromVariant = variantColors[index] || variantColors[0] || "";
+      return {
+        id: `img-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        url: URL.createObjectURL(file),
+        fileName: file.name,
+        color: fromName || fromVariant,
+        file,
+      };
+    });
+
+    return {
+      id: `bulk-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      title: p.title,
+      price: p.price,
+      stock: p.stock,
+      categoryName: p.categoryName.trim(),
+      description: p.description,
+      variants: p.variants.map((v) => ({
+        color: normalizeColor(v.color),
+        size: v.size,
+        qty: v.qty,
+      })),
+      images,
+    };
+  });
 }
 
 export function AddMultipleProductsModal({
   open,
   onClose,
-  onDone,
 }: {
   open: boolean;
   onClose: () => void;
-  onDone: () => void;
+  onDone?: () => void;
 }) {
-  const { toast } = useToast();
-  const [step, setStep] = useState<"upload" | "review">("upload");
-  const [products, setProducts] = useState<ParsedProduct[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+  const setProducts = useBulkUploadStore((s) => s.setProducts);
+  const csvInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
 
-  // Reset state when modal closes
+  const [fileName, setFileName] = useState("");
+  const [parsed, setParsed] = useState<BulkCsvProduct[] | null>(null);
+  const [csvImageNames, setCsvImageNames] = useState<string[]>([]);
+  const [imagesByTitle, setImagesByTitle] = useState<Map<string, File[]>>(new Map());
+  const [folderSelected, setFolderSelected] = useState(false);
+  const [folderImageCount, setFolderImageCount] = useState(0);
+  const [matchedCount, setMatchedCount] = useState(0);
+  const [error, setError] = useState("");
+  const [dragging, setDragging] = useState(false);
+
+  useEffect(() => {
+    const el = folderInputRef.current;
+    if (!el) return;
+    el.setAttribute("webkitdirectory", "");
+    el.setAttribute("directory", "");
+    el.multiple = true;
+  }, [open, parsed]);
+
   const resetAll = () => {
-    setStep("upload");
-    setProducts([]);
+    setFileName("");
+    setParsed(null);
+    setCsvImageNames([]);
+    setImagesByTitle(new Map());
+    setFolderSelected(false);
+    setFolderImageCount(0);
+    setMatchedCount(0);
     setError("");
-    setLoading(false);
+    setDragging(false);
+    if (csvInputRef.current) csvInputRef.current.value = "";
+    if (folderInputRef.current) folderInputRef.current.value = "";
   };
 
-  const handleCsvParse = (text: string) => {
-    const lines = text
-      .split(/\r?\n/)
-      .map((l) => l.trim())
-      .filter(Boolean);
+  const handleClose = () => {
+    resetAll();
+    onClose();
+  };
 
-    if (lines.length < 2) {
-      setError("CSV file must have a header row and at least one product row.");
-      return;
+  const handleCsvText = (text: string, name: string) => {
+    try {
+      const products = parseBulkProductsCsv(text);
+      const imageNames = collectCsvImageFileNames(products);
+      setParsed(products);
+      setCsvImageNames(imageNames);
+      setFileName(name);
+      setImagesByTitle(new Map());
+      setFolderSelected(false);
+      setFolderImageCount(0);
+      setMatchedCount(0);
+      setError("");
+    } catch (err) {
+      setParsed(null);
+      setCsvImageNames([]);
+      setFileName("");
+      setError(err instanceof Error ? err.message : "Failed to parse CSV");
     }
-
-    const header = lines[0].split(",").map((h) => h.trim().toLowerCase().replace(/^"|"$/g, ""));
-    const titleIdx = header.indexOf("title");
-    const priceIdx = header.indexOf("price");
-    const stockIdx = header.indexOf("stock");
-    const descIdx = header.indexOf("description");
-    const catIdx = header.indexOf("category");
-    const colorIdx = header.indexOf("color");
-    const sizeIdx = header.indexOf("size");
-    const imgIdx = header.indexOf("image");
-
-    if (titleIdx === -1 || priceIdx === -1) {
-      setError("CSV must contain at least 'title' and 'price' columns.");
-      return;
-    }
-
-    const parsed: ParsedProduct[] = [];
-    for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
-      const title = cols[titleIdx] || "";
-      if (!title) continue;
-
-      parsed.push({
-        id: `prod-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
-        title,
-        price: Number(cols[priceIdx]) || 0,
-        stock: stockIdx >= 0 ? Number(cols[stockIdx]) || 0 : 10,
-        description: descIdx >= 0 ? cols[descIdx] : "",
-        category: catIdx >= 0 ? cols[catIdx] : "",
-        color: colorIdx >= 0 ? cols[colorIdx] : "",
-        size: sizeIdx >= 0 ? cols[sizeIdx] : "",
-        image: imgIdx >= 0 ? cols[imgIdx] : "",
-      });
-    }
-
-    if (!parsed.length) {
-      setError("No valid products found in the uploaded file.");
-      return;
-    }
-
-    setProducts(parsed);
-    setStep("review");
-    setError("");
   };
 
   const handleFileSelect = (file: File) => {
     if (!file.name.toLowerCase().endsWith(".csv")) {
-      setError("Please upload a .csv file (one file at max).");
+      setError("Please upload a .csv file.");
       return;
     }
     const reader = new FileReader();
     reader.onload = (e) => {
-      const text = e.target?.result as string;
-      handleCsvParse(text);
+      handleCsvText(String(e.target?.result ?? ""), file.name);
     };
+    reader.onerror = () => setError("Could not read the selected file.");
     reader.readAsText(file);
   };
 
-  const updateProduct = (id: string, updates: Partial<ParsedProduct>) => {
-    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)));
-  };
-
-  const removeProduct = (id: string) => {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-  };
-
-  const addNewProduct = () => {
-    setProducts((prev) => [
-      ...prev,
-      {
-        id: `prod-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        title: "New Product",
-        price: 9.99,
-        stock: 20,
-        description: "",
-        category: "",
-        color: "",
-        size: "",
-        image: "",
-      },
-    ]);
-  };
-
-  const handleImageUpload = async (id: string, file: File) => {
-    updateProduct(id, { imageUploading: true });
-    try {
-      const url = await uploadAdminImage(file);
-      updateProduct(id, { image: url, imageUploading: false });
-      toast.success("Image uploaded successfully");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Image upload failed");
-      updateProduct(id, { imageUploading: false });
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!products.length) {
-      setError("Cannot submit an empty product list.");
+  const handleFolderSelect = (fileList: FileList | null) => {
+    if (!parsed) return;
+    if (!fileList?.length) {
+      setError("No files were selected from the folder.");
       return;
     }
-
-    // Client-side validations
-    for (const [idx, p] of products.entries()) {
-      if (!p.title.trim()) {
-        setError(`Product #${idx + 1} has no title.`);
-        return;
-      }
-      if (p.price <= 0) {
-        setError(`Product "${p.title}" must have a price greater than 0.`);
-        return;
-      }
+    const result = matchProductImagesFromFolder(parsed, Array.from(fileList));
+    if (!result.folderImageCount) {
+      setError("No image files found in that folder.");
+      setFolderSelected(false);
+      setImagesByTitle(new Map());
+      setFolderImageCount(0);
+      setMatchedCount(0);
+      return;
     }
-
-    setLoading(true);
+    setImagesByTitle(result.byProductTitle);
+    setFolderImageCount(result.folderImageCount);
+    setMatchedCount(result.assignedCount);
+    setFolderSelected(true);
     setError("");
-
-    try {
-      const res = await bulkUploadProductsJson(
-        products.map((p) => ({
-          title: p.title.trim(),
-          description: p.description.trim() || undefined,
-          price: p.price,
-          stock: p.stock,
-          image: p.image.trim() || undefined,
-          color: p.color.trim() || undefined,
-          size: p.size.trim() || undefined,
-          categoryName: p.category.trim() || undefined,
-        }))
-      );
-
-      toast.success(res.message || "Products queued for upload!");
-      resetAll();
-      onDone();
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Submission failed");
-    } finally {
-      setLoading(false);
-    }
   };
+
+  const clearCsv = () => {
+    resetAll();
+  };
+
+  const handleContinue = () => {
+    if (!parsed?.length) {
+      setError("Upload a CSV file before continuing.");
+      return;
+    }
+    const drafts = toDraftProducts(parsed, imagesByTitle);
+    setProducts(drafts.length ? drafts : [emptyBulkProduct()]);
+    resetAll();
+    onClose();
+    router.push("/admin/products/bulk");
+  };
+
+  const productCount = parsed?.length ?? 0;
+  const imageRefCount = csvImageNames.length;
+  const canContinue = productCount > 0;
 
   return (
     <Modal
       open={open}
-      onClose={() => {
-        resetAll();
-        onClose();
-      }}
-      title={
-        step === "upload"
-          ? "Upload Multiple Products (.csv)"
-          : `Review Products (${products.length})`
-      }
-      className={step === "review" ? "max-w-4xl max-h-[90vh] flex flex-col" : "max-w-lg rounded-xl"}
+      onClose={handleClose}
+      title="Upload Multiple Products"
+      className="max-w-[560px] rounded-2xl"
     >
-      {step === "upload" ? (
-        <div>
-          <div
-            className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center"
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              if (e.dataTransfer.files?.[0]) {
-                handleFileSelect(e.dataTransfer.files[0]);
-              }
-            }}
-          >
-            <CloudUpload className="mb-2 h-8 w-8 text-[#2563EB]" />
-            <p className="text-[13px] font-medium text-gray-700">
-              Drop your .csv file here (1 file max)
-            </p>
-            <p className="mt-1 text-[12px] text-gray-400">
-              CSV will be parsed into interactive product items
-            </p>
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              className="mt-3 rounded-lg border border-[#2563EB] px-4 py-1.5 text-[12px] font-medium text-[#2563EB] transition hover:bg-brand-50"
-            >
-              Browse CSV File
-            </button>
-            <input
-              ref={inputRef}
-              type="file"
-              accept=".csv"
-              className="hidden"
-              onChange={(e) => {
-                if (e.target.files?.[0]) {
-                  handleFileSelect(e.target.files[0]);
-                }
-              }}
-            />
-          </div>
-
-          <div className="mt-3 flex items-center justify-between text-[12px]">
+      <div>
+        <div className="space-y-4 pb-1">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-[#e8eef7] bg-[#f8fafc] px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-[14px] font-semibold text-[#1e293b]">Need a template?</p>
+              <p className="mt-0.5 text-[12px] text-[#94a3b8]">
+                XLSX with dropdown options for color, size {"&"} category
+              </p>
+            </div>
             <a
               href="/templates/products-template.csv"
               download
-              className="text-[#2563EB] hover:underline"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[#e8f0fe] px-3.5 py-2 text-[13px] font-medium text-[#3b82f6] transition hover:bg-[#dbe7fd]"
             >
-              Download CSV template
+              <Download className="h-4 w-4" />
+              Download
             </a>
-            <span className="text-gray-400">Max 1 file</span>
           </div>
 
-          {error && (
-            <div className="mt-3 flex items-center gap-1.5 text-[12px] text-red-500">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="flex flex-col flex-1 min-h-0">
-          <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-            <p className="text-[13px] text-gray-600">
-              Review details, edit values, upload images, or add/remove products before submitting
-              to the FastAPI worker.
-            </p>
-            <button
-              type="button"
-              onClick={addNewProduct}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#2563EB] bg-white px-3 py-1.5 text-[12px] font-medium text-[#2563EB] hover:bg-brand-50"
+          <p className="text-[13px] leading-relaxed text-[#94a3b8]">
+            Fill the template, save as CSV, then upload below. You can edit and attach images for
+            each product on the next step.
+          </p>
+
+          {!parsed ? (
+            <div
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") csvInputRef.current?.click();
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragging(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file) handleFileSelect(file);
+              }}
+              onClick={() => csvInputRef.current?.click()}
+              className={cn(
+                "flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-12 text-center transition",
+                dragging
+                  ? "border-[#5B8DEF] bg-[#eef4ff]"
+                  : "border-[#c7d7f5] bg-[#f8fbff] hover:border-[#5B8DEF] hover:bg-[#eef4ff]"
+              )}
             >
-              <Plus className="h-3.5 w-3.5" /> Add Product
-            </button>
-          </div>
-
-          {error && (
-            <div className="my-2 flex items-center gap-1.5 text-[12px] text-red-500 bg-red-50 p-2.5 rounded-md">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              <span>{error}</span>
+              <Upload className="mb-3 h-8 w-8 text-[#5B8DEF]" strokeWidth={1.75} />
+              <p className="text-[15px] font-semibold text-[#334155]">
+                Drag {"&"} Drop your CSV file here
+              </p>
+              <p className="mt-1 text-[13px] text-[#94a3b8]">or click to browse files</p>
             </div>
-          )}
-
-          <div className="flex-1 overflow-y-auto pr-1 py-3 space-y-3">
-            {products.map((p, index) => (
-              <div
-                key={p.id}
-                className="rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm transition hover:border-blue-200"
-              >
-                <div className="flex items-start gap-4">
-                  {/* Image section */}
-                  <div className="flex flex-col items-center">
-                    <div className="relative h-20 w-20 rounded-lg border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center">
-                      {p.image ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={p.image} alt={p.title} className="h-full w-full object-cover" />
-                      ) : (
-                        <ImageIcon className="h-6 w-6 text-gray-300" />
-                      )}
-                      {p.imageUploading && (
-                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-[10px] text-white">
-                          Uploading…
-                        </div>
-                      )}
-                    </div>
-                    <label className="mt-1 cursor-pointer text-[11px] font-medium text-[#2563EB] hover:underline">
-                      Upload
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files?.[0]) {
-                            handleImageUpload(p.id, e.target.files[0]);
-                          }
-                        }}
-                      />
-                    </label>
-                  </div>
-
-                  {/* Form fields */}
-                  <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-2.5">
-                    <div className="md:col-span-2">
-                      <label className="text-[11px] font-medium text-gray-600">
-                        Product Title *
-                      </label>
-                      <input
-                        value={p.title}
-                        onChange={(e) => updateProduct(p.id, { title: e.target.value })}
-                        placeholder="e.g. Wireless Headphones"
-                        className="mt-0.5 h-8 w-full rounded border border-gray-200 px-2 text-[12px] outline-none focus:border-[#2563EB]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] font-medium text-gray-600">Price ($) *</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={p.price}
-                        onChange={(e) =>
-                          updateProduct(p.id, { price: parseFloat(e.target.value) || 0 })
-                        }
-                        className="mt-0.5 h-8 w-full rounded border border-gray-200 px-2 text-[12px] outline-none focus:border-[#2563EB]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] font-medium text-gray-600">Stock Qty</label>
-                      <input
-                        type="number"
-                        value={p.stock}
-                        onChange={(e) =>
-                          updateProduct(p.id, { stock: parseInt(e.target.value) || 0 })
-                        }
-                        className="mt-0.5 h-8 w-full rounded border border-gray-200 px-2 text-[12px] outline-none focus:border-[#2563EB]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] font-medium text-gray-600">Category</label>
-                      <input
-                        value={p.category}
-                        onChange={(e) => updateProduct(p.id, { category: e.target.value })}
-                        placeholder="e.g. Electronics"
-                        className="mt-0.5 h-8 w-full rounded border border-gray-200 px-2 text-[12px] outline-none focus:border-[#2563EB]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] font-medium text-gray-600">Color</label>
-                      <input
-                        value={p.color}
-                        onChange={(e) => updateProduct(p.id, { color: e.target.value })}
-                        placeholder="e.g. Black"
-                        className="mt-0.5 h-8 w-full rounded border border-gray-200 px-2 text-[12px] outline-none focus:border-[#2563EB]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] font-medium text-gray-600">Size</label>
-                      <input
-                        value={p.size}
-                        onChange={(e) => updateProduct(p.id, { size: e.target.value })}
-                        placeholder="e.g. M / XL"
-                        className="mt-0.5 h-8 w-full rounded border border-gray-200 px-2 text-[12px] outline-none focus:border-[#2563EB]"
-                      />
-                    </div>
-
-                    <div className="flex items-end justify-end">
-                      <button
-                        type="button"
-                        onClick={() => removeProduct(p.id)}
-                        className="inline-flex items-center gap-1 text-[11px] text-red-500 hover:text-red-700 py-1.5"
-                        title="Remove product"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" /> Remove
-                      </button>
-                    </div>
-                  </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 rounded-xl border border-[#bfdbfe] bg-[#f0f7ff] px-4 py-3.5">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white">
+                  <FileSpreadsheet className="h-5 w-5 text-[#3b82f6]" />
                 </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[14px] font-semibold text-[#1e293b]">{fileName}</p>
+                  <p className="text-[12px] text-[#64748b]">
+                    {productCount} product{productCount === 1 ? "" : "s"} detected
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearCsv}
+                  className="rounded-md p-1 text-[#94a3b8] transition hover:bg-white hover:text-[#64748b]"
+                  aria-label="Remove CSV file"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-            ))}
-          </div>
 
-          <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setStep("upload")}
-              className="text-[12px] text-gray-600 hover:underline"
-            >
-              ← Choose another file
-            </button>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  resetAll();
-                  onClose();
-                }}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={loading || !products.length}
-                onClick={handleSubmit}
-                className="rounded-lg bg-[#2563EB] px-5 py-2 text-[13px] font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
-              >
-                {loading ? "Submitting to Queue…" : `Submit ${products.length} Products`}
-              </button>
+              <div className="rounded-xl border border-[#f5d9a8] bg-[#fff8eb] px-4 py-4">
+                <p className="text-[14px] font-semibold text-[#b45309]">
+                  {imageRefCount > 0
+                    ? `${imageRefCount} image${imageRefCount === 1 ? "" : "s"} detected across ${productCount} product${productCount === 1 ? "" : "s"}`
+                    : `Add images for ${productCount} product${productCount === 1 ? "" : "s"}`}
+                </p>
+                <p className="mt-1 text-[13px] text-[#c2410c]">
+                  Select the folder containing your images to auto-match by filename.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => folderInputRef.current?.click()}
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-[#f0c674] bg-[#ffe8b8] px-4 py-2.5 text-[14px] font-medium text-[#b45309] transition hover:bg-[#ffdf9a]"
+                >
+                  <FolderOpen className="h-4 w-4" />
+                  {folderSelected ? "Re-select Folder / Files" : "Select Images Folder"}
+                </button>
+                {folderSelected ? (
+                  <div className="mt-3 flex items-center gap-1.5 text-[13px] font-medium text-emerald-600">
+                    <CheckCircle2 className="h-4 w-4" />
+                    {matchedCount} of {folderImageCount} images selected
+                  </div>
+                ) : null}
+              </div>
             </div>
-          </div>
+          )}
+
+          <input
+            ref={csvInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleFileSelect(file);
+              e.target.value = "";
+            }}
+          />
+          <input
+            ref={folderInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              handleFolderSelect(e.target.files);
+              e.target.value = "";
+            }}
+          />
+
+          {error ? <p className="text-[12px] text-red-500">{error}</p> : null}
         </div>
-      )}
+
+        <div className="mt-6 flex items-center justify-end gap-2 border-t border-[#eef2f7] pt-4">
+          <button
+            type="button"
+            onClick={handleClose}
+            className="rounded-lg px-4 py-2.5 text-[14px] font-medium text-[#475569] transition hover:bg-[#f8fafc]"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={!canContinue}
+            onClick={handleContinue}
+            className="rounded-lg bg-[#5B8DEF] px-5 py-2.5 text-[14px] font-semibold text-white transition hover:bg-[#4a7de8] disabled:cursor-not-allowed disabled:bg-[#c5d4f7] disabled:opacity-100"
+          >
+            Continue
+          </button>
+        </div>
+      </div>
     </Modal>
   );
 }

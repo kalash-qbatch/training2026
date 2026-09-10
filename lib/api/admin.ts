@@ -167,6 +167,30 @@ export async function uploadAdminImage(file: File) {
   return data.url;
 }
 
+export async function fetchAdminJobStatus(jobId: string) {
+  const res = await fetch(`/api/admin/jobs/${encodeURIComponent(jobId)}`, {
+    cache: "no-store",
+  });
+  const data = await parseJson<{
+    success: boolean;
+    job_id?: string;
+    state?: "PENDING" | "STARTED" | "PROGRESS" | "SUCCESS" | "FAILURE" | "RETRY" | "REVOKED";
+    meta?: Record<string, unknown>;
+    result?: unknown;
+    error?: string;
+  }>(res);
+  if (!res.ok || !data.success || !data.state) {
+    throw new Error(data.error || "Failed to fetch job status");
+  }
+  return {
+    job_id: data.job_id || jobId,
+    state: data.state,
+    meta: data.meta,
+    result: data.result,
+    error: data.error,
+  };
+}
+
 export async function fetchAdminOrders(params: Record<string, string | number | undefined>) {
   const q = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
