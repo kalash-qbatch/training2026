@@ -207,7 +207,6 @@ export type OrderItem = {
 
 export type Order = {
   id: string;
-  orderNumber: number;
   orderRef: string;
   date: string;
   userId: string;

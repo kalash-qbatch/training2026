@@ -6,7 +6,6 @@ import type {
   Product as DbProduct,
 } from "@prisma/client";
 
-import { displayOrderRef } from "@/lib/order-id";
 import type { Category, Order, OrderItem, OrderStatus, Product, ProductVariant } from "@/types";
 
 type DbSpecification = {
@@ -126,8 +125,7 @@ export function mapOrder(row: DbOrderWithRelations): Order {
   }
   return {
     id: row.id,
-    orderNumber: row.orderNumber,
-    orderRef: displayOrderRef({ id: row.id, orderNumber: row.orderNumber }),
+    orderRef: row.id,
     date: row.createdAt.toISOString(),
     userId: row.userId,
     userName: row.user.fullName || row.user.name || "Customer",

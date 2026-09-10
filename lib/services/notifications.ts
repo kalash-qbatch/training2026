@@ -1,7 +1,6 @@
 import type { OrderStatus, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db";
-import { displayOrderRef } from "@/lib/order-id";
 import { emitNotificationToUser, emitUnreadCountToUser } from "@/lib/socket/server";
 import type { AppNotification } from "@/types";
 
@@ -90,14 +89,12 @@ export async function createNotification(
 export async function notifyOrderPlaced(
   tx: TxClient | typeof prisma,
   userId: string,
-  orderId: string,
-  orderNumber: number
+  orderId: string
 ) {
-  const ref = displayOrderRef({ id: orderId, orderNumber });
   return await createNotification(tx, {
     userId,
     title: "Order placed",
-    message: `Your order ${ref} has been placed successfully.`,
+    message: `Your order ${orderId} has been placed successfully.`,
     orderId,
   });
 }
@@ -106,18 +103,13 @@ export async function notifyOrderStatusChange(
   tx: TxClient | typeof prisma,
   userId: string,
   orderId: string,
-  status: OrderStatus,
-  orderNumber?: number
+  status: OrderStatus
 ) {
   const copy = statusNotificationCopy(status);
-  const ref =
-    orderNumber != null
-      ? displayOrderRef({ id: orderId, orderNumber })
-      : displayOrderRef({ id: orderId, orderNumber: 0 });
   return createNotification(tx, {
     userId,
     title: copy.title,
-    message: `${copy.message} (Order ${ref})`,
+    message: `${copy.message} (Order ${orderId})`,
     orderId,
   });
 }

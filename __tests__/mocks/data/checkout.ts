@@ -21,7 +21,6 @@ export const mockCardOrder = {
 export const mockDbOrderRow = {
   id: mockOrder.id,
   userId: mockOrder.userId,
-  orderNumber: mockOrder.orderNumber,
   stripePaymentIntentId: "pi_test_123",
   user: { fullName: "Jane Doe", name: "Jane Doe", email: "jane@example.com" },
   items: [],
@@ -31,7 +30,7 @@ export const mockPaymentIntent = {
   id: "pi_test_123",
   client_secret: "pi_test_123_secret",
   status: "succeeded",
-  metadata: { userId: "user-test-001", orderId: "order-001" },
+  metadata: { userId: "user-test-001", orderId: mockOrder.id },
   last_payment_error: null,
 };
 

@@ -20,7 +20,6 @@ import { useToast } from "@/components/ui/Toast";
 import { fetchAdminOrders } from "@/lib/api/admin";
 import { TABLE_INITIAL_PAGE, TABLE_PAGE_SIZE } from "@/lib/constants";
 import {
-  displayOrderRef,
   formatCurrency,
   formatDate,
   orderRouteId,
@@ -76,7 +75,7 @@ const AdminOrderRow = memo(function AdminOrderRow({ order }: { order: Order }) {
   return (
     <TableRow>
       <TableCell>{formatDate(order.date)}</TableCell>
-      <TableCell className="font-medium">{order.orderRef ?? displayOrderRef(order)}</TableCell>
+      <TableCell className="font-medium break-all">{order.id}</TableCell>
       <TableCell>{order.userName}</TableCell>
       <TableCell>{productCount}</TableCell>
       <TableCell className="font-medium tabular-nums">{formatCurrency(order.amount)}</TableCell>
@@ -197,7 +196,7 @@ export function OrdersPageClient() {
             value={search}
             onChange={(e) => setSearch(e.target.value.trimStart())}
             onBlur={() => setSearch((value) => value.trim())}
-            placeholder="Search by user or order number"
+            placeholder="Search by order id"
             className={`${inputClass} pr-10`}
           />
           <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-muted" />
@@ -208,7 +207,7 @@ export function OrdersPageClient() {
         <TableHeader>
           <TableRow className="border-b border-[#e5e7eb] hover:bg-transparent">
             <TableHead>Date</TableHead>
-            <TableHead>Order #</TableHead>
+            <TableHead>Order ID</TableHead>
             <TableHead>User</TableHead>
             <TableHead>Number of Product(s)</TableHead>
             <TableHead>Amount</TableHead>

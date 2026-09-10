@@ -176,7 +176,6 @@ export function delay(ms = 600) {
 
 export {
   displayOrderRef,
-  formatOrderRef,
   formatOrderRefDisplay,
   orderRouteId,
   parseOrderRef,

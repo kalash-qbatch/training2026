@@ -7,7 +7,8 @@ from app.tasks.email_tasks import render_invoice_email, send_email_task
 class InvoiceEmailTemplateTests(unittest.TestCase):
     def setUp(self):
         self.payload = {
-            "order_number": 4353452,
+            "order_id": "a1b2c3d4-e5f6-4789-a012-3456789abcde",
+            "order_number": "a1b2c3d4-e5f6-4789-a012-3456789abcde",
             "name": "Jane & Co",
             "payment_method": "CARD",
             "payment_status": "SUCCEEDED",
@@ -15,7 +16,7 @@ class InvoiceEmailTemplateTests(unittest.TestCase):
             "subtotal": "59.98",
             "tax": "4.80",
             "total": "64.78",
-            "order_url": "/orders/4353452?from=email&view=receipt",
+            "order_url": "/orders/a1b2c3d4-e5f6-4789-a012-3456789abcde?from=email&view=receipt",
             "items": [
                 {
                     "title": "Classic <Tee>",
@@ -42,7 +43,10 @@ class InvoiceEmailTemplateTests(unittest.TestCase):
             app_base_url="https://shop.example.com",
         )
 
-        self.assertEqual(subject, "Order Confirmed #4353452 — Bhai ka Store")
+        self.assertEqual(
+            subject,
+            "Order Confirmed a1b2c3d4-e5f6-4789-a012-3456789abcde — Bhai ka Store",
+        )
         self.assertIn("https://shop.example.com/products/tee.jpg", html)
         self.assertIn("Classic &lt;Tee&gt;", html)
         self.assertNotIn("Classic <Tee>", html)
@@ -54,7 +58,7 @@ class InvoiceEmailTemplateTests(unittest.TestCase):
         self.assertIn("$64.78", html)
         self.assertIn("12 Market Street, New York, 10001", html)
         self.assertIn(
-            "https://shop.example.com/orders/4353452?from=email&amp;view=receipt",
+            "https://shop.example.com/orders/a1b2c3d4-e5f6-4789-a012-3456789abcde?from=email&amp;view=receipt",
             html,
         )
         self.assertIn("Classic <Tee> (Color: Black, Size: M)", text)
@@ -63,7 +67,8 @@ class InvoiceEmailTemplateTests(unittest.TestCase):
     def test_remains_useful_for_older_jobs_without_item_details(self):
         _, html, text = render_invoice_email(
             {
-                "order_number": 4353453,
+                "order_id": "b2c3d4e5-e5f6-4789-a012-3456789abcde",
+                "order_number": "b2c3d4e5-e5f6-4789-a012-3456789abcde",
                 "total": "20",
             },
             app_base_url="https://shop.example.com",

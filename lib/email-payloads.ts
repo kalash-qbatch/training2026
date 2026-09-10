@@ -1,7 +1,6 @@
 import type { UserInfo } from "@/types";
 
 export type InvoiceEmailDetails = {
-  orderNumber: number;
   orderId: string;
   name: string;
   subTotal: number;
@@ -50,9 +49,10 @@ export function buildInvoiceEmailPayload(
   const baseUrl = appBaseUrl.replace(/\/+$/, "");
 
   return {
-    order_number: details.orderNumber,
     order_id: details.orderId,
-    order_url: `${baseUrl}/orders/${encodeURIComponent(String(details.orderNumber))}`,
+    // legacy key for older job workers — same value as order_id
+    order_number: details.orderId,
+    order_url: `${baseUrl}/orders/${encodeURIComponent(details.orderId)}`,
     subtotal: money(details.subTotal),
     tax: money(details.tax),
     total: money(details.total),
@@ -70,6 +70,6 @@ export function buildInvoiceEmailPayload(
       size: item.size,
     })),
     shipping: details.shipping,
-    subject: `Invoice & Confirmation for Order #${details.orderNumber}`,
+    subject: `Invoice & Confirmation for Order ${details.orderId}`,
   };
 }

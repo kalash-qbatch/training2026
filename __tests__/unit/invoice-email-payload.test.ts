@@ -17,10 +17,10 @@ describe("invoice email payload", () => {
   });
 
   it("includes products, variants, images, totals, shipping, and the order URL", () => {
+    const orderId = "a1b2c3d4-e5f6-4789-a012-3456789abcde";
     const payload = buildInvoiceEmailPayload(
       {
-        orderNumber: 4353452,
-        orderId: "order-001",
+        orderId,
         name: "Jane Doe",
         subTotal: 59.98,
         tax: 4.8,
@@ -52,9 +52,9 @@ describe("invoice email payload", () => {
 
     expect(payload).toEqual(
       expect.objectContaining({
-        order_number: 4353452,
-        order_id: "order-001",
-        order_url: "https://shop.example.com/orders/4353452",
+        order_number: orderId,
+        order_id: orderId,
+        order_url: `https://shop.example.com/orders/${encodeURIComponent(orderId)}`,
         subtotal: "59.98",
         tax: "4.80",
         total: "64.78",

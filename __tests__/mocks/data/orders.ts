@@ -1,9 +1,8 @@
 import type { Order } from "@/types";
 
 export const mockOrder: Order = {
-  id: "order-001",
-  orderNumber: 4_353_452,
-  orderRef: "#4353452",
+  id: "a1b2c3d4-e5f6-4789-a012-3456789abcde",
+  orderRef: "a1b2c3d4-e5f6-4789-a012-3456789abcde",
   date: "2026-08-28T10:00:00.000Z",
   userId: "user-test-001",
   userName: "Jane Doe",
