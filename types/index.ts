@@ -72,7 +72,6 @@ export type CategoryDto = {
 export type Product = {
   id: string;
   name: string;
-  description?: string;
   price: number;
   imageUrl: string;
   images?: ProductImage[];
@@ -196,7 +195,6 @@ export type OrderItem = {
   productId: string;
   specificationId?: string;
   title: string;
-  description?: string;
   imageUrl: string;
   price: number;
   qty: number;

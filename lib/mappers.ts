@@ -65,7 +65,6 @@ export function mapProduct(row: DbProductRow): Product {
   return {
     id: row.id,
     name: row.title,
-    description: row.description,
     price: Number(row.price),
     imageUrl,
     images: images.length ? images : undefined,
@@ -152,7 +151,6 @@ export function mapOrder(row: DbOrderWithRelations): Order {
       productId: item.productId,
       specificationId: item.specificationId ?? undefined,
       title: item.product.title,
-      description: item.product.description,
       imageUrl:
         (item.color?.trim()
           ? item.product.images

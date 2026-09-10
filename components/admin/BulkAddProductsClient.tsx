@@ -13,6 +13,7 @@ import { Select } from "@/components/ui/Select";
 import { useToast } from "@/components/ui/Toast";
 import {
   bulkUploadProductsJson,
+  createAdminCategory,
   fetchAdminCategories,
   fetchAdminJobStatus,
   uploadAdminImage,
@@ -24,17 +25,21 @@ import {
   useBulkUploadStore,
 } from "@/lib/bulk-upload-store";
 import {
+  assignFallbackStockToVariants,
   detectColorFromFileName,
+  ensureVariantsFromImageNames,
   normalizeColor,
   normalizeSize,
   PRODUCT_COLOR_OPTIONS,
   PRODUCT_SIZE_OPTIONS,
   resolveCategoryName,
+  selectSizeValue,
 } from "@/lib/product-options";
 import type { Category } from "@/types";
 
 const COLOR_OPTIONS = [...PRODUCT_COLOR_OPTIONS];
 const SIZE_OPTIONS = [...PRODUCT_SIZE_OPTIONS];
+const NEW_CATEGORY = "__new__";
 
 type FieldKey = "title" | "price" | "category" | "images" | "variants";
 
@@ -106,6 +111,7 @@ function ProductCard({
   onChange,
   onRemove,
   onClearError,
+  onCategoryCreated,
 }: {
   index: number;
   product: BulkDraftProduct;
@@ -115,10 +121,15 @@ function ProductCard({
   onChange: (next: BulkDraftProduct) => void;
   onRemove: () => void;
   onClearError?: () => void;
+  onCategoryCreated: (category: Category) => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState({ color: "", size: "", qty: "" });
   const [localError, setLocalError] = useState("");
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [savingCategory, setSavingCategory] = useState(false);
+  const [categoryError, setCategoryError] = useState("");
   const hasVariants = product.variants.length > 0;
   const colors = colorOptionsFor(product);
   const sizes = sizeOptionsFor(product);
@@ -127,29 +138,41 @@ function ProductCard({
   const hasFieldError = (field: FieldKey) => errorFields.has(field);
 
   const resolvedCategory = resolveCategoryName(product.categoryName, categories);
-  const categoryValue = resolvedCategory?.categoryId
-    ? resolvedCategory.categoryId
-    : product.categoryName
-      ? `__name__:${resolvedCategory?.categoryName || product.categoryName}`
-      : "";
-
+  const categoryValue = creatingCategory ? NEW_CATEGORY : (resolvedCategory?.categoryId ?? "");
   const categoryOptions = [
     ...categories.map((c) => ({ value: c.id, label: c.name })),
-    ...(product.categoryName &&
-    !categories.some((c) => c.name.toLowerCase() === product.categoryName.toLowerCase()) &&
-    !resolvedCategory?.categoryId
-      ? [
-          {
-            value: `__name__:${resolvedCategory?.categoryName || product.categoryName}`,
-            label: resolvedCategory?.categoryName || product.categoryName,
-          },
-        ]
-      : []),
+    {
+      value: NEW_CATEGORY,
+      label: "+ Create New Category",
+      accent: true,
+      className: "sticky -bottom-0 uppercase w-full z-30 bg-white border-t border-[#e5e7eb]",
+    },
   ];
 
   const patch = (next: BulkDraftProduct) => {
     onClearError?.();
     onChange(next);
+  };
+
+  const saveNewCategory = async () => {
+    const name = newCategoryName.trim();
+    if (!name) {
+      setCategoryError("Enter a category name");
+      return;
+    }
+    setSavingCategory(true);
+    setCategoryError("");
+    try {
+      const category = await createAdminCategory(name);
+      onCategoryCreated(category);
+      setCreatingCategory(false);
+      setNewCategoryName("");
+      patch({ ...product, categoryName: category.name });
+    } catch (err) {
+      setCategoryError(err instanceof Error ? err.message : "Failed to create category");
+    } finally {
+      setSavingCategory(false);
+    }
   };
 
   const addVariant = () => {
@@ -187,18 +210,41 @@ function ProductCard({
   const onUploadFiles = (files: FileList | null) => {
     if (!files?.length) return;
     const nextImages: BulkDraftImage[] = [...product.images];
+    const addedNames: string[] = [];
+    const hasFileVariants = product.variants.some((v) => v.color || v.size || v.qty > 0);
+
     for (const file of Array.from(files)) {
       if (!file.type.startsWith("image/")) continue;
       const fromName = detectColorFromFileName(file.name);
+      addedNames.push(file.name);
+      const matching = product.variants.find(
+        (v) => fromName && v.color.toLowerCase() === fromName.toLowerCase()
+      );
       nextImages.push({
         id: uid(),
         url: URL.createObjectURL(file),
         fileName: file.name,
-        color: fromName || normalizeColor(product.variants[0]?.color || ""),
+        color: fromName || matching?.color || normalizeColor(product.variants[0]?.color || ""),
         file,
       });
     }
-    patch({ ...product, images: nextImages });
+
+    // Never invent/even-split over variants that came from the uploaded file.
+    let variants = product.variants;
+    if (!hasFileVariants) {
+      variants = ensureVariantsFromImageNames(product.variants, [
+        ...product.images.map((img) => img.fileName),
+        ...addedNames,
+      ]);
+      variants = assignFallbackStockToVariants(variants, product.stock);
+    }
+
+    patch({
+      ...product,
+      images: nextImages,
+      variants,
+      stock: variantStock(variants, product.stock),
+    });
   };
 
   const removeImage = (imgId: string) => {
@@ -229,16 +275,6 @@ function ProductCard({
           <Trash2 className="h-4 w-4" />
         </button>
       </div>
-
-      {isErrorCard ? (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600">
-          <ul className="list-disc space-y-1 pl-4">
-            {validationError!.errors.map((err) => (
-              <li key={`${err.field}-${err.message}`}>{err.message}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(240px,0.9fr)_1.1fr]">
         <div data-field="images">
@@ -364,11 +400,18 @@ function ProductCard({
             <div className="mt-1.5">
               <Select
                 value={categoryValue}
+                buttonClass="!uppercase"
                 onChange={(value) => {
-                  if (value.startsWith("__name__:")) {
-                    patch({ ...product, categoryName: value.slice("__name__:".length) });
+                  if (value === NEW_CATEGORY) {
+                    setCreatingCategory(true);
+                    setNewCategoryName("");
+                    setCategoryError("");
+                    patch({ ...product, categoryName: "" });
                     return;
                   }
+                  setCreatingCategory(false);
+                  setNewCategoryName("");
+                  setCategoryError("");
                   const cat = categories.find((c) => c.id === value);
                   patch({ ...product, categoryName: cat?.name || "" });
                 }}
@@ -378,6 +421,27 @@ function ProductCard({
                 className={hasFieldError("category") ? fieldErrorClass : undefined}
               />
             </div>
+            {creatingCategory ? (
+              <div className="mt-2 flex gap-2">
+                <input
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="New category name"
+                  className="h-10 min-w-0 flex-1 rounded-md border border-neutral-border px-3 text-[13px] text-neutral-text outline-none focus:border-[#2563EB]"
+                />
+                <button
+                  type="button"
+                  disabled={savingCategory}
+                  onClick={() => void saveNewCategory()}
+                  className="shrink-0 rounded-md bg-[#2563EB] px-3 text-[13px] font-medium text-white hover:bg-brand-600 disabled:opacity-60"
+                >
+                  {savingCategory ? "Adding…" : "Add"}
+                </button>
+              </div>
+            ) : null}
+            {categoryError ? (
+              <p className="mt-1.5 text-[12px] font-normal text-red-500">{categoryError}</p>
+            ) : null}
             {hasFieldError("category") ? (
               <p className="mt-1.5 text-[12px] font-normal text-red-500">Category is required</p>
             ) : null}
@@ -436,12 +500,34 @@ function ProductCard({
                     key={`${v.color}-${v.size}-${vIdx}`}
                     className="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-2"
                   >
-                    <div className="flex h-10 items-center rounded-md border border-[#e5e7eb] px-3 text-[13px]">
-                      {v.color || "—"}
-                    </div>
-                    <div className="flex h-10 items-center rounded-md border border-[#e5e7eb] px-3 text-[13px]">
-                      {v.size || "—"}
-                    </div>
+                    <Select
+                      value={selectColorValue(v.color, colors)}
+                      onChange={(color) => {
+                        const variants = product.variants.map((item, i) =>
+                          i === vIdx ? { ...item, color: normalizeColor(color) } : item
+                        );
+                        patch({ ...product, variants });
+                      }}
+                      options={[
+                        { value: "", label: "Select Color" },
+                        ...colors.map((c) => ({ value: c, label: c })),
+                      ]}
+                      ariaLabel={`Color for variant ${vIdx + 1}`}
+                    />
+                    <Select
+                      value={selectSizeValue(v.size, sizes)}
+                      onChange={(size) => {
+                        const variants = product.variants.map((item, i) =>
+                          i === vIdx ? { ...item, size: normalizeSize(size) } : item
+                        );
+                        patch({ ...product, variants });
+                      }}
+                      options={[
+                        { value: "", label: "Select Size" },
+                        ...sizes.map((s) => ({ value: s, label: s })),
+                      ]}
+                      ariaLabel={`Size for variant ${vIdx + 1}`}
+                    />
                     <input
                       type="number"
                       min={0}
@@ -553,15 +639,16 @@ export function BulkAddProductsClient() {
       .catch(() => setCategories([]));
   }, []);
 
-  // Auto-map CSV category/color values onto real Select options once categories load.
+  // Map CSV category onto existing Select options only; clear unmatched names.
   useEffect(() => {
+    if (!categories.length) return;
     const current = useBulkUploadStore.getState().products;
     if (!current.length) return;
 
     let changed = false;
     const next = current.map((p) => {
       const resolved = resolveCategoryName(p.categoryName, categories);
-      const categoryName = resolved?.categoryName || p.categoryName;
+      const categoryName = resolved?.categoryName ?? "";
 
       const variants = p.variants.map((v) => {
         const color = normalizeColor(v.color);
@@ -715,7 +802,6 @@ export function BulkAddProductsClient() {
         const stock = variantStock(p.variants, p.stock);
         return {
           title: p.title.trim(),
-          description: p.description.trim() || undefined,
           price: p.price,
           stock,
           image: images[0]?.url,
@@ -807,33 +893,6 @@ export function BulkAddProductsClient() {
               </div>
             </div>
           </div>
-
-          {validationErrors.length ? (
-            <div className="max-h-40 overflow-y-auto rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700 shadow-sm">
-              <p className="font-semibold">
-                Fix {validationErrors.reduce((sum, e) => sum + e.errors.length, 0)} error
-                {validationErrors.reduce((sum, e) => sum + e.errors.length, 0) === 1
-                  ? ""
-                  : "s"}{" "}
-                before submitting
-              </p>
-              <ul className="mt-2 list-disc space-y-1 pl-5">
-                {validationErrors.flatMap((card) =>
-                  card.errors.map((err) => (
-                    <li key={`${card.productId}-${err.field}`}>
-                      <button
-                        type="button"
-                        className="text-left underline-offset-2 hover:underline"
-                        onClick={() => scrollToFirstError([card])}
-                      >
-                        {err.message}
-                      </button>
-                    </li>
-                  ))
-                )}
-              </ul>
-            </div>
-          ) : null}
         </div>
 
         <div className="space-y-4">
@@ -849,6 +908,12 @@ export function BulkAddProductsClient() {
                 else cardRefs.current.delete(product.id);
               }}
               onClearError={() => clearProductError(product.id)}
+              onCategoryCreated={(category) => {
+                setCategories((prev) => {
+                  if (prev.some((c) => c.id === category.id)) return prev;
+                  return [...prev, category].sort((a, b) => a.name.localeCompare(b.name));
+                });
+              }}
               onChange={(next) => updateProduct(product.id, next)}
               onRemove={() => {
                 clearProductError(product.id);

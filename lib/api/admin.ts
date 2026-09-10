@@ -56,7 +56,6 @@ export async function createAdminCategory(name: string) {
 
 type AdminProductBody = {
   title: string;
-  description?: string;
   price: number;
   stock: number;
   image?: string;
@@ -83,7 +82,6 @@ function toProductFormData(body: AdminProductBody) {
     "payload",
     JSON.stringify({
       title: body.title,
-      description: body.description,
       price: body.price,
       stock: body.stock,
       size: body.size,
@@ -134,7 +132,6 @@ export async function bulkUploadProducts(file: File) {
 export async function bulkUploadProductsJson(
   products: Array<{
     title: string;
-    description?: string;
     price: number;
     stock: number;
     image?: string;

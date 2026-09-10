@@ -64,7 +64,12 @@ export function Select({
   const [listMaxHeight, setListMaxHeight] = useState(DROPDOWN_MAX_HEIGHT);
   const rootRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
-  const selected = options.find((o) => o.value === value);
+  const selected =
+    options.find((o) => o.value === value) ||
+    (value
+      ? options.find((o) => o.value.toLowerCase() === String(value).toLowerCase())
+      : undefined);
+  const displayLabel = selected?.label ?? (value ? String(value) : "");
 
   const updatePlacement = () => {
     const trigger = rootRef.current;
@@ -145,9 +150,9 @@ export function Select({
       >
         <span className="truncate">
           {prefix ? <span className="text-[#8E94A9] uppercase">{prefix} </span> : null}
-          {selected ? (
-            <span className={cn(selected.accent && "text-[#2563EB] uppercase")}>
-              {selected.label}
+          {displayLabel ? (
+            <span className={cn(selected?.accent && "text-[#2563EB] uppercase")}>
+              {displayLabel}
             </span>
           ) : (
             <span className="text-neutral-muted uppercase">{placeholder}</span>

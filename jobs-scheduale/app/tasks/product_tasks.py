@@ -1,15 +1,8 @@
-import re
 import uuid
 from decimal import Decimal
 from app.celery_app import celery_app
 from app.database import SessionLocal
 from app.models import Product, Category, Specification, ProductImage
-
-def slugify(text: str) -> str:
-    text = text.lower().strip()
-    text = re.sub(r"[^\w\s-]", "", text)
-    text = re.sub(r"[\s_-]+", "-", text)
-    return text.strip("-")
 
 @celery_app.task(bind=True, name="app.tasks.product_tasks.process_bulk_products_task")
 def process_bulk_products_task(self, products_data: list):
@@ -39,7 +32,6 @@ def process_bulk_products_task(self, products_data: list):
             price_raw = item.get("price", 0)
             stock_raw = item.get("stock", 0)
             image_url = (item.get("image") or "").strip()
-            description = (item.get("description") or title).strip()
             category_name = (item.get("category") or item.get("categoryName") or "").strip()
             color = (item.get("color") or "").strip()
             size = (item.get("size") or "").strip()
@@ -78,16 +70,9 @@ def process_bulk_products_task(self, products_data: list):
                 category_id = None
                 if category_name:
                     cat = db.query(Category).filter(Category.name.ilike(category_name)).first()
-                    if not cat:
-                        cat_slug = slugify(category_name)
-                        cat = Category(
-                            id=str(uuid.uuid4()),
-                            name=category_name,
-                            slug=cat_slug,
-                        )
-                        db.add(cat)
-                        db.flush()
-                    category_id = cat.id
+                    if cat:
+                        category_id = cat.id
+                    # Unmatched names are ignored — never create a new category here.
 
                 if not image_url and images_list:
                     image_url = images_list[0].get("url", "")
@@ -103,8 +88,6 @@ def process_bulk_products_task(self, products_data: list):
                 if existing:
                     existing.price = price
                     existing.stock = stock
-                    if description:
-                        existing.description = description
                     if image_url:
                         existing.image = image_url
                     if category_id:
@@ -119,7 +102,6 @@ def process_bulk_products_task(self, products_data: list):
                     new_prod = Product(
                         id=str(uuid.uuid4()),
                         title=title,
-                        description=description,
                         price=price,
                         stock=stock,
                         image=image_url,

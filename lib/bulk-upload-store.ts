@@ -22,7 +22,6 @@ export type BulkDraftProduct = {
   price: number;
   stock: number;
   categoryName: string;
-  description: string;
   variants: BulkDraftVariant[];
   images: BulkDraftImage[];
 };
@@ -47,7 +46,6 @@ export function emptyBulkProduct(): BulkDraftProduct {
     price: 0,
     stock: 0,
     categoryName: "",
-    description: "",
     variants: [],
     images: [],
   };

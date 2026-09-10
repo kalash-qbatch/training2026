@@ -9,8 +9,10 @@ import { Modal } from "@/components/ui/Modal";
 import {
   type BulkCsvProduct,
   collectCsvImageFileNames,
+  isImageMappedToProduct,
   matchProductImagesFromFolder,
-  parseBulkProductsCsv,
+  parseBulkProductsFile,
+  resolveBulkVariants,
 } from "@/lib/bulk-csv";
 import {
   type BulkDraftImage,
@@ -21,37 +23,70 @@ import {
 import { detectColorFromFileName, normalizeColor } from "@/lib/product-options";
 import { cn } from "@/lib/utils";
 
+function colorForImage(
+  fileName: string,
+  product: BulkCsvProduct,
+  variants: Array<{ color: string }>
+): string {
+  const base = fileName.toLowerCase();
+  const baseNoExt = base.replace(/\.[^.]+$/, "");
+  const fromCsv = product.imageRefs.find((r) => {
+    const listed = r.fileName.toLowerCase();
+    const listedNoExt = listed.replace(/\.[^.]+$/, "");
+    return listed === base || listedNoExt === baseNoExt || base.endsWith(listed);
+  });
+  // CSV row color wins (e.g. jacket_red.jpeg → Black in the sheet).
+  if (fromCsv?.color) return normalizeColor(fromCsv.color);
+
+  const fromName = detectColorFromFileName(fileName);
+  if (fromName) {
+    const csvMatch = variants.find((v) => v.color.toLowerCase() === fromName.toLowerCase());
+    if (csvMatch) return csvMatch.color;
+    return normalizeColor(fromName);
+  }
+
+  return normalizeColor(variants[0]?.color || "");
+}
+
+/**
+ * Build draft products. When the CSV/XLSX has color/size/qty rows, those win exactly —
+ * images must never invent colors or even-split stock over file data.
+ */
 function toDraftProducts(
   parsed: BulkCsvProduct[],
-  imagesByTitle: Map<string, File[]>
+  imagesByProductId: Map<string, File[]>
 ): BulkDraftProduct[] {
   return parsed.map((p) => {
-    const variantColors = p.variants.map((v) => normalizeColor(v.color)).filter(Boolean);
-    const files = imagesByTitle.get(p.title.toLowerCase()) ?? [];
-    const images: BulkDraftImage[] = files.map((file, index) => {
-      const fromName = detectColorFromFileName(file.name);
-      const fromVariant = variantColors[index] || variantColors[0] || "";
-      return {
-        id: `img-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    const files = imagesByProductId.get(p.id) ?? [];
+    const attachedNames = files.map((f) => f.name || f.webkitRelativePath.split("/").pop() || "");
+    const variants = resolveBulkVariants(p, attachedNames);
+
+    const images: BulkDraftImage[] = [];
+    for (const file of files) {
+      const fileName = file.name || file.webkitRelativePath.split("/").pop() || "";
+      if (p.imageFileNames.length > 0 && !isImageMappedToProduct(p, fileName)) {
+        console.warn(
+          `[bulk-csv] Image "${fileName}" attached to "${p.title}" via title/color match (not listed in CSV image column)`
+        );
+      }
+      images.push({
+        id: `img-${p.id}-${fileName}`,
         url: URL.createObjectURL(file),
-        fileName: file.name,
-        color: fromName || fromVariant,
+        fileName,
+        color: colorForImage(fileName, p, variants),
         file,
-      };
-    });
+      });
+    }
+
+    const stock = variants.length ? variants.reduce((sum, v) => sum + v.qty, 0) : p.stock;
 
     return {
-      id: `bulk-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: p.id,
       title: p.title,
       price: p.price,
-      stock: p.stock,
+      stock,
       categoryName: p.categoryName.trim(),
-      description: p.description,
-      variants: p.variants.map((v) => ({
-        color: normalizeColor(v.color),
-        size: v.size,
-        qty: v.qty,
-      })),
+      variants,
       images,
     };
   });
@@ -73,10 +108,11 @@ export function AddMultipleProductsModal({
   const [fileName, setFileName] = useState("");
   const [parsed, setParsed] = useState<BulkCsvProduct[] | null>(null);
   const [csvImageNames, setCsvImageNames] = useState<string[]>([]);
-  const [imagesByTitle, setImagesByTitle] = useState<Map<string, File[]>>(new Map());
+  const [imagesByProductId, setImagesByProductId] = useState<Map<string, File[]>>(new Map());
   const [folderSelected, setFolderSelected] = useState(false);
   const [folderImageCount, setFolderImageCount] = useState(0);
   const [matchedCount, setMatchedCount] = useState(0);
+  const [unmatchedCount, setUnmatchedCount] = useState(0);
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
 
@@ -92,10 +128,11 @@ export function AddMultipleProductsModal({
     setFileName("");
     setParsed(null);
     setCsvImageNames([]);
-    setImagesByTitle(new Map());
+    setImagesByProductId(new Map());
     setFolderSelected(false);
     setFolderImageCount(0);
     setMatchedCount(0);
+    setUnmatchedCount(0);
     setError("");
     setDragging(false);
     if (csvInputRef.current) csvInputRef.current.value = "";
@@ -109,29 +146,66 @@ export function AddMultipleProductsModal({
 
   const handleCsvText = (text: string, name: string) => {
     try {
-      const products = parseBulkProductsCsv(text);
+      const products = parseBulkProductsFile(text, name);
       const imageNames = collectCsvImageFileNames(products);
       setParsed(products);
       setCsvImageNames(imageNames);
       setFileName(name);
-      setImagesByTitle(new Map());
+      setImagesByProductId(new Map());
       setFolderSelected(false);
       setFolderImageCount(0);
       setMatchedCount(0);
+      setUnmatchedCount(0);
       setError("");
     } catch (err) {
       setParsed(null);
       setCsvImageNames([]);
       setFileName("");
-      setError(err instanceof Error ? err.message : "Failed to parse CSV");
+      setError(err instanceof Error ? err.message : "Failed to parse file");
     }
   };
 
   const handleFileSelect = (file: File) => {
-    if (!file.name.toLowerCase().endsWith(".csv")) {
-      setError("Please upload a .csv file.");
+    const lower = file.name.toLowerCase();
+    const isCsv = lower.endsWith(".csv");
+    const isExcel = lower.endsWith(".xlsx") || lower.endsWith(".xls");
+    if (!isCsv && !isExcel) {
+      setError("Please upload a .csv or .xlsx file.");
       return;
     }
+
+    if (isExcel) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const buffer = e.target?.result;
+          if (!(buffer instanceof ArrayBuffer)) {
+            setError("Could not read the Excel file.");
+            return;
+          }
+          const products = parseBulkProductsFile(buffer, file.name);
+          const imageNames = collectCsvImageFileNames(products);
+          setParsed(products);
+          setCsvImageNames(imageNames);
+          setFileName(file.name);
+          setImagesByProductId(new Map());
+          setFolderSelected(false);
+          setFolderImageCount(0);
+          setMatchedCount(0);
+          setUnmatchedCount(0);
+          setError("");
+        } catch (err) {
+          setParsed(null);
+          setCsvImageNames([]);
+          setFileName("");
+          setError(err instanceof Error ? err.message : "Failed to parse Excel file");
+        }
+      };
+      reader.onerror = () => setError("Could not read the selected file.");
+      reader.readAsArrayBuffer(file);
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (e) => {
       handleCsvText(String(e.target?.result ?? ""), file.name);
@@ -150,14 +224,16 @@ export function AddMultipleProductsModal({
     if (!result.folderImageCount) {
       setError("No image files found in that folder.");
       setFolderSelected(false);
-      setImagesByTitle(new Map());
+      setImagesByProductId(new Map());
       setFolderImageCount(0);
       setMatchedCount(0);
+      setUnmatchedCount(0);
       return;
     }
-    setImagesByTitle(result.byProductTitle);
+    setImagesByProductId(result.byProductId);
     setFolderImageCount(result.folderImageCount);
     setMatchedCount(result.assignedCount);
+    setUnmatchedCount(result.unmatchedFolderFiles.length);
     setFolderSelected(true);
     setError("");
   };
@@ -171,7 +247,7 @@ export function AddMultipleProductsModal({
       setError("Upload a CSV file before continuing.");
       return;
     }
-    const drafts = toDraftProducts(parsed, imagesByTitle);
+    const drafts = toDraftProducts(parsed, imagesByProductId);
     setProducts(drafts.length ? drafts : [emptyBulkProduct()]);
     resetAll();
     onClose();
@@ -195,7 +271,7 @@ export function AddMultipleProductsModal({
             <div className="min-w-0">
               <p className="text-[14px] font-semibold text-[#1e293b]">Need a template?</p>
               <p className="mt-0.5 text-[12px] text-[#94a3b8]">
-                XLSX with dropdown options for color, size {"&"} category
+                CSV or XLSX with color, size {"&"} qty per variant row
               </p>
             </div>
             <a
@@ -209,8 +285,9 @@ export function AddMultipleProductsModal({
           </div>
 
           <p className="text-[13px] leading-relaxed text-[#94a3b8]">
-            Fill the template, save as CSV, then upload below. You can edit and attach images for
-            each product on the next step.
+            Fill one row per color/size with its own qty (e.g. Blue/M/15, Black/L/16), save as CSV
+            or XLSX, then upload. Sizes and quantities come from these rows — not from image
+            filenames.
           </p>
 
           {!parsed ? (
@@ -241,7 +318,7 @@ export function AddMultipleProductsModal({
             >
               <Upload className="mb-3 h-8 w-8 text-[#5B8DEF]" strokeWidth={1.75} />
               <p className="text-[15px] font-semibold text-[#334155]">
-                Drag {"&"} Drop your CSV file here
+                Drag {"&"} Drop your CSV or Excel file here
               </p>
               <p className="mt-1 text-[13px] text-[#94a3b8]">or click to browse files</p>
             </div>
@@ -255,7 +332,19 @@ export function AddMultipleProductsModal({
                   <p className="truncate text-[14px] font-semibold text-[#1e293b]">{fileName}</p>
                   <p className="text-[12px] text-[#64748b]">
                     {productCount} product{productCount === 1 ? "" : "s"} detected
+                    {parsed
+                      ? ` · ${parsed.reduce((n, p) => n + p.variants.length, 0)} variants`
+                      : ""}
                   </p>
+                  {parsed?.[0]?.variants.length ? (
+                    <p className="mt-0.5 truncate text-[11px] text-[#94a3b8]">
+                      e.g.{" "}
+                      {parsed[0].variants
+                        .slice(0, 3)
+                        .map((v) => `${v.color || "—"}/${v.size || "—"}/${v.qty}`)
+                        .join(", ")}
+                    </p>
+                  ) : null}
                 </div>
                 <button
                   type="button"
@@ -274,7 +363,9 @@ export function AddMultipleProductsModal({
                     : `Add images for ${productCount} product${productCount === 1 ? "" : "s"}`}
                 </p>
                 <p className="mt-1 text-[13px] text-[#c2410c]">
-                  Select the folder containing your images to auto-match by filename.
+                  Select the folder containing your images. Files are matched by CSV image filename
+                  first, then by product title / color in the filename. Unmatched files are skipped
+                  (never shared across products).
                 </p>
                 <button
                   type="button"
@@ -285,9 +376,17 @@ export function AddMultipleProductsModal({
                   {folderSelected ? "Re-select Folder / Files" : "Select Images Folder"}
                 </button>
                 {folderSelected ? (
-                  <div className="mt-3 flex items-center gap-1.5 text-[13px] font-medium text-emerald-600">
-                    <CheckCircle2 className="h-4 w-4" />
-                    {matchedCount} of {folderImageCount} images selected
+                  <div className="mt-3 space-y-1 text-[13px] font-medium">
+                    <div className="flex items-center gap-1.5 text-emerald-600">
+                      <CheckCircle2 className="h-4 w-4" />
+                      {matchedCount} of {folderImageCount} images matched to CSV rows
+                    </div>
+                    {unmatchedCount > 0 ? (
+                      <p className="text-[12px] font-normal text-[#b45309]">
+                        {unmatchedCount} folder image{unmatchedCount === 1 ? "" : "s"} skipped (no
+                        unique match to a product)
+                      </p>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
@@ -297,7 +396,7 @@ export function AddMultipleProductsModal({
           <input
             ref={csvInputRef}
             type="file"
-            accept=".csv,text/csv"
+            accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0];

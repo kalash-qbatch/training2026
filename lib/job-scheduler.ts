@@ -69,7 +69,6 @@ export async function enqueueEmailJob(params: {
 export async function enqueueBulkProductsJob(
   products: Array<{
     title: string;
-    description?: string;
     price: number;
     stock: number;
     image?: string;

@@ -57,7 +57,6 @@ model Category {
 model Product {
   id          String      @id @default(uuid())
   title       String
-  description String
   price       Decimal     @db.Decimal(10, 2)
   image       String
   color       String?

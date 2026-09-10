@@ -121,7 +121,6 @@ export async function createAdminProduct(request: Request) {
   try {
     const product = await createProduct({
       title: parsed.data.title,
-      description: parsed.data.description,
       price: parsed.data.price,
       stock: parsed.data.stock,
       image: parsed.data.image,
@@ -180,7 +179,6 @@ export async function updateAdminProduct(id: string, request: Request) {
   try {
     const product = await updateProduct(id, {
       title: parsed.data.title,
-      description: parsed.data.description,
       price: parsed.data.price,
       stock: parsed.data.stock,
       image: parsed.data.image,
@@ -217,22 +215,18 @@ function parseCsv(text: string) {
 
   const header = lines[0].split(",").map((h) => h.trim().toLowerCase());
   const titleIdx = header.indexOf("title");
-  const descIdx = header.indexOf("description");
   const priceIdx = header.indexOf("price");
   const stockIdx = header.indexOf("stock");
   const imageIdx = header.indexOf("image");
 
   if (titleIdx < 0 || priceIdx < 0 || stockIdx < 0) {
-    throw new Error(
-      "CSV must include title, price, and stock columns (optional: description, image)"
-    );
+    throw new Error("CSV must include title, price, and stock columns (optional: image)");
   }
 
   return lines.slice(1).map((line) => {
     const cols = line.split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
     return {
       title: cols[titleIdx] ?? "",
-      description: descIdx >= 0 ? cols[descIdx] : undefined,
       price: Number(cols[priceIdx]),
       stock: Number(cols[stockIdx]),
       image: imageIdx >= 0 ? cols[imageIdx] : undefined,
@@ -248,7 +242,6 @@ export async function bulkCreateAdminProducts(request: Request) {
     const contentType = request.headers.get("content-type") || "";
     let rows: Array<{
       title: string;
-      description?: string;
       price: number;
       stock: number;
       image?: string;
@@ -309,7 +302,6 @@ export async function bulkCreateAdminProducts(request: Request) {
       const jobRes = await enqueueBulkProductsJob(
         validated.map((v) => ({
           title: v.title,
-          description: v.description,
           price: v.price,
           stock: v.stock,
           image: v.image,
@@ -333,7 +325,6 @@ export async function bulkCreateAdminProducts(request: Request) {
       const products = await createProductsBulk(
         validated.map((v) => ({
           title: v.title,
-          description: v.description,
           price: v.price,
           stock: v.stock,
           image: v.image,

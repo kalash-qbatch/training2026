@@ -1,5 +1,5 @@
-title,price,category,color,size,qty,image,description
-Denimm Jackettt,1595,Jackets,Blue,M,12,denim-blue.jpg,Classic denim jacket
-Denimm Jackettt,1595,Jackets,Black,L,23,denim-black.jpg,Classic denim jacket
-Gharii,900,Watches,Gray/Silver,Fixed,16,gharii.jpg,Analog wrist watch
-Sample Cap,19.99,Accessories,Black,One Size,40,sample-cap.jpg,Everyday cap
+title,price,category,color,size,qty,image
+Classic Denim Jacket,49.99,jacket,Blue,M,15,jacket_blue.jpeg
+Classic Denim Jacket,49.99,jacket,Black,L,16,jacket_red.jpeg
+Classic Denim Jacket,49.99,jacket,Brown,XL,43,jacket_brown.jpeg
+Phone,49.99,Phones,Black,One Size,43,phone_black.jpeg

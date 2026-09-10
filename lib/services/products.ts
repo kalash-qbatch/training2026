@@ -57,10 +57,7 @@ export async function findProducts(opts?: {
       { isActive: true },
       q
         ? {
-            OR: [
-              { title: { contains: q, mode: "insensitive" } },
-              { description: { contains: q, mode: "insensitive" } },
-            ],
+            OR: [{ title: { contains: q, mode: "insensitive" } }],
           }
         : {},
       opts?.categoryId ? { categoryId: opts.categoryId } : {},
@@ -126,10 +123,7 @@ export async function findAdminProducts(opts: {
     AND: [
       q
         ? {
-            OR: [
-              { title: { contains: q, mode: "insensitive" } },
-              { description: { contains: q, mode: "insensitive" } },
-            ],
+            OR: [{ title: { contains: q, mode: "insensitive" } }],
           }
         : {},
       opts.categoryId ? { categoryId: opts.categoryId } : {},
@@ -286,7 +280,6 @@ async function syncImages(productId: string, images?: ProductImageInput[]) {
 
 export async function createProduct(data: {
   title: string;
-  description?: string;
   price: number;
   stock: number;
   image?: string;
@@ -314,7 +307,6 @@ export async function createProduct(data: {
   const row = await prisma.product.create({
     data: {
       title,
-      description: data.description?.trim() || title,
       price: data.price,
       stock,
       image,
@@ -340,7 +332,6 @@ export async function updateProduct(
   id: string,
   data: {
     title?: string;
-    description?: string;
     price?: number;
     stock?: number;
     image?: string;
@@ -371,7 +362,6 @@ export async function updateProduct(
     where: { id },
     data: {
       ...(data.title != null ? { title: normalizeTitle(data.title) } : {}),
-      ...(data.description != null ? { description: data.description } : {}),
       ...(data.price != null ? { price: data.price } : {}),
       ...(stock != null ? { stock } : {}),
       ...(image != null ? { image } : {}),
@@ -411,7 +401,6 @@ export async function updateProduct(
 export async function createProductsBulk(
   items: Array<{
     title: string;
-    description?: string;
     price: number;
     stock: number;
     image?: string;
