@@ -147,7 +147,7 @@ def _invoice_items_html(items: list[dict]) -> str:
 def render_invoice_email(payload: dict, app_base_url: str | None = None):
     base_url = app_base_url or settings.APP_BASE_URL
     items = _invoice_items(payload, base_url)
-    order_number_text = str(payload.get("order_number") or "—")
+    order_number_text = str(payload.get("order_id") or payload.get("order_number") or "—")
     order_number = escape(order_number_text)
     name_text = str(payload.get("name") or "Customer")
     name = escape(name_text)
@@ -214,7 +214,7 @@ def render_invoice_email(payload: dict, app_base_url: str | None = None):
       <p class="copy">We have received your order and will keep you updated as it moves forward.</p>
 
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;border-spacing:0;margin:0 0 22px;border:1px solid #e7edf4;border-radius:12px;background:#f8fafc">
-        <tr><td style="padding:14px 16px;border-bottom:1px solid #e7edf4;color:#64748b;font-size:13px">Order number</td><td align="right" style="padding:14px 16px;border-bottom:1px solid #e7edf4;color:#172033;font-size:14px;font-weight:700">#{order_number}</td></tr>
+        <tr><td style="padding:14px 16px;border-bottom:1px solid #e7edf4;color:#64748b;font-size:13px">Order ID</td><td align="right" style="padding:14px 16px;border-bottom:1px solid #e7edf4;color:#172033;font-size:14px;font-weight:700">{order_number}</td></tr>
         <tr><td style="padding:14px 16px;border-bottom:1px solid #e7edf4;color:#64748b;font-size:13px">Payment method</td><td align="right" style="padding:14px 16px;border-bottom:1px solid #e7edf4;color:#172033;font-size:13px;font-weight:700">{method_label}</td></tr>
         <tr><td style="padding:14px 16px;border-bottom:1px solid #e7edf4;color:#64748b;font-size:13px">Payment status</td><td align="right" style="padding:10px 16px;border-bottom:1px solid #e7edf4">{pay_badge}</td></tr>
         <tr><td style="padding:14px 16px;color:#64748b;font-size:13px">Order status</td><td align="right" style="padding:10px 16px">{order_badge}</td></tr>
@@ -230,20 +230,20 @@ def render_invoice_email(payload: dict, app_base_url: str | None = None):
       </table>
       {shipping_html}
       {button_html}
-      <p style="margin:18px 0 0;color:#94a3b8;font-size:11px;line-height:17px;text-align:center">Keep this email for your records. If you have questions, reply to this message with your order number.</p>
+      <p style="margin:18px 0 0;color:#94a3b8;font-size:11px;line-height:17px;text-align:center">Keep this email for your records. If you have questions, reply to this message with your order ID.</p>
     """
 
-    subject = payload.get("subject") or f"Order Confirmed #{order_number_text} — Bhai ka Store"
+    subject = payload.get("subject") or f"Order Confirmed {order_number_text} — Bhai ka Store"
     html = _shell(
         "linear-gradient(135deg,#059669,#0f766e)",
         "Order Confirmed!",
-        f"Order #{order_number} &bull; Thanks for shopping with us",
+        f"Order {order_number} &bull; Thanks for shopping with us",
         body,
     )
 
     text_lines = [
         "ORDER CONFIRMED",
-        f"Order #{order_number_text}",
+        f"Order {order_number_text}",
         f"Customer: {name_text}",
         f"Payment method: {method_label}",
         f"Payment status: {payment_status.title()}",
@@ -364,10 +364,10 @@ def send_email_task(self, email_type: str, to: str, payload: dict):
             text = text or rendered_text
         else:
             order_number = payload.get("order_number") or "—"
-            subject = subject or f"Order Confirmed #{order_number} — Bhai ka Store"
+            subject = subject or f"Order Confirmed {order_number} — Bhai ka Store"
 
     elif email_type == "payment_failed":
-        order_number = escape(str(payload.get("order_number") or "—"))
+        order_number = escape(str(payload.get("order_id") or payload.get("order_number") or "—"))
         name = escape(str(payload.get("name") or "Customer"))
         total = payload.get("total", "")
         attempt = int(payload.get("attempt", 1))
@@ -382,7 +382,7 @@ def send_email_task(self, email_type: str, to: str, payload: dict):
             if total
             else ""
         )
-        subject = subject or f"Payment Unpaid — Order #{payload.get('order_number')} is Pending"
+        subject = subject or f"Payment Unpaid — Order {payload.get('order_id') or payload.get('order_number')} is Pending"
         if not html:
             html = _shell(
                 "linear-gradient(135deg,#d97706,#b45309)",
@@ -393,7 +393,7 @@ def send_email_task(self, email_type: str, to: str, payload: dict):
                 <p class="copy">We could not process your payment. Your order is still reserved with
                 <strong>Payment Status: Unpaid</strong> and <strong>Order Status: Pending</strong>.</p>
                 <div class="tbl">
-                  <div class="row"><span class="lbl">Order Number</span><span class="val">#{order_number}</span></div>
+                  <div class="row"><span class="lbl">Order ID</span><span class="val">{order_number}</span></div>
                   {total_row}
                   <div class="row"><span class="lbl">Payment Status</span><span class="val">
                     <span class="bdg" style="background:#fee2e2;color:#991b1b">Unpaid</span></span></div>
@@ -410,10 +410,10 @@ def send_email_task(self, email_type: str, to: str, payload: dict):
             )
 
     elif email_type == "payment_success":
-        order_number = escape(str(payload.get("order_number") or "—"))
+        order_number = escape(str(payload.get("order_id") or payload.get("order_number") or "—"))
         total = escape(str(payload.get("total") or "0.00"))
         name = escape(str(payload.get("name") or "Customer"))
-        subject = subject or f"Payment Confirmed — Order #{payload.get('order_number')}"
+        subject = subject or f"Payment Confirmed — Order {payload.get('order_id') or payload.get('order_number')}"
         if not html:
             html = _shell(
                 "linear-gradient(135deg,#2563eb,#4f46e5)",
@@ -422,7 +422,7 @@ def send_email_task(self, email_type: str, to: str, payload: dict):
                 f"""
                 <p class="greet">Dear <strong>{name}</strong>, your payment was successfully processed.</p>
                 <div class="tbl">
-                  <div class="row"><span class="lbl">Order Number</span><span class="val">#{order_number}</span></div>
+                  <div class="row"><span class="lbl">Order ID</span><span class="val">{order_number}</span></div>
                   <div class="row"><span class="lbl">Total Charged</span><span class="val" style="color:#2563eb;font-size:16px">${total}</span></div>
                   <div class="row"><span class="lbl">Payment Status</span><span class="val">
                     <span class="bdg" style="background:#dcfce7;color:#15803d">Paid</span></span></div>
@@ -433,10 +433,10 @@ def send_email_task(self, email_type: str, to: str, payload: dict):
             )
 
     elif email_type == "order_approved":
-        order_number = escape(str(payload.get("order_number") or "—"))
+        order_number = escape(str(payload.get("order_id") or payload.get("order_number") or "—"))
         name = escape(str(payload.get("name") or "Customer"))
         total = escape(str(payload.get("total") or "0.00"))
-        subject = subject or f"Order #{payload.get('order_number')} Approved — On the way!"
+        subject = subject or f"Order {payload.get('order_id') or payload.get('order_number')} Approved — On the way!"
         if not html:
             html = _shell(
                 "linear-gradient(135deg,#2563eb,#1d4ed8)",
@@ -446,7 +446,7 @@ def send_email_task(self, email_type: str, to: str, payload: dict):
                 <p class="greet">Dear <strong>{name}</strong>,</p>
                 <p class="copy">Good news — your order has been <strong>approved</strong> and is now being prepared for delivery.</p>
                 <div class="tbl">
-                  <div class="row"><span class="lbl">Order Number</span><span class="val">#{order_number}</span></div>
+                  <div class="row"><span class="lbl">Order ID</span><span class="val">{order_number}</span></div>
                   <div class="row"><span class="lbl">Total</span><span class="val">${total}</span></div>
                   <div class="row"><span class="lbl">Order Status</span><span class="val">
                     <span class="bdg" style="background:#dbeafe;color:#1d4ed8">Approved</span></span></div>
@@ -457,10 +457,10 @@ def send_email_task(self, email_type: str, to: str, payload: dict):
             )
 
     elif email_type == "order_delivered":
-        order_number = escape(str(payload.get("order_number") or "—"))
+        order_number = escape(str(payload.get("order_id") or payload.get("order_number") or "—"))
         name = escape(str(payload.get("name") or "Customer"))
         total = escape(str(payload.get("total") or "0.00"))
-        subject = subject or f"Your Order #{payload.get('order_number')} has been Delivered!"
+        subject = subject or f"Your Order {payload.get('order_id') or payload.get('order_number')} has been Delivered!"
         if not html:
             html = _shell(
                 "linear-gradient(135deg,#16a34a,#059669)",
@@ -469,7 +469,7 @@ def send_email_task(self, email_type: str, to: str, payload: dict):
                 f"""
                 <p class="greet">Dear <strong>{name}</strong>, your order has been delivered.</p>
                 <div class="tbl">
-                  <div class="row"><span class="lbl">Order Number</span><span class="val">#{order_number}</span></div>
+                  <div class="row"><span class="lbl">Order ID</span><span class="val">{order_number}</span></div>
                   <div class="row"><span class="lbl">Total</span><span class="val">${total}</span></div>
                   <div class="row"><span class="lbl">Order Status</span><span class="val">
                     <span class="bdg" style="background:#dcfce7;color:#15803d">Delivered</span></span></div>
@@ -482,7 +482,7 @@ def send_email_task(self, email_type: str, to: str, payload: dict):
             )
 
     elif email_type == "order_cancelled":
-        order_number = escape(str(payload.get("order_number") or "—"))
+        order_number = escape(str(payload.get("order_id") or payload.get("order_number") or "—"))
         name = escape(str(payload.get("name") or "Customer"))
         reason = escape(
             str(
@@ -492,7 +492,7 @@ def send_email_task(self, email_type: str, to: str, payload: dict):
                 )
             )
         )
-        subject = subject or f"Order #{payload.get('order_number')} has been Cancelled"
+        subject = subject or f"Order {payload.get('order_id') or payload.get('order_number')} has been Cancelled"
         if not html:
             html = _shell(
                 "linear-gradient(135deg,#ef4444,#dc2626)",
@@ -500,9 +500,9 @@ def send_email_task(self, email_type: str, to: str, payload: dict):
                 "This order could not be completed",
                 f"""
                 <p class="greet">Dear <strong>{name}</strong>,</p>
-                <p class="copy">Your order <strong>#{order_number}</strong> has been cancelled because {reason}.</p>
+                <p class="copy">Your order <strong>{order_number}</strong> has been cancelled because {reason}.</p>
                 <div class="tbl">
-                  <div class="row"><span class="lbl">Order Number</span><span class="val">#{order_number}</span></div>
+                  <div class="row"><span class="lbl">Order ID</span><span class="val">{order_number}</span></div>
                   <div class="row"><span class="lbl">Order Status</span><span class="val">
                     <span class="bdg" style="background:#fee2e2;color:#991b1b">Cancelled</span></span></div>
                   <div class="row"><span class="lbl">Payment Status</span><span class="val">

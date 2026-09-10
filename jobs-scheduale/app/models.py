@@ -95,7 +95,6 @@ class Order(Base):
     __tablename__ = "Order"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    orderNumber = Column(Integer, unique=True, nullable=False)
     userId = Column(String, ForeignKey("User.id"), nullable=False)
     status = Column(String, default="PENDING")
     paymentMethod = Column(String, default="CARD")

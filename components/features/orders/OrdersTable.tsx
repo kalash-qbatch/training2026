@@ -13,7 +13,6 @@ import {
   TableRow,
 } from "@/components/ui/Table";
 import {
-  displayOrderRef,
   formatCurrency,
   formatDate,
   orderRouteId,
@@ -36,9 +35,7 @@ const OrderTableRow = memo(function OrderTableRow({
   return (
     <TableRow className="border-b border-neutral-border">
       <TableCell className="py-4 text-sm">{formatDate(order.date)}</TableCell>
-      <TableCell className="py-4 text-sm font-medium">
-        {order.orderRef ?? displayOrderRef(order)}
-      </TableCell>
+      <TableCell className="max-w-48 break-all py-4 text-sm font-medium">{order.id}</TableCell>
       <TableCell className="py-4 text-sm">{productCount}</TableCell>
       <TableCell className="py-4 text-sm font-semibold tabular-nums">
         {formatCurrency(order.amount)}
@@ -64,7 +61,7 @@ const OrderTableRow = memo(function OrderTableRow({
           type="button"
           onClick={() => onViewOrder?.(orderRouteId(order))}
           className="inline-flex cursor-pointer rounded-md p-2 text-neutral-muted hover:bg-brand-50 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-          aria-label={`View order ${order.orderRef ?? displayOrderRef(order)}`}
+          aria-label={`View order ${order.id}`}
         >
           <ArrowUpRight className="h-4 w-4" strokeWidth={2} />
         </button>
@@ -86,9 +83,7 @@ const OrderMobileCard = memo(function OrderMobileCard({
     <li className="rounded-lg border border-neutral-border bg-neutral-surface p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-neutral-text">
-            {order.orderRef ?? displayOrderRef(order)}
-          </p>
+          <p className="break-all text-sm font-semibold text-neutral-text">{order.id}</p>
           <p className="mt-1 text-xs text-neutral-muted">{formatDate(order.date)}</p>
           <p className="mt-1 text-xs text-neutral-muted">
             {productCount} product{productCount === 1 ? "" : "s"}
@@ -113,7 +108,7 @@ const OrderMobileCard = memo(function OrderMobileCard({
           type="button"
           onClick={() => onViewOrder?.(orderRouteId(order))}
           className="rounded-md p-2 text-neutral-muted hover:bg-brand-50 hover:text-brand-600"
-          aria-label={`View order ${order.orderRef ?? displayOrderRef(order)}`}
+          aria-label={`View order ${order.id}`}
         >
           <ArrowUpRight className="h-4 w-4" />
         </button>
@@ -143,7 +138,7 @@ export function OrdersTable({
           <TableHeader>
             <TableRow className="border-b border-neutral-border text-left hover:bg-transparent">
               <TableHead>Date</TableHead>
-              <TableHead>Order #</TableHead>
+              <TableHead>Order ID</TableHead>
               <TableHead>Number of Product(s)</TableHead>
               <TableHead>Amount</TableHead>
               <TableHead>Order Status</TableHead>

@@ -5,13 +5,7 @@ import { TAX_RATE } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 import { buildInvoiceEmailPayload, selectInvoiceProductImage } from "@/lib/email-payloads";
 import { mapOrder } from "@/lib/mappers";
-import {
-  allocateOrderNumber,
-  buildOrderUniqueWhere,
-  hasValidOrderNumber,
-  parseOrderRef,
-} from "@/lib/order-id";
-import { ensureOrderNumberInfrastructure } from "@/lib/order-number-setup";
+import { buildOrderUniqueWhere, parseOrderRef } from "@/lib/order-id";
 import { removeCartItems, syncOrderItemsToCart } from "@/lib/services/cart";
 import { notifyOrderPlaced, notifyOrderStatusChange } from "@/lib/services/notifications";
 import type { AdminOrderFilters, Order, OrderItem, PlaceOrderItemInput } from "@/types";
@@ -36,25 +30,6 @@ const orderInclude = {
   user: { select: { fullName: true, name: true, email: true } },
   items: orderItemsInclude,
 } as const;
-
-async function backfillOrderNumberIfMissing<
-  T extends { id: string; orderNumber: number | null | undefined },
->(row: T): Promise<T> {
-  if (hasValidOrderNumber(row.orderNumber)) return row;
-
-  try {
-    const orderNumber = await prisma.$transaction(async (tx) => allocateOrderNumber(tx));
-    const updated = await prisma.order.update({
-      where: { id: row.id },
-      data: { orderNumber },
-      include: orderInclude,
-    });
-    return updated as unknown as T;
-  } catch (err) {
-    console.error("orderNumber backfill error:", err);
-    return row;
-  }
-}
 
 // Error handling component with status code as well
 export class OrderError extends Error {
@@ -86,8 +61,6 @@ export async function createOrder(
   if (!items.length) {
     throw new OrderError("Cart is empty");
   }
-
-  await ensureOrderNumberInfrastructure();
 
   const created = await prisma.$transaction(
     async (tx) => {
@@ -224,11 +197,9 @@ export async function createOrder(
       const paymentStatus = opts?.paymentStatus ?? "PENDING";
       // Card orders stay PENDING until payment succeeds; COD starts as PROCESSING.
       const orderStatus = opts?.orderStatus ?? (paymentMethod === "COD" ? "PROCESSING" : "PENDING");
-      const orderNumber = await allocateOrderNumber(tx);
 
       const order = await tx.order.create({
         data: {
-          orderNumber,
           userId,
           status: orderStatus,
           paymentMethod,
@@ -261,7 +232,7 @@ export async function createOrder(
         },
       });
 
-      await notifyOrderPlaced(tx, userId, order.id, order.orderNumber);
+      await notifyOrderPlaced(tx, userId, order.id);
 
       for (const line of lineData) {
         await tx.cartItem.deleteMany({
@@ -278,7 +249,6 @@ export async function createOrder(
         mail: {
           to: order.shippingEmail || order.user?.email || null,
           name: order.shippingFullName || order.user?.fullName || order.user?.name || "Customer",
-          orderNumber: order.orderNumber,
           orderId: order.id,
           subTotal: Number(order.subTotal),
           tax: Number(order.tax),
@@ -327,8 +297,6 @@ export async function findOrders(
   page: number;
   pageSize: number;
 }> {
-  await ensureOrderNumberInfrastructure();
-
   const where = userId ? { userId } : {};
   const total = await prisma.order.count({ where });
   const rows = await prisma.order.findMany({
@@ -339,10 +307,8 @@ export async function findOrders(
     take: pageSize,
   });
 
-  const hydrated = await Promise.all(rows.map((row) => backfillOrderNumberIfMissing(row)));
-
   return {
-    orders: hydrated.map(mapOrder),
+    orders: rows.map(mapOrder),
     total,
     page,
     pageSize,
@@ -381,15 +347,11 @@ export async function findLatestShippingForUser(userId: string): Promise<Shippin
 }
 
 export async function findOrderById(id: string, userId?: string): Promise<Order | null> {
-  await ensureOrderNumberInfrastructure();
-
-  let row = await prisma.order.findFirst({
+  const row = await prisma.order.findFirst({
     where: buildOrderUniqueWhere(id, userId),
     include: orderInclude,
   });
   if (!row) return null;
-
-  row = await backfillOrderNumberIfMissing(row);
 
   if (
     row.status === "DELIVERED" &&
@@ -637,14 +599,14 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
       },
     });
 
-    await notifyOrderStatusChange(tx, existing.userId, id, status, row.orderNumber);
+    await notifyOrderStatusChange(tx, existing.userId, id, status);
 
     return {
       order: mapOrder(row),
       mail: {
         to: row.shippingEmail || row.user?.email || null,
         name: row.shippingFullName || row.user?.fullName || row.user?.name || "Customer",
-        orderNumber: row.orderNumber,
+        orderId: row.id,
         total: Number(row.total).toFixed(2),
         status,
         justCancelled: willCancel && !wasCancelled,
@@ -660,10 +622,11 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
           emailType: "order_approved",
           to: mapped.mail.to,
           payload: {
-            order_number: mapped.mail.orderNumber,
+            order_id: mapped.mail.orderId,
+            order_number: mapped.mail.orderId,
             name: mapped.mail.name,
             total: mapped.mail.total,
-            subject: `Order #${mapped.mail.orderNumber} Approved — On the way!`,
+            subject: `Order ${mapped.mail.orderId} Approved — On the way!`,
           },
         });
       } else if (mapped.mail.status === "DELIVERED") {
@@ -671,10 +634,11 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
           emailType: "order_delivered",
           to: mapped.mail.to,
           payload: {
-            order_number: mapped.mail.orderNumber,
+            order_id: mapped.mail.orderId,
+            order_number: mapped.mail.orderId,
             name: mapped.mail.name,
             total: mapped.mail.total,
-            subject: `Your Order #${mapped.mail.orderNumber} has been Delivered!`,
+            subject: `Your Order ${mapped.mail.orderId} has been Delivered!`,
           },
         });
       } else if (mapped.mail.justCancelled) {
@@ -682,10 +646,11 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
           emailType: "order_cancelled",
           to: mapped.mail.to,
           payload: {
-            order_number: mapped.mail.orderNumber,
+            order_id: mapped.mail.orderId,
+            order_number: mapped.mail.orderId,
             name: mapped.mail.name,
             reason: "it was cancelled by the store",
-            subject: `Order #${mapped.mail.orderNumber} has been Cancelled`,
+            subject: `Order ${mapped.mail.orderId} has been Cancelled`,
           },
         });
       }
@@ -697,15 +662,9 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
   return mapped.order;
 }
 
-async function buildOrderWhere(opts: AdminOrderFilters): Promise<Prisma.OrderWhereInput> {
+function buildOrderWhere(opts: AdminOrderFilters): Prisma.OrderWhereInput {
   const q = opts.search?.trim();
   const ref = q ? parseOrderRef(q) : "";
-  const matches = /^\d+$/.test(ref)
-    ? await prisma.$queryRaw<{ id: string }[]>`
-        SELECT "id" FROM "Order"
-        WHERE CAST("orderNumber" AS TEXT) LIKE ${`%${ref}%`}
-      `
-    : [];
   return {
     AND: [
       opts.userId ? { userId: opts.userId } : {},
@@ -720,26 +679,15 @@ async function buildOrderWhere(opts: AdminOrderFilters): Promise<Prisma.OrderWhe
             },
           }
         : {},
-      q
-        ? {
-            OR: [
-              { id: { in: matches.map((order) => order.id) } },
-              { user: { fullName: { contains: q, mode: "insensitive" } } },
-              { user: { email: { contains: q, mode: "insensitive" } } },
-              { user: { name: { contains: q, mode: "insensitive" } } },
-            ],
-          }
-        : {},
+      ref ? { id: { contains: ref, mode: "insensitive" as const } } : {},
     ],
   };
 }
 
 export async function findAdminOrders(opts: AdminOrderFilters = {}) {
-  await ensureOrderNumberInfrastructure();
-
   const page = opts.page ?? 1;
   const pageSize = opts.pageSize ?? 8;
-  const where = await buildOrderWhere(opts);
+  const where = buildOrderWhere(opts);
 
   const [total, rows, aggregates, unitsAgg] = await Promise.all([
     prisma.order.count({ where }),
@@ -761,10 +709,8 @@ export async function findAdminOrders(opts: AdminOrderFilters = {}) {
     }),
   ]);
 
-  const hydrated = await Promise.all(rows.map((row) => backfillOrderNumberIfMissing(row)));
-
   return {
-    orders: hydrated.map(mapOrder),
+    orders: rows.map(mapOrder),
     total,
     page,
     pageSize,
@@ -985,13 +931,7 @@ export async function handlePaymentFailure(orderId: string, paymentIntentId?: st
           items: orderItemsInclude,
         },
       });
-      await notifyOrderStatusChange(
-        tx,
-        existing.userId,
-        orderId,
-        "CANCELLED",
-        existing.orderNumber
-      );
+      await notifyOrderStatusChange(tx, existing.userId, orderId, "CANCELLED");
       return { action: "cancelled" as const, order: mapOrder(row) };
     }
 
@@ -1020,7 +960,7 @@ export async function handlePaymentFailure(orderId: string, paymentIntentId?: st
       mail: {
         to: row.shippingEmail || row.user?.email || null,
         name: row.shippingFullName || row.user?.fullName || row.user?.name || "Customer",
-        orderNumber: row.orderNumber,
+        orderId: row.id,
         total: Number(row.total).toFixed(2),
         attempt: newAttemptCount,
       },
@@ -1034,13 +974,14 @@ export async function handlePaymentFailure(orderId: string, paymentIntentId?: st
         emailType: "payment_failed",
         to: result.mail.to,
         payload: {
-          order_number: result.mail.orderNumber,
+          order_id: result.mail.orderId,
+          order_number: result.mail.orderId,
           name: result.mail.name,
           total: result.mail.total,
           attempt: result.mail.attempt,
           cancel_minutes: 5,
           retry_url: `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/checkout?orderId=${orderId}`,
-          subject: `Payment Unpaid — Order #${result.mail.orderNumber} is Pending`,
+          subject: `Payment Unpaid — Order ${result.mail.orderId} is Pending`,
         },
       });
     } catch (mailErr) {
@@ -1142,19 +1083,18 @@ export async function confirmExistingOrderPayment(
           emailType: "payment_success",
           to: recipientEmail,
           payload: {
-            order_number: updated.orderNumber,
+            order_id: updated.id,
+            order_number: updated.id,
             name: recipientName,
             total: Number(updated.total).toFixed(2),
-            subject: `Payment Confirmed — Order #${updated.orderNumber}`,
+            subject: `Payment Confirmed — Order ${updated.id}`,
           },
         });
       } catch (mailErr) {
         console.error("Failed to enqueue payment_success email:", mailErr);
       }
     } else {
-      console.error(
-        `payment_success email skipped: no recipient for order #${updated.orderNumber}`
-      );
+      console.error(`payment_success email skipped: no recipient for order ${updated.id}`);
     }
   }
 

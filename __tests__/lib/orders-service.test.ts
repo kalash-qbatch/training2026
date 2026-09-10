@@ -2,15 +2,10 @@ import { createOrder, findAdminOrders, updateOrderStatus } from "@/lib/services/
 
 const mockClaimCart = jest.fn();
 const mockCheckoutProduct = jest.fn();
-const mockQueryRaw = jest.fn();
 const mockCount = jest.fn();
 const mockFindMany = jest.fn();
 const mockAggregate = jest.fn();
 const mockUnitsAggregate = jest.fn();
-
-jest.mock("../../lib/order-number-setup", () => ({
-  ensureOrderNumberInfrastructure: jest.fn().mockResolvedValue(undefined),
-}));
 
 const mockFindUnique = jest.fn();
 const mockUpdate = jest.fn();
@@ -18,7 +13,6 @@ const mockNotifyOrderStatusChange = jest.fn();
 
 jest.mock("../../lib/db", () => ({
   prisma: {
-    $queryRaw: (...args: unknown[]) => mockQueryRaw(...args),
     order: {
       count: (...args: unknown[]) => mockCount(...args),
       findMany: (...args: unknown[]) => mockFindMany(...args),
@@ -43,9 +37,8 @@ jest.mock("../../lib/services/notifications", () => ({
 }));
 
 jest.mock("../../lib/mappers", () => ({
-  mapOrder: (row: { id: string; orderNumber: number; status: string; paymentStatus: string }) => ({
+  mapOrder: (row: { id: string; status: string; paymentStatus: string }) => ({
     id: row.id,
-    orderNumber: row.orderNumber,
     status: row.status.toLowerCase(),
     paymentStatus: row.paymentStatus,
   }),
@@ -60,7 +53,6 @@ describe("orders service — updateOrderStatus", () => {
   it("marks payment as SUCCEEDED when order is delivered", async () => {
     mockFindUnique.mockResolvedValue({
       id: "order-001",
-      orderNumber: 4353452,
       userId: "user-001",
       status: "SHIPPED",
       paymentMethod: "COD",
@@ -69,7 +61,6 @@ describe("orders service — updateOrderStatus", () => {
     });
     mockUpdate.mockResolvedValue({
       id: "order-001",
-      orderNumber: 4353452,
       status: "DELIVERED",
       paymentStatus: "SUCCEEDED",
       user: { fullName: "Jane", name: "Jane", email: "jane@example.com" },
@@ -121,33 +112,35 @@ describe("orders service — updateOrderStatus", () => {
 describe("admin order search", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockQueryRaw.mockResolvedValue([{ id: "matching-order" }]);
     mockCount.mockResolvedValue(0);
     mockFindMany.mockResolvedValue([]);
     mockAggregate.mockResolvedValue({ _count: { _all: 0 }, _sum: { total: 0 } });
     mockUnitsAggregate.mockResolvedValue({ _sum: { quantity: 0 } });
   });
 
-  it.each(["55", "4353505", " #4353505 "])("searches displayed numbers for %s", async (search) => {
-    await findAdminOrders({ search });
-    expect(mockQueryRaw.mock.calls[0][0].join("?")).toContain('CAST("orderNumber" AS TEXT) LIKE ?');
-    expect(mockQueryRaw.mock.calls[0][1]).toBe(`%${search.trim().replace(/^#/, "")}%`);
-    const where = mockFindMany.mock.calls[0][0].where;
-    expect(where.AND.at(-1).OR).toContainEqual({ id: { in: ["matching-order"] } });
-    expect(JSON.stringify(where)).not.toContain('"id":{"contains"');
-    expect(mockCount).toHaveBeenCalledWith({ where });
-    expect(mockAggregate).toHaveBeenCalledWith(expect.objectContaining({ where }));
-    expect(mockUnitsAggregate).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { order: where } })
-    );
-  });
+  it.each(["a1b2c3d4", "A1B2C3D4-1234", " #order-abc "])(
+    "searches by order id contains for %s",
+    async (search) => {
+      await findAdminOrders({ search });
+      const where = mockFindMany.mock.calls[0][0].where;
+      const expectedRef = search.trim().replace(/^#/, "");
+      expect(where.AND.at(-1)).toEqual({
+        id: { contains: expectedRef, mode: "insensitive" },
+      });
+      expect(JSON.stringify(where)).not.toContain("fullName");
+      expect(JSON.stringify(where)).not.toContain("orderNumber");
+      expect(mockCount).toHaveBeenCalledWith({ where });
+      expect(mockAggregate).toHaveBeenCalledWith(expect.objectContaining({ where }));
+      expect(mockUnitsAggregate).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { order: where } })
+      );
+    }
+  );
 
-  it("keeps user search and skips number lookup for names", async () => {
-    await findAdminOrders({ search: "Jane" });
-    expect(mockQueryRaw).not.toHaveBeenCalled();
-    expect(mockFindMany.mock.calls[0][0].where.AND.at(-1).OR).toContainEqual({
-      user: { fullName: { contains: "Jane", mode: "insensitive" } },
-    });
+  it("skips id filter when search is empty", async () => {
+    await findAdminOrders({ search: "   " });
+    const where = mockFindMany.mock.calls[0][0].where;
+    expect(where.AND.at(-1)).toEqual({});
   });
 });
 

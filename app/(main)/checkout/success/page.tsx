@@ -6,8 +6,6 @@ import { CheckCircle2, CreditCard, Package, ShoppingBag, Truck } from "lucide-re
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-import { formatOrderRefDisplay } from "@/lib/utils";
-
 function SuccessContent() {
   const params = useSearchParams();
   const orderId = params.get("orderId");
@@ -30,8 +28,8 @@ function SuccessContent() {
             {orderId && (
               <div className="flex items-center justify-between rounded-xl bg-neutral-50 px-4 py-3">
                 <span className="text-sm text-neutral-500">Order ID</span>
-                <span className="font-mono text-sm font-semibold text-neutral-800">
-                  {formatOrderRefDisplay(orderId)}
+                <span className="font-mono text-sm font-semibold text-neutral-800 break-all">
+                  {orderId}
                 </span>
               </div>
             )}

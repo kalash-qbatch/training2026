@@ -89,7 +89,7 @@ def _cancel_order_and_notify(db, order: Order, reason: str):
             id=str(uuid.uuid4()),
             userId=order.userId,
             title="Order cancelled",
-            message=f"Your order #{order.orderNumber} was cancelled because {reason}.",
+            message=f"Your order {order.id} was cancelled because {reason}.",
             orderId=order.id,
             read=False,
             createdAt=datetime.utcnow(),
@@ -109,10 +109,10 @@ def _cancel_order_and_notify(db, order: Order, reason: str):
             email_type="order_cancelled",
             to=user_email,
             payload={
-                "order_number": order.orderNumber,
+                "order_id": order.id, "order_number": order.id,
                 "name": user_name,
                 "reason": reason,
-                "subject": f"Order #{order.orderNumber} has been Cancelled",
+                "subject": f"Order {order.id} has been Cancelled",
             },
         )
 
@@ -162,7 +162,7 @@ def cancel_unpaid_order_task(order_id: str):
         return {
             "cancelled": cancelled,
             "order_id": order_id,
-            "orderNumber": order.orderNumber,
+            "id": order.id,
         }
     except Exception:
         db.rollback()
@@ -209,7 +209,6 @@ def cancel_stale_failed_orders_task(hours_threshold: int = None):
                 cancelled_orders.append(
                     {
                         "id": order.id,
-                        "orderNumber": order.orderNumber,
                         "userId": order.userId,
                     }
                 )

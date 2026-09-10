@@ -13,7 +13,6 @@ import { getOrderById } from "@/lib/api/orders";
 import { TAX_RATE } from "@/lib/constants";
 import { formatLineColor, formatLineSize } from "@/lib/product";
 import {
-  displayOrderRef,
   formatCurrency,
   formatDate,
   orderRouteId,
@@ -128,7 +127,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-neutral-border pb-5">
         <div className="grid flex-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
           <Meta label="Date" value={formatDate(order.date)} />
-          <Meta label="Order #" value={order.orderRef ?? displayOrderRef(order)} />
+          <Meta label="Order ID" value={order.id} />
           <Meta label="User" value={order.userName} />
           <Meta label="Products" value={String(productCount).padStart(2, "0")} />
           <Meta label="Sub Total" value={formatCurrency(subTotal)} />

@@ -2,8 +2,7 @@ import { mapOrder } from "@/lib/mappers";
 
 describe("mapOrder — payment status for delivered orders", () => {
   const baseRow = {
-    id: "order-001",
-    orderNumber: 4353452,
+    id: "a1b2c3d4-e5f6-4789-a012-3456789abcde",
     userId: "user-001",
     createdAt: new Date("2026-08-28T10:00:00.000Z"),
     subTotal: 59.98,
@@ -22,7 +21,7 @@ describe("mapOrder — payment status for delivered orders", () => {
     } as never);
 
     expect(order.status).toBe("delivered");
-    expect(order.orderNumber).toBe(4353452);
+    expect(order.orderRef).toBe("a1b2c3d4-e5f6-4789-a012-3456789abcde");
     expect(order.paymentStatus).toBe("SUCCEEDED");
   });
 

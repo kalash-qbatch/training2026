@@ -366,14 +366,14 @@ describe("Orders — POST /api/orders/[id]/retry route", () => {
 
   it("prepares checkout retry for eligible order", async () => {
     const response = await retryOrderRoute(
-      getRequest("http://localhost/api/orders/order-001/retry"),
-      { params: Promise.resolve({ id: "order-001" }) }
+      getRequest(`http://localhost/api/orders/${mockOrder.id}/retry`),
+      { params: Promise.resolve({ id: mockOrder.id }) }
     );
     const body = await parseJson<{ success: boolean; checkoutUrl: string }>(response);
 
     expect(response.status).toBe(200);
     expect(body.success).toBe(true);
-    expect(body.checkoutUrl).toBe("/checkout?orderId=order-001");
+    expect(body.checkoutUrl).toBe(`/checkout?orderId=${mockOrder.id}`);
   });
 });
 
