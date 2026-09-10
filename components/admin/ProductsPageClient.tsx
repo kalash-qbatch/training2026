@@ -324,14 +324,7 @@ export function ProductsPageClient() {
         />
       ) : null}
       {bulkOpen ? (
-        <AddMultipleProductsModal
-          open={bulkOpen}
-          onClose={() => setBulkOpen(false)}
-          onDone={async () => {
-            toast.success("Products uploaded successfully");
-            await load();
-          }}
-        />
+        <AddMultipleProductsModal open={bulkOpen} onClose={() => setBulkOpen(false)} />
       ) : null}
     </div>
   );

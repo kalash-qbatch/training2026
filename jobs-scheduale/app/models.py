@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, DateTime, Boolean, ForeignKey, Numeric, Text, Enum
+from sqlalchemy import Column, String, Integer, DateTime, Boolean, ForeignKey, Numeric, Enum
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -41,7 +41,6 @@ class Product(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     title = Column(String, nullable=False)
-    description = Column(Text, nullable=False)
     price = Column(Numeric(10, 2), nullable=False)
     image = Column(String, nullable=False)
     color = Column(String, nullable=True)

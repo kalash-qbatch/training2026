@@ -47,7 +47,7 @@ export async function createCategory(name: string): Promise<CategoryDto> {
   });
 }
 
-/** Resolve categoryId, or find/create from name. */
+/** Resolve category id; create when an explicit new name is provided. */
 export async function resolveCategoryId(opts: {
   categoryId?: string | null;
   categoryName?: string | null;
@@ -61,8 +61,8 @@ export async function resolveCategoryId(opts: {
     return found.id;
   }
   if (opts.categoryName?.trim()) {
-    const cat = await createCategory(opts.categoryName);
-    return cat.id;
+    const created = await createCategory(opts.categoryName);
+    return created.id;
   }
   // undefined = leave unchanged on update; null = clear
   if (opts.categoryId === null) return null;

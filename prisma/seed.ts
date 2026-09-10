@@ -64,7 +64,6 @@ async function main() {
   const catalog = [
     {
       title: "Classic Cotton Tee — Soft Everyday Essential",
-      description: "Soft everyday essential cotton tee",
       price: 28,
       image: "/products/tee.jpg",
       color: "White",
@@ -74,7 +73,6 @@ async function main() {
     },
     {
       title: "Denim Jacket Slim Fit Urban Style",
-      description: "Urban style slim denim jacket",
       price: 89,
       image: "/products/jacket.jpg",
       color: "Blue",
@@ -84,7 +82,6 @@ async function main() {
     },
     {
       title: "Leather Crossbody Bag Compact Travel",
-      description: "Compact leather travel bag",
       price: 120,
       image: "/products/bag.jpg",
       color: "Brown",
@@ -94,7 +91,6 @@ async function main() {
     },
     {
       title: "Running Sneakers Lightweight Breathable",
-      description: "Lightweight breathable sneakers",
       price: 95,
       image: "/products/sneakers.jpg",
       color: "Red",
@@ -104,7 +100,6 @@ async function main() {
     },
     {
       title: "Wool Beanie Winter Warm Soft Knit",
-      description: "Warm soft knit beanie",
       price: 24,
       image: "/products/beanie.jpg",
       color: "Gray",
@@ -114,7 +109,6 @@ async function main() {
     },
     {
       title: "Sunglasses UV400 Polarized Classic",
-      description: "Polarized classic sunglasses",
       price: 55,
       image: "/products/sunglasses.jpg",
       color: "Black",
@@ -124,7 +118,6 @@ async function main() {
     },
     {
       title: "Canvas Tote Everyday Carry All",
-      description: "Everyday canvas tote bag",
       price: 35,
       image: "/products/tote.jpg",
       color: "Natural",
@@ -134,7 +127,6 @@ async function main() {
     },
     {
       title: "Minimalist Watch Stainless Steel",
-      description: "Stainless steel everyday watch",
       price: 150,
       image: "/products/watch.jpg",
       color: "Silver",

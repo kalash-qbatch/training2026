@@ -1,3 +1,5 @@
-title,description,price,stock,image
-Sample Hoodie,Warm cotton hoodie,49.99,25,/products/tee.jpg
-Sample Cap,Everyday cap,19.99,40,/products/beanie.jpg
+title,price,category,color,size,qty,image
+Classic Denim Jacket,49.99,jacket,Blue,M,15,jacket_blue.jpeg
+Classic Denim Jacket,49.99,jacket,Black,L,16,jacket_red.jpeg
+Classic Denim Jacket,49.99,jacket,Brown,XL,43,jacket_brown.jpeg
+Phone,49.99,Phones,Black,One Size,43,phone_black.jpeg

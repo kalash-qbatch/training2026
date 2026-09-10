@@ -26,8 +26,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   const title = `${product.name} | Bhai ka Store`;
-  const description =
-    product.description || `Shop ${product.name} at Bhai ka Store. In stock and ready to ship.`;
+  const description = `Shop ${product.name} at Bhai ka Store. In stock and ready to ship.`;
   const canonicalUrl = `${BASE_URL}/products/${product.id}`;
 
   return {
@@ -66,7 +65,7 @@ export default async function ProductDetailPage({ params }: Props) {
     "@context": "https://schema.org",
     "@type": "Product",
     name: product.name,
-    description: product.description || product.name,
+    description: product.name,
     image: product.imageUrl,
     offers: {
       "@type": "Offer",
@@ -149,10 +148,6 @@ export default async function ProductDetailPage({ params }: Props) {
               {product.name}
             </h1>
             <p className="mt-4 text-2xl font-bold text-gray-900">{formatCurrency(product.price)}</p>
-
-            <div className="mt-4 prose prose-sm text-gray-600">
-              <p>{product.description || "No description provided for this product."}</p>
-            </div>
           </div>
 
           <div className="mt-8 pt-6 border-t border-gray-100">

@@ -56,7 +56,6 @@ export async function createAdminCategory(name: string) {
 
 type AdminProductBody = {
   title: string;
-  description?: string;
   price: number;
   stock: number;
   image?: string;
@@ -83,7 +82,6 @@ function toProductFormData(body: AdminProductBody) {
     "payload",
     JSON.stringify({
       title: body.title,
-      description: body.description,
       price: body.price,
       stock: body.stock,
       size: body.size,
@@ -134,7 +132,6 @@ export async function bulkUploadProducts(file: File) {
 export async function bulkUploadProductsJson(
   products: Array<{
     title: string;
-    description?: string;
     price: number;
     stock: number;
     image?: string;
@@ -165,6 +162,30 @@ export async function uploadAdminImage(file: File) {
     throw new Error(data.error || "Upload failed");
   }
   return data.url;
+}
+
+export async function fetchAdminJobStatus(jobId: string) {
+  const res = await fetch(`/api/admin/jobs/${encodeURIComponent(jobId)}`, {
+    cache: "no-store",
+  });
+  const data = await parseJson<{
+    success: boolean;
+    job_id?: string;
+    state?: "PENDING" | "STARTED" | "PROGRESS" | "SUCCESS" | "FAILURE" | "RETRY" | "REVOKED";
+    meta?: Record<string, unknown>;
+    result?: unknown;
+    error?: string;
+  }>(res);
+  if (!res.ok || !data.success || !data.state) {
+    throw new Error(data.error || "Failed to fetch job status");
+  }
+  return {
+    job_id: data.job_id || jobId,
+    state: data.state,
+    meta: data.meta,
+    result: data.result,
+    error: data.error,
+  };
 }
 
 export async function fetchAdminOrders(params: Record<string, string | number | undefined>) {

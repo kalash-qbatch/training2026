@@ -49,7 +49,6 @@ class ProductImageItem(BaseModel):
 
 class BulkProductItem(BaseModel):
     title: str
-    description: Optional[str] = None
     price: float
     stock: int = 0
     image: Optional[str] = None
