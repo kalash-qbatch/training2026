@@ -1,3 +1,5 @@
+import * as XLSX from "xlsx";
+
 import {
   assignFallbackStockToVariants,
   detectColorFromFileName,
@@ -326,9 +328,6 @@ export function resolveBulkVariants(
 
 /** Convert an Excel workbook (xlsx/xls) ArrayBuffer into CSV text for parsing. */
 export function workbookToCsvText(data: ArrayBuffer): string {
-  // Lazy require keeps the CSV path free of the xlsx bundle when unused.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const XLSX = require("xlsx") as typeof import("xlsx");
   const workbook = XLSX.read(data, { type: "array", cellDates: false, raw: false });
   if (!workbook.SheetNames.length) {
     throw new Error("Excel file has no sheets.");
