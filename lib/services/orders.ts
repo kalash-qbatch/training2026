@@ -195,8 +195,8 @@ export async function createOrder(
 
       const paymentMethod = opts?.paymentMethod ?? "CARD";
       const paymentStatus = opts?.paymentStatus ?? "PENDING";
-      // Card orders stay PENDING until payment succeeds; COD starts as PROCESSING.
-      const orderStatus = opts?.orderStatus ?? (paymentMethod === "COD" ? "PROCESSING" : "PENDING");
+      // Orders stay PENDING until payment is settled or an admin approves them.
+      const orderStatus = opts?.orderStatus ?? "PENDING";
 
       const order = await tx.order.create({
         data: {
@@ -853,7 +853,7 @@ export async function switchOrderToCod(orderId: string, userId: string) {
         stripePaymentIntentId: null,
         stripeClientSecret: null,
         nextPaymentRetryAt: null,
-        status: "PROCESSING",
+        status: "PENDING",
       },
       include: {
         user: { select: { fullName: true, name: true, email: true } },
@@ -887,7 +887,7 @@ export async function switchOrderToCod(orderId: string, userId: string) {
           total: Number(updated.total),
           paymentMethod: "COD",
           paymentStatus: "PENDING",
-          orderStatus: "PROCESSING",
+          orderStatus: "PENDING",
           items: updated.items.map((item) => ({
             title: item.product.title,
             imageUrl: selectInvoiceProductImage(item.product, item.color ?? undefined),
@@ -1024,7 +1024,7 @@ export async function handlePaymentFailure(orderId: string, paymentIntentId?: st
           total: result.mail.total,
           attempt: result.mail.attempt,
           cancel_minutes: 5,
-          retry_url: `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/checkout?orderId=${orderId}`,
+          retry_url: `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/orders/${orderId}`,
           subject: `Payment Unpaid — Order ${result.mail.orderId} is Pending`,
         },
       });
@@ -1037,8 +1037,8 @@ export async function handlePaymentFailure(orderId: string, paymentIntentId?: st
   if (result?.scheduleAutoCancel) {
     try {
       const { enqueueOrderAutoCancelJob } = await import("@/lib/job-scheduler");
-      // await enqueueOrderAutoCancelJob({ orderId, delaySeconds: 300 }); // 5 minutes
-      await enqueueOrderAutoCancelJob({ orderId, delaySeconds: 5 * 24 * 60 * 60 }); // 5 days
+      await enqueueOrderAutoCancelJob({ orderId, delaySeconds: 5 * 60 }); // 5 minutes
+      //  await enqueueOrderAutoCancelJob({ orderId, delaySeconds: 5 * 24 * 60 * 60 }); // 5 days
     } catch (scheduleErr) {
       console.error("Failed to schedule order auto-cancel:", scheduleErr);
     }

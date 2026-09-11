@@ -86,7 +86,7 @@ export async function enqueueBulkProductsJob(
   return postJob("/api/jobs/products/bulk", { products });
 }
 
-/** Schedule auto-cancel if order is still unpaid after delay (default 5 days). */
+/** Schedule auto-cancel if order is still unpaid after delay (default 5 minutes). */
 export async function enqueueOrderAutoCancelJob(params: {
   orderId: string;
   delaySeconds?: number;
