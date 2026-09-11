@@ -6,10 +6,15 @@ export type CategoryDto = {
   slug: string;
 };
 
+export function capitalizeCategoryName(name: string): string {
+  const trimmed = name.trim();
+  return trimmed ? `${trimmed[0].toUpperCase()}${trimmed.slice(1)}` : trimmed;
+}
+
 export function slugifyCategory(name: string): string {
   return name
     .trim()
-    .toUpperCase()
+    .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
@@ -19,11 +24,11 @@ export async function listCategories(): Promise<CategoryDto[]> {
     orderBy: { name: "asc" },
     select: { id: true, name: true, slug: true },
   });
-  return rows;
+  return rows.map((row) => ({ ...row, name: capitalizeCategoryName(row.name) }));
 }
 
 export async function createCategory(name: string): Promise<CategoryDto> {
-  const trimmed = name.trim();
+  const trimmed = capitalizeCategoryName(name);
   if (!trimmed) {
     throw new Error("Category name is required");
   }

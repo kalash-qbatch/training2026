@@ -233,16 +233,16 @@ def render_invoice_email(payload: dict, app_base_url: str | None = None):
       <p style="margin:18px 0 0;color:#94a3b8;font-size:11px;line-height:17px;text-align:center">Keep this email for your records. If you have questions, reply to this message with your order ID.</p>
     """
 
-    subject = payload.get("subject") or f"Order Confirmed {order_number_text} — Bhai ka Store"
+    subject = payload.get("subject") or f"Invoice & Order Confirmed {order_number_text} — Bhai ka Store"
     html = _shell(
         "linear-gradient(135deg,#059669,#0f766e)",
-        "Order Confirmed!",
+        "Invoice & Order Confirmed!",
         f"Order {order_number} &bull; Thanks for shopping with us",
         body,
     )
 
     text_lines = [
-        "ORDER CONFIRMED",
+        "INVOICE & ORDER CONFIRMED",
         f"Order {order_number_text}",
         f"Customer: {name_text}",
         f"Payment method: {method_label}",
@@ -364,16 +364,17 @@ def send_email_task(self, email_type: str, to: str, payload: dict):
             text = text or rendered_text
         else:
             order_number = payload.get("order_number") or "—"
-            subject = subject or f"Order Confirmed {order_number} — Bhai ka Store"
+            subject = subject or f"Invoice & Order Confirmed {order_number} — Bhai ka Store"
 
     elif email_type == "payment_failed":
-        order_number = escape(str(payload.get("order_id") or payload.get("order_number") or "—"))
+        order_id = str(payload.get("order_id") or payload.get("order_number") or "")
+        order_number = escape(order_id or "—")
         name = escape(str(payload.get("name") or "Customer"))
         total = payload.get("total", "")
         attempt = int(payload.get("attempt", 1))
         cancel_minutes = int(payload.get("cancel_minutes", 5))
         retry_url = escape(
-            str(payload.get("retry_url") or f"{settings.APP_BASE_URL}/orders"),
+            str(payload.get("retry_url") or f"{settings.APP_BASE_URL}/orders/{order_id}"),
             quote=True,
         )
         total_row = (
@@ -405,7 +406,7 @@ def send_email_task(self, email_type: str, to: str, payload: dict):
                   Please retry payment within <strong>{cancel_minutes} minutes</strong>.
                   If payment is not completed in time, this order will be <strong>automatically cancelled</strong>
                   and reserved stock will be released.</div>
-                <a href="{retry_url}" class="btn" style="background:#d97706;color:#fff">Retry Payment Now</a>
+                <a href="{retry_url}" class="btn" style="background:#d97706;color:#fff">Check Order Details</a>
                 """,
             )
 

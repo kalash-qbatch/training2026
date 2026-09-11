@@ -45,7 +45,7 @@ class InvoiceEmailTemplateTests(unittest.TestCase):
 
         self.assertEqual(
             subject,
-            "Order Confirmed a1b2c3d4-e5f6-4789-a012-3456789abcde — Bhai ka Store",
+            "Invoice & Order Confirmed a1b2c3d4-e5f6-4789-a012-3456789abcde — Bhai ka Store",
         )
         self.assertIn("https://shop.example.com/products/tee.jpg", html)
         self.assertIn("Classic &lt;Tee&gt;", html)

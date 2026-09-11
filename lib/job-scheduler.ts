@@ -5,6 +5,7 @@
 const JOB_SCHEDULER_URL = process.env.JOB_SCHEDULAR_URL || "http://localhost:8000";
 const INTERNAL_KEY =
   process.env.JOB_SCHEDULAR_INTERNAL_KEY || "super-secret-internal-key-for-nextjs";
+const JOB_REQUEST_TIMEOUT_MS = 3_000;
 
 interface JobEnqueueResponse {
   status: string;
@@ -24,6 +25,7 @@ async function postJob(path: string, body: Record<string, unknown>): Promise<Job
   const url = `${JOB_SCHEDULER_URL}${path}`;
   let res: Response;
   try {
+    const signal = AbortSignal.timeout(JOB_REQUEST_TIMEOUT_MS);
     res = await fetch(url, {
       method: "POST",
       headers: {
@@ -31,6 +33,7 @@ async function postJob(path: string, body: Record<string, unknown>): Promise<Job
         "X-Internal-Key": INTERNAL_KEY,
       },
       body: JSON.stringify(body),
+      signal,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -88,12 +91,15 @@ export async function enqueueOrderAutoCancelJob(params: {
   orderId: string;
   delaySeconds?: number;
 }): Promise<JobEnqueueResponse> {
+  const DEFAULT_DELAY_SECONDS = 300; // 5 minutes
+  // const DEFAULT_DELAY_SECONDS = 5 * 24 * 60 * 60; // 5 days
+  const delaySeconds = params.delaySeconds ?? DEFAULT_DELAY_SECONDS;
   const result = await postJob("/api/jobs/orders/schedule-cancel", {
     order_id: params.orderId,
-    delay_seconds: params.delaySeconds ?? 300,
+    delay_seconds: delaySeconds,
   });
   console.warn(
-    `[email] scheduled auto-cancel for order ${params.orderId} in ${params.delaySeconds ?? 300}s (job_id=${result.job_id})`
+    `[email] scheduled auto-cancel for order ${params.orderId} in ${delaySeconds}s (job_id=${result.job_id})`
   );
   return result;
 }

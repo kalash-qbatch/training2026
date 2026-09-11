@@ -195,8 +195,8 @@ export async function createOrder(
 
       const paymentMethod = opts?.paymentMethod ?? "CARD";
       const paymentStatus = opts?.paymentStatus ?? "PENDING";
-      // Card orders stay PENDING until payment succeeds; COD starts as PROCESSING.
-      const orderStatus = opts?.orderStatus ?? (paymentMethod === "COD" ? "PROCESSING" : "PENDING");
+      // Orders stay PENDING until payment is settled or an admin approves them.
+      const orderStatus = opts?.orderStatus ?? "PENDING";
 
       const order = await tx.order.create({
         data: {
@@ -271,7 +271,8 @@ export async function createOrder(
     { maxWait: 15_000, timeout: 30_000 }
   );
 
-  if (created.mail.to) {
+  if (created.mail.to && created.mail.paymentMethod === "COD") {
+    // Card invoices wait until payment succeeds (see confirmExistingOrderPayment).
     try {
       const { enqueueEmailJob } = await import("@/lib/job-scheduler");
       await enqueueEmailJob({
@@ -852,7 +853,7 @@ export async function switchOrderToCod(orderId: string, userId: string) {
         stripePaymentIntentId: null,
         stripeClientSecret: null,
         nextPaymentRetryAt: null,
-        status: "PROCESSING",
+        status: "PENDING",
       },
       include: {
         user: { select: { fullName: true, name: true, email: true } },
@@ -868,6 +869,49 @@ export async function switchOrderToCod(orderId: string, userId: string) {
       specificationId: item.specificationId,
     }))
   );
+
+  const recipientEmail = updated.shippingEmail || updated.user?.email;
+  const recipientName =
+    updated.shippingFullName || updated.user?.fullName || updated.user?.name || "Customer";
+  if (recipientEmail) {
+    try {
+      const { enqueueEmailJob } = await import("@/lib/job-scheduler");
+      await enqueueEmailJob({
+        emailType: "invoice",
+        to: recipientEmail,
+        payload: buildInvoiceEmailPayload({
+          orderId: updated.id,
+          name: recipientName,
+          subTotal: Number(updated.subTotal),
+          tax: Number(updated.tax),
+          total: Number(updated.total),
+          paymentMethod: "COD",
+          paymentStatus: "PENDING",
+          orderStatus: "PENDING",
+          items: updated.items.map((item) => ({
+            title: item.product.title,
+            imageUrl: selectInvoiceProductImage(item.product, item.color ?? undefined),
+            quantity: item.quantity,
+            unitPrice: Number(item.price),
+            color: item.color ?? undefined,
+            size: item.size ?? undefined,
+          })),
+          shipping: {
+            fullName: updated.shippingFullName || recipientName,
+            email: recipientEmail,
+            phone: updated.shippingPhone || "",
+            address: updated.shippingAddress || "",
+            city: updated.shippingCity || "",
+            postalCode: updated.shippingPostalCode || "",
+          },
+        }),
+      });
+    } catch (mailErr) {
+      console.error("Failed to enqueue COD switch invoice email:", mailErr);
+    }
+  } else {
+    console.error(`COD switch invoice skipped: no recipient for order ${updated.id}`);
+  }
 
   return mapOrder(updated);
 }
@@ -980,7 +1024,7 @@ export async function handlePaymentFailure(orderId: string, paymentIntentId?: st
           total: result.mail.total,
           attempt: result.mail.attempt,
           cancel_minutes: 5,
-          retry_url: `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/checkout?orderId=${orderId}`,
+          retry_url: `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/orders/${orderId}`,
           subject: `Payment Unpaid — Order ${result.mail.orderId} is Pending`,
         },
       });
@@ -989,13 +1033,14 @@ export async function handlePaymentFailure(orderId: string, paymentIntentId?: st
     }
   }
 
-  // Schedule 5-min auto-cancel only once (first failure). Retry failures just re-email.
+  // Schedule auto-cancel only once (first failure). Retry failures just re-email.
   if (result?.scheduleAutoCancel) {
     try {
       const { enqueueOrderAutoCancelJob } = await import("@/lib/job-scheduler");
-      await enqueueOrderAutoCancelJob({ orderId, delaySeconds: 300 });
+      await enqueueOrderAutoCancelJob({ orderId, delaySeconds: 5 * 60 }); // 5 minutes
+      //  await enqueueOrderAutoCancelJob({ orderId, delaySeconds: 5 * 24 * 60 * 60 }); // 5 days
     } catch (scheduleErr) {
-      console.error("Failed to schedule 5-min order auto-cancel:", scheduleErr);
+      console.error("Failed to schedule order auto-cancel:", scheduleErr);
     }
   }
 
@@ -1025,6 +1070,8 @@ export async function findOrdersDueForPaymentRetry() {
 
 /**
  * Mark payment success on an existing order after Stripe confirms.
+ * Sets payment to PAID and order to PROCESSING, then sends Order Confirmed
+ * (Paid / Processing). No separate payment_success email.
  */
 export async function confirmExistingOrderPayment(
   orderId: string,
@@ -1036,6 +1083,10 @@ export async function confirmExistingOrderPayment(
   if (!["SUCCEEDED", "PAID", "PROCESSING"].includes(paymentStatus)) {
     throw new OrderError("Invalid payment confirmation status");
   }
+  // Prefer PAID for confirmed card charges (SUCCEEDED is treated the same elsewhere).
+  const confirmedStatus: PaymentStatus =
+    paymentStatus === "SUCCEEDED" || paymentStatus === "PAID" ? "PAID" : paymentStatus;
+
   const { updated, justPaid } = await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
     const order = await tx.order.findFirst({
@@ -1053,14 +1104,17 @@ export async function confirmExistingOrderPayment(
     const updated = await tx.order.update({
       where: { id: orderId },
       data: {
-        paymentStatus,
+        paymentStatus: confirmedStatus,
         stripeClientSecret: stripeClientSecret ?? order.stripeClientSecret,
         nextPaymentRetryAt: null,
         status: "PROCESSING",
       },
       include: orderInclude,
     });
-    return { updated, justPaid: paymentStatus === "SUCCEEDED" || paymentStatus === "PAID" };
+    return {
+      updated,
+      justPaid: confirmedStatus === "PAID",
+    };
   });
 
   await removeCartItems(
@@ -1071,7 +1125,6 @@ export async function confirmExistingOrderPayment(
     }))
   );
 
-  // Send payment success email for confirmed card payments
   if (justPaid) {
     const recipientEmail = updated.shippingEmail || updated.user?.email;
     const recipientName =
@@ -1079,22 +1132,43 @@ export async function confirmExistingOrderPayment(
     if (recipientEmail) {
       try {
         const { enqueueEmailJob } = await import("@/lib/job-scheduler");
+
+        // Invoice + order confirmed (Paid / Processing). No separate payment_success email.
         await enqueueEmailJob({
-          emailType: "payment_success",
+          emailType: "invoice",
           to: recipientEmail,
-          payload: {
-            order_id: updated.id,
-            order_number: updated.id,
+          payload: buildInvoiceEmailPayload({
+            orderId: updated.id,
             name: recipientName,
-            total: Number(updated.total).toFixed(2),
-            subject: `Payment Confirmed — Order ${updated.id}`,
-          },
+            subTotal: Number(updated.subTotal),
+            tax: Number(updated.tax),
+            total: Number(updated.total),
+            paymentMethod: "CARD",
+            paymentStatus: "PAID",
+            orderStatus: "PROCESSING",
+            items: updated.items.map((item) => ({
+              title: item.product.title,
+              imageUrl: selectInvoiceProductImage(item.product, item.color ?? undefined),
+              quantity: item.quantity,
+              unitPrice: Number(item.price),
+              color: item.color ?? undefined,
+              size: item.size ?? undefined,
+            })),
+            shipping: {
+              fullName: updated.shippingFullName || recipientName,
+              email: recipientEmail,
+              phone: updated.shippingPhone || "",
+              address: updated.shippingAddress || "",
+              city: updated.shippingCity || "",
+              postalCode: updated.shippingPostalCode || "",
+            },
+          }),
         });
       } catch (mailErr) {
-        console.error("Failed to enqueue payment_success email:", mailErr);
+        console.error("Failed to enqueue order confirmation email:", mailErr);
       }
     } else {
-      console.error(`payment_success email skipped: no recipient for order ${updated.id}`);
+      console.error(`order confirmation email skipped: no recipient for order ${updated.id}`);
     }
   }
 

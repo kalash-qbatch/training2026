@@ -47,20 +47,31 @@ AUTO_CANCEL_SCHEDULE_MINUTES="60"
 The order-cancellation tasks automatically retry transient database connection
 failures with exponential backoff (up to five retries).
 
-Run the automated startup script:
+Run each service in a separate terminal:
 
 ```bash
 cd jobs-scheduale
-./run.sh
+./run.sh redis
+./run.sh api
+./run.sh worker
+./run.sh beat
 ```
 
-This script:
+The commands start:
 
-1. Starts the local `redis-server` in daemon mode if not already running.
-2. Creates and activates the Python virtual environment (`venv`).
-3. Starts the **Celery Worker**.
-4. Starts the **Celery Beat** periodic scheduler.
-5. Starts the **FastAPI Server** on `http://0.0.0.0:8000`.
+1. `redis`: local `redis-server` in daemon mode if not already running.
+2. `api`: FastAPI with Uvicorn on `http://0.0.0.0:8000`.
+3. `worker`: the Celery worker that executes queued jobs.
+4. `beat`: the Celery Beat periodic scheduler.
+
+The Python commands create and reuse the local `venv` automatically. To use a
+different API port, set `JOBS_HTTP_PORT`, for example:
+
+```bash
+JOBS_HTTP_PORT=8001 ./run.sh api
+```
+
+For the old combined behavior, use `./run.sh all`.
 
 ## Endpoints
 
