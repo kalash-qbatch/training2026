@@ -70,6 +70,6 @@ export function buildInvoiceEmailPayload(
       size: item.size,
     })),
     shipping: details.shipping,
-    subject: `Invoice & Confirmation for Order ${details.orderId}`,
+    subject: `Invoice & Order Confirmed — ${details.orderId}`,
   };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { AlertCircle, Lock, ShoppingBag } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -87,8 +87,13 @@ export function CheckoutPageClient({
     };
   });
 
+  useEffect(() => {
+    if (!user) {
+      router.push("/login?next=/checkout");
+    }
+  }, [router, user]);
+
   if (!user) {
-    router.push("/login?next=/checkout");
     return null;
   }
 
