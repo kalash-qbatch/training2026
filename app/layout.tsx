@@ -24,6 +24,10 @@ export const metadata: Metadata = {
   },
   description:
     "Discover premium products with instant checkout, live variant stock, and fast delivery at Bhai ka Store.",
+  icons: {
+    icon: [{ url: "/images/bhai-ka-store-logo.jpg", type: "image/jpeg" }],
+    apple: [{ url: "/images/bhai-ka-store-logo.jpg" }],
+  },
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -32,11 +36,13 @@ export const metadata: Metadata = {
     title: "Bhai ka Store | Premium E-Commerce Storefront",
     description:
       "Discover premium products with instant checkout, live variant stock, and fast delivery.",
+    images: [{ url: "/images/bhai-ka-store-logo.jpg", alt: "Bhai ka Store" }],
   },
   twitter: {
-    card: "summary_large_image",
+    card: "summary",
     title: "Bhai ka Store",
     description: "Discover premium products with instant checkout and fast delivery.",
+    images: ["/images/bhai-ka-store-logo.jpg"],
   },
   robots: {
     index: true,

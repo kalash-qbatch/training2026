@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { useAuthStore } from "@/lib/store/useAuthStore";
 import { useCartStore } from "@/lib/store/useCartStore";
 
@@ -54,13 +55,7 @@ export function Navbar() {
       <div
         className={`mx-auto flex items-center justify-between px-4 sm:px-6 h-12 lg:px-8 ${showLoggedInChrome ? "py-1" : "py-3.5"}`}
       >
-        <Link
-          href="/products"
-          prefetch={false}
-          className="text-[15px] font-semibold tracking-tight text-[#333333]"
-        >
-          Bhai ka Store
-        </Link>
+        <BrandLogo href="/products" size="sm" />
 
         <div className="flex items-center gap-3 sm:gap-5">
           <Link

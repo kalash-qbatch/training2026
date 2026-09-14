@@ -6,6 +6,7 @@ import { LayoutGrid, Menu, ShoppingBag, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { cn } from "@/lib/utils";
 
 const nav = [
@@ -19,13 +20,8 @@ export function AdminSidebar() {
 
   const content = (
     <div className="flex h-full flex-col bg-white">
-      <div className="border-b border-gray-200 px-5 py-[15.5px]">
-        <Link
-          href="/admin/products"
-          className="text-[15px] font-semibold tracking-tight text-neutral-text transition-colors duration-200 hover:text-[#2563EB]"
-        >
-          Bhai Ka Store (Admin)
-        </Link>
+      <div className="border-b border-gray-200 px-5 py-[11px]">
+        <BrandLogo href="/admin/products" size="sm" showWordmark />
       </div>
 
       <nav className="mt-4 flex-1 space-y-1 px-3 pb-4">

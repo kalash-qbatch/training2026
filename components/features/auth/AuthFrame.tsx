@@ -1,6 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { BRAND_LOGO_SRC, BRAND_NAME } from "@/components/brand/BrandLogo";
+
 export function AuthFrame({ children }: { children: React.ReactNode }) {
   return (
     <main className="relative h-dvh overflow-hidden min-[1000px]:grid min-[1000px]:grid-cols-2">
@@ -25,12 +27,20 @@ export function AuthFrame({ children }: { children: React.ReactNode }) {
         <div className="absolute inset-0 flex flex-col justify-between p-5 sm:p-8 min-[1000px]:p-8 lg:p-10 xl:p-12">
           <Link
             href="/products"
-            className="inline-flex w-fit items-center gap-2.5 rounded-full border border-white/20 bg-white/15 px-3 py-1.5 text-white shadow-[0_8px_30px_rgba(0,0,0,0.18)] backdrop-blur-md transition hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+            className="inline-flex w-fit items-center gap-2.5 rounded-full border border-white/20 bg-white/15 py-1.5 pl-1.5 pr-3 text-white shadow-[0_8px_30px_rgba(0,0,0,0.18)] backdrop-blur-md transition hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+            aria-label={BRAND_NAME}
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm font-bold text-brand-600 shadow-sm">
-              B
+            <span className="relative h-9 w-9 overflow-hidden rounded-full ring-1 ring-white/30">
+              <Image
+                src={BRAND_LOGO_SRC}
+                alt=""
+                width={36}
+                height={36}
+                priority
+                className="h-full w-full object-cover"
+              />
             </span>
-            <span className="pr-1 text-sm font-semibold tracking-wide">Bhai ka Store</span>
+            <span className="pr-1 text-sm font-semibold tracking-wide">{BRAND_NAME}</span>
           </Link>
 
           <div className="hidden max-w-md space-y-3 min-[1000px]:block">
@@ -49,7 +59,21 @@ export function AuthFrame({ children }: { children: React.ReactNode }) {
           className="pointer-events-none absolute inset-0 hidden bg-[radial-gradient(ellipse_at_top,_var(--color-brand-50)_0%,_transparent_55%)] min-[1000px]:block"
           aria-hidden
         />
-        <div className="relative mx-auto w-full max-w-[400px] animate-fade-in-up">{children}</div>
+        <div className="relative mx-auto w-full max-w-[400px] animate-fade-in-up">
+          <div className="mb-5 flex justify-center min-[1000px]:hidden">
+            <span className="relative h-16 w-16 overflow-hidden rounded-xl shadow-lg ring-1 ring-black/10">
+              <Image
+                src={BRAND_LOGO_SRC}
+                alt={BRAND_NAME}
+                width={64}
+                height={64}
+                priority
+                className="h-full w-full object-cover"
+              />
+            </span>
+          </div>
+          {children}
+        </div>
       </section>
     </main>
   );

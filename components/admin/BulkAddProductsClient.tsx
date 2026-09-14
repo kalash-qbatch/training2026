@@ -418,6 +418,8 @@ function ProductCard({
                 options={categoryOptions}
                 placeholder="Select Category"
                 ariaLabel="Category"
+                searchable
+                searchPlaceholder="Search category…"
                 className={hasFieldError("category") ? fieldErrorClass : undefined}
               />
             </div>

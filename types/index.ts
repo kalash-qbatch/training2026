@@ -127,6 +127,9 @@ export type SelectProps = {
   ariaLabel?: string;
   labelClass?: string | null;
   buttonClass?: string;
+  /** Show a search input to filter options. */
+  searchable?: boolean;
+  searchPlaceholder?: string;
 };
 
 export type GetProductsResult = {

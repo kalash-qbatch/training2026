@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Eye, Package, Pencil, Plus, Search } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -93,6 +93,76 @@ function StockColorCircles({ product }: { product: Product }) {
         );
       })}
     </div>
+  );
+}
+
+function ProductThumbHover({ src, alt }: { src: string; alt: string }) {
+  const PREVIEW_SIZE = 280;
+  const EXIT_MS = 180;
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [visible, setVisible] = useState(false);
+  const hideTimer = useRef<number | null>(null);
+
+  const clearHideTimer = () => {
+    if (hideTimer.current != null) {
+      window.clearTimeout(hideTimer.current);
+      hideTimer.current = null;
+    }
+  };
+
+  const show = (el: HTMLElement) => {
+    clearHideTimer();
+    const rect = el.getBoundingClientRect();
+    const gap = 14;
+    let left = rect.right + gap;
+    let top = rect.top + rect.height / 2 - PREVIEW_SIZE / 2;
+    if (left + PREVIEW_SIZE > window.innerWidth - 12) left = rect.left - PREVIEW_SIZE - gap;
+    if (top < 12) top = 12;
+    if (top + PREVIEW_SIZE > window.innerHeight - 12) {
+      top = window.innerHeight - PREVIEW_SIZE - 12;
+    }
+    setPos({ top, left });
+    requestAnimationFrame(() => setVisible(true));
+  };
+
+  const hide = () => {
+    setVisible(false);
+    clearHideTimer();
+    hideTimer.current = window.setTimeout(() => {
+      setPos(null);
+      hideTimer.current = null;
+    }, EXIT_MS);
+  };
+
+  useEffect(() => () => clearHideTimer(), []);
+
+  return (
+    <>
+      <div
+        className="relative shrink-0"
+        onMouseEnter={(e) => show(e.currentTarget)}
+        onMouseLeave={hide}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt="" className="h-10 w-10 rounded object-cover ring-1 ring-[#e5e7eb]" />
+      </div>
+      {pos ? (
+        <div
+          className={`pointer-events-none fixed z-[100] origin-left rounded-xl border border-[#e5e7eb] bg-white p-2 shadow-2xl transition-[opacity,transform] ease-out ${
+            visible ? "scale-100 opacity-100" : "scale-95 opacity-0"
+          }`}
+          style={{ top: pos.top, left: pos.left, transitionDuration: `${EXIT_MS}ms` }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src}
+            alt={alt}
+            className="rounded-lg object-cover"
+            style={{ width: PREVIEW_SIZE, height: PREVIEW_SIZE }}
+          />
+        </div>
+      ) : null}
+    </>
   );
 }
 export function ProductsPageClient() {
@@ -237,6 +307,8 @@ export function ProductsPageClient() {
             ...categories.map((c) => ({ value: c.id, label: c.name })),
           ]}
           ariaLabel="Filter by category"
+          searchable
+          searchPlaceholder="Search category…"
         />
         <Select
           value={status}
@@ -274,8 +346,7 @@ export function ProductsPageClient() {
               <TableRow key={p.id}>
                 <TableCell>
                   <div className="flex items-center gap-3">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={p.imageUrl} alt="" className="h-10 w-10 rounded object-cover" />
+                    <ProductThumbHover src={p.imageUrl} alt={p.name} />
                     <p className="font-medium text-neutral-text">{p.name}</p>
                   </div>
                 </TableCell>

@@ -70,7 +70,7 @@ export async function findProducts(opts?: {
       ? { price: "asc" }
       : opts?.sort === "price-desc"
         ? { price: "desc" }
-        : { title: "asc" };
+        : { createdAt: "desc" };
 
   const [total, rows] = await Promise.all([
     prisma.product.count({ where }),

@@ -200,6 +200,8 @@ export function ProductListing({
 
   const filterKey = `${debounced}|${sort}|${categoryId}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  // Only skip the first default listing when SSR already hydrated it.
+  const skipDefaultOnceRef = useRef(hydrateFromServer);
 
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey);
@@ -207,17 +209,20 @@ export function ProductListing({
     setEndPage(1);
   }
 
-  // Fetch when filters change. If SSR already seeded the default listing, don't refetch it.
+  // Fetch when filters change. If SSR already seeded the default listing, don't refetch it once.
   useEffect(() => {
     const isDefaultListing = debounced === "" && sort === "newest" && categoryId === "";
-    if (hydrateFromServer && isDefaultListing) {
+    if (skipDefaultOnceRef.current && isDefaultListing) {
+      skipDefaultOnceRef.current = false;
       return;
     }
+    skipDefaultOnceRef.current = false;
+
     const id = window.setTimeout(() => {
       void fetchPage(CARD_INITIAL_PAGE, true);
     }, 0);
     return () => window.clearTimeout(id);
-  }, [debounced, sort, categoryId, fetchPage, hydrateFromServer]);
+  }, [debounced, sort, categoryId, fetchPage]);
 
   // Scroll anchoring adjustment
   useLayoutEffect(() => {
@@ -304,9 +309,11 @@ export function ProductListing({
           </div>
 
           {/* Category filter */}
-          <div className="w-full shrink-0 sm:w-40">
+          <div className="w-full shrink-0 sm:w-50">
             <Select
               value={categoryId}
+              searchable
+              searchPlaceholder="Search category..."
               onChange={setCategoryId}
               options={[
                 { value: "", label: "All CATEGORIES" },

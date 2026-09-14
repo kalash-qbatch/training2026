@@ -357,6 +357,8 @@ function ProductFormFields({
                   ]}
                   placeholder="Select Category"
                   ariaLabel="Category"
+                  searchable
+                  searchPlaceholder="Search category…"
                 />
               </div>
             </div>
