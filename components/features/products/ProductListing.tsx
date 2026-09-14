@@ -13,6 +13,16 @@ import type { Category, Product } from "@/types";
 import { ProductCard } from "./ProductCard";
 import { ProductGridSkeleton } from "./ProductGridSkeleton";
 
+function mergeUniqueById(existing: Product[], incoming: Product[], mode: "append" | "prepend") {
+  const seen = new Set(existing.map((p) => p.id));
+  const uniqueIncoming = incoming.filter((p) => {
+    if (seen.has(p.id)) return false;
+    seen.add(p.id);
+    return true;
+  });
+  return mode === "append" ? [...existing, ...uniqueIncoming] : [...uniqueIncoming, ...existing];
+}
+
 export function ProductListing({
   initialProducts = [],
   initialTotalPages = 1,
@@ -31,7 +41,7 @@ export function ProductListing({
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
-  const [sort, setSort] = useState<ProductSort>("name-asc");
+  const [sort, setSort] = useState<ProductSort>("newest");
   const [categoryId, setCategoryId] = useState("");
 
   const [totalPages, setTotalPages] = useState(initialTotalPages);
@@ -140,10 +150,9 @@ export function ProductListing({
 
       setProducts((prev) => {
         if (prev.length === 8) {
-          return [...prev, ...data.products];
-        } else {
-          return [...prev.slice(8), ...data.products];
+          return mergeUniqueById(prev, data.products, "append");
         }
+        return mergeUniqueById(prev.slice(8), data.products, "append");
       });
       setStartPage((prev) => (products.length === 16 ? prev + 1 : prev));
       setEndPage(nextPage);
@@ -168,9 +177,7 @@ export function ProductListing({
           }
         }
 
-        setProducts((prev) => {
-          return [...data.products, ...prev.slice(0, 8)];
-        });
+        setProducts((prev) => mergeUniqueById(prev.slice(0, 8), data.products, "prepend"));
         setStartPage(prevPage);
         setEndPage((prev) => prev - 1);
       }
@@ -202,7 +209,7 @@ export function ProductListing({
 
   // Fetch when filters change. If SSR already seeded the default listing, don't refetch it.
   useEffect(() => {
-    const isDefaultListing = debounced === "" && sort === "name-asc" && categoryId === "";
+    const isDefaultListing = debounced === "" && sort === "newest" && categoryId === "";
     if (hydrateFromServer && isDefaultListing) {
       return;
     }
@@ -316,7 +323,7 @@ export function ProductListing({
               value={sort}
               onChange={(v) => setSort(v as ProductSort)}
               options={[
-                { value: "name-asc", label: "Name" },
+                { value: "newest", label: "Newest" },
                 { value: "price-asc", label: "Price: Low to High" },
                 { value: "price-desc", label: "Price: High to Low" },
               ]}

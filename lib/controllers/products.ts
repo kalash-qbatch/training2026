@@ -5,7 +5,7 @@ import type { ProductSort } from "@/types";
 export async function listProducts(request: Request) {
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search") ?? undefined;
-  const sort = (searchParams.get("sort") as ProductSort | null) ?? "name-asc";
+  const sort = (searchParams.get("sort") as ProductSort | null) ?? "newest";
   const page = Number(searchParams.get("page") || CARD_INITIAL_PAGE);
   const pageSize = Number(
     searchParams.get("pageSize") || searchParams.get("limit") || CARD_PAGE_SIZE

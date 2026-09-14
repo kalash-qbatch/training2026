@@ -85,7 +85,7 @@ export type Product = {
   isActive: boolean;
 };
 
-export type ProductSort = "price-asc" | "price-desc" | "name-asc";
+export type ProductSort = "price-asc" | "price-desc" | "newest";
 
 export type SizeFilter = "all" | "s" | "m" | "l" | "xl" | "xxl";
 

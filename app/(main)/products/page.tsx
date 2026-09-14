@@ -6,7 +6,7 @@ import { findProducts } from "@/lib/services/products";
 export default async function ProductsPage() {
   const [productsResult, categories] = await Promise.all([
     findProducts({
-      sort: "name-asc",
+      sort: "newest",
       page: CARD_INITIAL_PAGE,
       pageSize: CARD_PAGE_SIZE,
     }),

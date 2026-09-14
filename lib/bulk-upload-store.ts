@@ -22,6 +22,8 @@ export type BulkDraftProduct = {
   price: number;
   stock: number;
   categoryName: string;
+  /** Original category from CSV/XLSX — kept even when it doesn't match DB yet. */
+  fileCategoryName?: string;
   variants: BulkDraftVariant[];
   images: BulkDraftImage[];
 };

@@ -86,6 +86,7 @@ function toDraftProducts(
       price: p.price,
       stock,
       categoryName: p.categoryName.trim(),
+      fileCategoryName: p.categoryName.trim() || undefined,
       variants,
       images,
     };
@@ -271,11 +272,11 @@ export function AddMultipleProductsModal({
             <div className="min-w-0">
               <p className="text-[14px] font-semibold text-[#1e293b]">Need a template?</p>
               <p className="mt-0.5 text-[12px] text-[#94a3b8]">
-                CSV or XLSX with color, size {"&"} qty per variant row
+                XLSX with categories, colors {"&"} sizes from your store
               </p>
             </div>
             <a
-              href="/templates/products-template.csv"
+              href="/api/admin/products/bulk/template"
               download
               className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[#e8f0fe] px-3.5 py-2 text-[13px] font-medium text-[#3b82f6] transition hover:bg-[#dbe7fd]"
             >

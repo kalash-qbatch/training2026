@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { ArrowLeft, Loader2, Plus, Send, Trash2, Upload, X } from "lucide-react";
+import { ArrowLeft, Plus, Send, Trash2, Upload, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -167,7 +167,7 @@ function ProductCard({
       onCategoryCreated(category);
       setCreatingCategory(false);
       setNewCategoryName("");
-      patch({ ...product, categoryName: category.name });
+      patch({ ...product, categoryName: category.name, fileCategoryName: undefined });
     } catch (err) {
       setCategoryError(err instanceof Error ? err.message : "Failed to create category");
     } finally {
@@ -404,7 +404,7 @@ function ProductCard({
                 onChange={(value) => {
                   if (value === NEW_CATEGORY) {
                     setCreatingCategory(true);
-                    setNewCategoryName("");
+                    setNewCategoryName(product.fileCategoryName?.trim() || "");
                     setCategoryError("");
                     patch({ ...product, categoryName: "" });
                     return;
@@ -628,18 +628,13 @@ export function BulkAddProductsClient() {
   }, []);
 
   useEffect(() => {
-    if (!hasProducts) {
-      router.replace("/admin/products");
-    }
-  }, [hasProducts, router]);
-
-  useEffect(() => {
     void fetchAdminCategories()
       .then(setCategories)
       .catch(() => setCategories([]));
   }, []);
 
   // Map CSV category onto existing Select options only; clear unmatched names.
+  // Keep fileCategoryName so "Create New Category" can auto-fill from the file.
   useEffect(() => {
     if (!categories.length) return;
     const current = useBulkUploadStore.getState().products;
@@ -647,8 +642,10 @@ export function BulkAddProductsClient() {
 
     let changed = false;
     const next = current.map((p) => {
-      const resolved = resolveCategoryName(p.categoryName, categories);
+      const fromFile = (p.fileCategoryName || p.categoryName || "").trim();
+      const resolved = resolveCategoryName(p.categoryName || fromFile, categories);
       const categoryName = resolved?.categoryName ?? "";
+      const fileCategoryName = resolved ? undefined : fromFile || undefined;
 
       const variants = p.variants.map((v) => {
         const color = normalizeColor(v.color);
@@ -664,9 +661,11 @@ export function BulkAddProductsClient() {
         return { ...img, color };
       });
 
-      if (categoryName !== p.categoryName) changed = true;
+      if (categoryName !== p.categoryName || fileCategoryName !== p.fileCategoryName) {
+        changed = true;
+      }
 
-      return { ...p, categoryName, variants, images };
+      return { ...p, categoryName, fileCategoryName, variants, images };
     });
 
     if (changed) setProducts(next);
@@ -835,10 +834,71 @@ export function BulkAddProductsClient() {
     }
   };
 
+  const goToProductsPage = () => {
+    router.push("/admin/products");
+  };
+
   if (!hasProducts) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-[#94a3b8]">
-        <Loader2 className="h-6 w-6 animate-spin" />
+      <div className="-mx-4 -my-6 min-h-[calc(100vh-3.5rem)] bg-[#f3f4f6] px-4 py-6 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <div className="mx-auto max-w-6xl space-y-5">
+          <div className="sticky top-14 z-40 -mx-4 space-y-3 bg-[#f3f4f6] px-4 py-3 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+            <div className="rounded-xl border border-[#e5e7eb] bg-white px-5 py-4 shadow-sm">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex min-w-0 items-start gap-3">
+                  <button
+                    type="button"
+                    onClick={goBack}
+                    className="mt-0.5 rounded-md p-1.5 text-[#64748b] transition hover:bg-[#f1f5f9]"
+                    aria-label="Back to products"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </button>
+                  <div>
+                    <h1 className="text-[20px] font-semibold tracking-tight text-[#111827]">
+                      {title}
+                    </h1>
+                    <p className="mt-1 text-[13px] text-[#94a3b8]">
+                      Review pre-filled CSV data, add images, edit details, then submit to queue
+                      tasks.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 lg:shrink-0">
+                  <button
+                    type="button"
+                    onClick={addProduct}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#2563EB] bg-white px-3.5 py-2 text-[13px] font-medium text-[#2563EB] transition hover:bg-brand-50"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Product Card
+                  </button>
+                  <button
+                    type="button"
+                    disabled
+                    className="inline-flex items-center gap-2 rounded-lg bg-[#2563EB] px-4 py-2 text-[13px] font-semibold text-white opacity-60"
+                  >
+                    <Send className="h-4 w-4" />
+                    Submit All Products
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex min-h-[40vh] flex-col items-center justify-center rounded-xl border border-[#e5e7eb] bg-white px-6 py-16 text-center shadow-sm">
+            <p className="text-[14px] text-[#94a3b8]">
+              No product cards yet. Add a blank card to get started.
+            </p>
+            <button
+              type="button"
+              onClick={goToProductsPage}
+              className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-[#2563EB] px-5 py-2.5 text-[14px] font-semibold text-white transition hover:bg-brand-600"
+            >
+              Go to Products Page
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -884,7 +944,7 @@ export function BulkAddProductsClient() {
                 <button
                   type="button"
                   onClick={() => void handleSubmit()}
-                  disabled={progressOpen && phase !== "error"}
+                  disabled={!hasProducts || (progressOpen && phase !== "error")}
                   className="inline-flex items-center gap-2 rounded-lg bg-[#2563EB] px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-brand-600 disabled:opacity-60"
                 >
                   <Send className="h-4 w-4" />
@@ -917,10 +977,6 @@ export function BulkAddProductsClient() {
               onChange={(next) => updateProduct(product.id, next)}
               onRemove={() => {
                 clearProductError(product.id);
-                if (products.length === 1) {
-                  goBack();
-                  return;
-                }
                 removeProduct(product.id);
               }}
             />

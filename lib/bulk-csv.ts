@@ -155,12 +155,20 @@ export function parseBulkProductsCsv(text: string): BulkCsvProduct[] {
   }
 
   const catIdx = idx("category", "categoryname", "category_name", "cat");
-  const colorIdx = idx("color", "colour", "variantcolor", "productcolor", "productcolour");
-  const sizeIdx = idx("size", "sizes", "variantsize", "productsize", "sz");
+  const colorIdx = idx(
+    "color",
+    "colorname",
+    "colour",
+    "variantcolor",
+    "productcolor",
+    "productcolour"
+  );
+  const sizeIdx = idx("size", "sizename", "sizes", "variantsize", "productsize", "sz");
   const qtyIdx = idx("qty", "quantity", "qty.", "qnty");
   const stockIdx = idx("stock", "inventory", "totalqty", "totalquantity", "totalstock");
   const imageIdx = idx(
     "image",
+    "imagepath",
     "images",
     "imagefile",
     "imagefilename",
