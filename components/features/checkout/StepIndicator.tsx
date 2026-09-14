@@ -1,5 +1,3 @@
-"use client";
-
 import { Fragment } from "react";
 
 import { Check, CreditCard, User } from "lucide-react";

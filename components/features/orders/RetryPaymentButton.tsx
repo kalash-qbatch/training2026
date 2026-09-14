@@ -1,5 +1,3 @@
-"use client";
-
 import { CreditCard, RefreshCw } from "lucide-react";
 import Link from "next/link";
 
