@@ -1,4 +1,11 @@
-import type { AdminOrderStats, AdminOrderStatusUpdate, Category, Order, Product } from "@/types";
+import type {
+  AdminOrderStats,
+  AdminOrderStatusUpdate,
+  AdminProductStats,
+  Category,
+  Order,
+  Product,
+} from "@/types";
 
 export type { AdminOrderStatusUpdate };
 
@@ -27,6 +34,7 @@ export async function fetchAdminProducts(params: {
     total: number;
     page: number;
     totalPages: number;
+    stats: AdminProductStats;
   }>(res);
   if (!res.ok || !data.success) throw new Error(data.error || "Failed to load products");
   return data;

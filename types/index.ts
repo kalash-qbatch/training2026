@@ -253,6 +253,11 @@ export type AdminOrderStats = {
   totalAmount: number;
 };
 
+export type AdminProductStats = {
+  totalProducts: number;
+  addedLast24h: number;
+};
+
 export type DbOrderStatus =
   "PENDING" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED" | "REJECTED";
 

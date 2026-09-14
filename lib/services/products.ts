@@ -131,7 +131,7 @@ export async function findAdminProducts(opts: {
     ],
   };
 
-  const [total, rows] = await Promise.all([
+  const [total, rows, totalProducts, addedLast24h] = await Promise.all([
     prisma.product.count({ where }),
     prisma.product.findMany({
       where,
@@ -139,6 +139,10 @@ export async function findAdminProducts(opts: {
       skip: (page - 1) * pageSize,
       take: pageSize,
       include: productInclude,
+    }),
+    prisma.product.count(),
+    prisma.product.count({
+      where: { createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
     }),
   ]);
 
@@ -148,6 +152,10 @@ export async function findAdminProducts(opts: {
     page,
     pageSize,
     totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    stats: {
+      totalProducts,
+      addedLast24h,
+    },
   };
 }
 

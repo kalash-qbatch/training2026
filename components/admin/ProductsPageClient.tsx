@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { Eye, Pencil, Search } from "lucide-react";
+import { Eye, Package, Pencil, Plus, Search } from "lucide-react";
 import dynamic from "next/dynamic";
 
 const AddMultipleProductsModal = dynamic(
@@ -48,7 +48,7 @@ import {
 } from "@/lib/api/admin";
 import { TABLE_INITIAL_PAGE, TABLE_PAGE_SIZE } from "@/lib/constants";
 import { colorSwatch, formatCurrency, isLightSwatch } from "@/lib/utils";
-import type { Category, Product, ProductVariant } from "@/types";
+import type { AdminProductStats, Category, Product, ProductVariant } from "@/types";
 
 const inputClass =
   "h-10 w-full rounded-md border border-neutral-border bg-white px-3 text-[13px] text-neutral-text outline-none placeholder:text-neutral-muted focus:border-[#2563EB]";
@@ -99,6 +99,10 @@ export function ProductsPageClient() {
   const { toast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [stats, setStats] = useState<AdminProductStats>({
+    totalProducts: 0,
+    addedLast24h: 0,
+  });
   const [page, setPage] = useState(TABLE_INITIAL_PAGE);
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState("");
@@ -137,6 +141,7 @@ export function ProductsPageClient() {
       });
       setProducts(data.products);
       setTotalPages(data.totalPages);
+      if (data.stats) setStats(data.stats);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to load");
     } finally {
@@ -155,6 +160,7 @@ export function ProductsPageClient() {
       .then((data) => {
         setProducts(data.products);
         setTotalPages(data.totalPages);
+        if (data.stats) setStats(data.stats);
       })
       .catch((err: unknown) => {
         toast.error(err instanceof Error ? err.message : "Failed to load");
@@ -167,7 +173,28 @@ export function ProductsPageClient() {
   return (
     <div>
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-[22px] font-semibold text-[#2563EB]">Products</h1>
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+          <h1 className="text-[22px] font-semibold text-[#2563EB]">Products</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-[#e5e7eb] bg-white px-2.5 py-1 text-[12px] text-[#64748b]">
+              <Package className="h-3.5 w-3.5 text-[#2563EB]" />
+              Total products{" "}
+              <strong className="font-semibold tabular-nums text-[#111827]">
+                {stats.totalProducts}
+              </strong>
+            </span>
+            <span
+              className="inline-flex items-center gap-1.5 rounded-md border border-[#e5e7eb] bg-white px-2.5 py-1 text-[12px] text-[#64748b]"
+              title="Number of products created in the last 24 hours"
+            >
+              <Plus className="h-3.5 w-3.5 text-[#2563EB]" />
+              Added today (24h){" "}
+              <strong className="font-semibold tabular-nums text-[#111827]">
+                {stats.addedLast24h}
+              </strong>
+            </span>
+          </div>
+        </div>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
