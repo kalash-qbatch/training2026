@@ -10,11 +10,13 @@ This microservice handles asynchronous and background jobs for the e-commerce pl
    - Celery worker processes the email and sends it via SMTP.
    - Templates: `forgot_password`, `invoice`, `payment_failed` (Unpaid + Pending), `payment_success`, `order_approved` (Approve → SHIPPED), `order_delivered`, `order_cancelled`.
 2. **Upload Multiple Products**:
-   - Admin uploads a `.csv` file in the NextJS Admin interface (`+ Add Multiple Products`).
-   - NextJS parses the CSV client-side into interactive product cards.
-   - Admin can review, modify fields, add rows, delete rows, and upload images.
+   - Admin uploads a `.csv` / `.xlsx` file in the NextJS Admin interface (`+ Add Multiple Products`).
+   - NextJS parses the file client-side into interactive product cards and validates optional SKUs.
+   - Matched SKUs show **Update Product** (stock will be **added**); unmatched / blank SKU show **New Product**.
+   - Admin can review, modify fields, add rows, delete rows, and upload images (images optional on updates).
    - Upon submission, NextJS sends the validated list to FastAPI (`POST /api/jobs/products/bulk`), which returns `202 ACCEPTED`.
-   - Celery worker executes the bulk insertion into PostgreSQL one product at a time with validation and category/variant handling.
+   - Celery worker processes one product at a time: allocates SKUs, merges stock on updates, creates on new rows.
+   - **Restart the worker** after pulling `app/tasks/product_tasks.py` changes (no hot reload).
 3. **Payment failed → 5-minute auto-cancel**:
    - On first payment failure, Next.js sets order to `PENDING` / `UNPAID`, emails the user, and calls `POST /api/jobs/orders/schedule-cancel` (countdown **300s**).
    - If the user retries and fails again, the same unpaid email is sent again — **order is not cancelled** on retry failure.

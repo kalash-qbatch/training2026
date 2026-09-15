@@ -22,6 +22,7 @@ throughout this document.
 - [Backend API](#backend-api)
 - [Background jobs and schedules](#background-jobs-and-schedules)
 - [Database](#database)
+- [SKU system](#sku-system)
 - [Scripts and tests](#scripts-and-tests)
 - [Production checklist](#production-checklist)
 - [Known setup caveats](#known-setup-caveats)
@@ -43,7 +44,10 @@ throughout this document.
 
 - Role-protected product and order management.
 - Product creation/editing, categories, variants, multiple images, and soft deactivation.
-- CSV/XLSX bulk-product review and import with asynchronous progress polling.
+- **SKU system**: every product gets a base code `TITLE-CODE` (e.g. `CHAI-001`); each variant gets `TITLE-CODE-SIZE-COLOR` (e.g. `CHAI-001-FreeSize-BLK`).
+- Color/Size catalog tables with stable codes; Free Size / One Size supported for non-apparel items.
+- CSV/XLSX bulk-product review and import with SKU match → **Update** vs **New** badges, asynchronous progress polling.
+- On update rows, submitted quantities are **added** to existing stock (not replaced); images are optional and not duplicated.
 - Search, status/category filters, pagination, order details, and controlled status updates.
 
 ### Platform services
@@ -62,7 +66,7 @@ throughout this document.
 | ------------------ | ---------------------------------------------------------------------- |
 | Web application    | Next.js 16.2.12 App Router, React 19.2.4, TypeScript 5                 |
 | UI                 | Tailwind CSS 4, Inter, Lucide React, custom UI primitives              |
-| Bulk import        | `xlsx` workbook parsing with CSV delimiter/header normalization        |
+| Bulk import        | `xlsx` / CSV parsing, SKU validate/match, Celery bulk worker           |
 | Client state/forms | Zustand, React Hook Form, Zod                                          |
 | Authentication     | Auth.js / NextAuth 5 beta, JWT sessions, credentials, Google, Facebook |
 | Primary API        | Next.js Route Handlers and layered controllers/services                |
@@ -133,18 +137,21 @@ schema for job execution.
 │   ├── api/                     frontend API clients
 │   ├── controllers/             request validation and authorization
 │   ├── services/                application and database business logic
+│   ├── sku.ts / services/sku.ts SKU parsing, allocation, and catalog helpers
+│   ├── bulk-csv.ts              CSV/XLSX parse + image-folder matching
 │   ├── socket/                  Socket.IO client/server helpers
 │   ├── store/                   Zustand auth and cart stores
 │   └── validations/             Zod schemas
 ├── prisma/                      Prisma schema, migrations, and destructive demo seed
 ├── jobs-scheduale/              FastAPI/Celery/Redis background service
 │   ├── app/main.py              internal job HTTP API
+│   ├── app/sku.py               SKU allocation mirroring Next.js rules
 │   ├── app/celery_app.py        worker and Beat configuration
 │   ├── app/tasks/               email, product, and order tasks
 │   ├── tests/                   Python email-template tests
-│   └── run.sh                   local all-in-one launcher
+│   └── run.sh                   local redis/api/worker/beat launcher
 ├── public/                      local assets and the product CSV template
-├── scripts/                     SMTP, Stripe-flow, and image migration utilities
+├── scripts/                     SMTP, Stripe-flow, SKU backfill, image migration
 ├── __tests__/                   Jest API, service, page, and component tests
 ├── .github/workflows/checks.yml JavaScript lint, typecheck, and build CI
 ├── auth.ts / auth.config.ts     Auth.js Node and edge-compatible configuration
@@ -253,6 +260,14 @@ use:
 
 ```bash
 npm run db:migrate
+```
+
+If products predate the SKU columns (`titlePrefix`, `code`, `Specification.sku`),
+backfill after migrate:
+
+```bash
+npm run db:backfill-skus -- --dry-run
+npm run db:backfill-skus
 ```
 
 ### 4. Configure the job service
@@ -432,30 +447,51 @@ The recommended columns are:
 
 | Column              | Purpose                                                                                       |
 | ------------------- | --------------------------------------------------------------------------------------------- |
+| `sku`               | Optional. Base SKU (`TITLE-CODE`) or full variant SKU (`TITLE-CODE-SIZE-COLOR`).              |
 | `title`             | Product name. Blank cells inherit the previous title, which supports Excel continuation rows. |
 | `price`             | Product price. Blank continuation cells inherit the previous price.                           |
 | `category`          | Existing category name, or a category that can be created during review.                      |
-| `color`, `size`     | Variant attributes. Missing values may be inferred from the image filename.                   |
+| `color`, `size`     | Variant attributes. Size is required before submit (use **Free Size** when N/A).              |
 | `qty` or `quantity` | Quantity for the row's color/size variant.                                                    |
 | `stock`             | Aggregate stock when no variant quantity is supplied.                                         |
-| `image` or `images` | One or more image filenames, separated by `                                                   | `or`;`. |
+| `image` or `images` | One or more image filenames, separated by `\|` or `;`.                                        |
 
 Rows with the same title are merged into one product. Variant quantities remain
 bound to their own color/size row and product stock is recalculated from variants.
 When `qty` is absent, `stock` is used for a variant row or as product stock. Image
 color/size from the sheet takes precedence over filename inference.
 
+#### SKU column behavior (review + submit)
+
+After parse, SKUs collected per product are validated against the database
+(`POST /api/admin/products/validate-skus`):
+
+| CSV SKU                                        | Match result                         | Review badge       | Submit outcome                                                                                     |
+| ---------------------------------------------- | ------------------------------------ | ------------------ | -------------------------------------------------------------------------------------------------- |
+| Blank / omitted                                | No SKU lookup                        | **New Product**    | Creates a new product (new `TITLE-CODE`). Worker may still update if the **title** already exists. |
+| Base only, e.g. `CHAI-001`                     | Product `titlePrefix` + `code` found | **Update Product** | Updates that product; variant qtys are **added** to matching color/size rows.                      |
+| Base only, no DB match                         | Unmatched                            | **New Product**    | Creates as new; toast warns SKU was not found.                                                     |
+| Full variant, e.g. `CHAI-001-FreeSize-BLK`     | `Specification.sku` found            | **Update Product** | Updates parent product; matching variants marked Existing; qty **merged (add)**.                   |
+| Full variant, no DB match                      | Unmatched                            | **New Product**    | Creates as new.                                                                                    |
+| Mix of matched + unmatched SKUs on one product | Any hit wins                         | **Update Product** | Unmatched SKUs listed on the card; product still updates via the matched id.                       |
+
+On **Update Product** rows:
+
+- Images are optional; existing gallery is kept (no duplicate appends).
+- Sheet qty is **added** to current variant stock (e.g. 22 + 10 → 32), never replaced.
+- New color/size combinations on an existing product are created as new specifications.
+
 After parsing, select the folder containing the referenced images. Exact filenames
-listed in the `image` column are preferred; when that column is empty, unique title
-or color matches are used. Ambiguous or unrelated files are left unmatched for
+listed in the `image` column are preferred; fuzzy matches (hyphen/underscore/case)
+are allowed when unique. Ambiguous or unrelated files are left unmatched for
 manual review. The review screen lets an admin edit products, variants, categories,
 and images before submitting.
 
 Submission returns a background job ID when the FastAPI/Celery service is available.
 The admin page polls `GET /api/admin/jobs/{jobId}` and displays per-row progress and
 results. If the job service is unavailable, the API uses its documented synchronous
-fallback; verify the resulting products before relying on the fallback for large
-imports.
+fallback with the same add-stock update rules. **Restart the Celery worker** after
+pulling job-task changes — workers do not hot-reload Python modules.
 
 ## Backend API
 
@@ -496,18 +532,20 @@ valid Auth.js session and `Admin` means a valid session with role `ADMIN`.
 
 ### Admin and integration routes
 
-| Method      | Route                      | Access               | Purpose                                                     |
-| ----------- | -------------------------- | -------------------- | ----------------------------------------------------------- |
-| `GET/POST`  | `/api/admin/categories`    | Admin                | List or create categories.                                  |
-| `GET/POST`  | `/api/admin/products`      | Admin                | List or create products.                                    |
-| `PUT`       | `/api/admin/products/[id]` | Admin                | Update product data, including active status.               |
-| `POST`      | `/api/admin/products/bulk` | Admin                | Validate and queue/fallback-process reviewed bulk products. |
-| `POST`      | `/api/admin/upload`        | Admin                | Upload a product image to Supabase.                         |
-| `GET`       | `/api/admin/orders`        | Admin                | Filtered/paginated order list.                              |
-| `GET/PATCH` | `/api/admin/orders/[id]`   | Admin                | Read an order or change its status.                         |
-| `GET`       | `/api/admin/jobs/[jobId]`  | Admin                | Proxy Celery job status from FastAPI.                       |
-| `POST`      | `/api/stripe/webhook`      | Stripe signature     | Apply supported PaymentIntent webhook events.               |
-| `POST`      | `/api/cron/retry-payments` | Bearer `CRON_SECRET` | Process orders whose automatic retry time is due.           |
+| Method      | Route                               | Access               | Purpose                                                     |
+| ----------- | ----------------------------------- | -------------------- | ----------------------------------------------------------- |
+| `GET/POST`  | `/api/admin/categories`             | Admin                | List or create categories.                                  |
+| `GET/POST`  | `/api/admin/products`               | Admin                | List or create products.                                    |
+| `PUT`       | `/api/admin/products/[id]`          | Admin                | Update product data, including active status.               |
+| `POST`      | `/api/admin/products/bulk`          | Admin                | Validate and queue/fallback-process reviewed bulk products. |
+| `POST`      | `/api/admin/products/validate-skus` | Admin                | Match CSV SKUs to existing products/specifications.         |
+| `GET`       | `/api/admin/products/next-sku`      | Admin                | Peek next `TITLE-CODE` for a product title (preview).       |
+| `POST`      | `/api/admin/upload`                 | Admin                | Upload a product image to Supabase.                         |
+| `GET`       | `/api/admin/orders`                 | Admin                | Filtered/paginated order list.                              |
+| `GET/PATCH` | `/api/admin/orders/[id]`            | Admin                | Read an order or change its status.                         |
+| `GET`       | `/api/admin/jobs/[jobId]`           | Admin                | Proxy Celery job status from FastAPI.                       |
+| `POST`      | `/api/stripe/webhook`               | Stripe signature     | Apply supported PaymentIntent webhook events.               |
+| `POST`      | `/api/cron/retry-payments`          | Bearer `CRON_SECRET` | Process orders whose automatic retry time is due.           |
 
 Controllers return JSON success/error envelopes and validate most domain input with
 Zod. Order creation, inventory consumption/restoration, and important status changes
@@ -575,15 +613,16 @@ The more detailed microservice notes are in
 
 ### Models
 
-| Model                     | Responsibility                                                          |
-| ------------------------- | ----------------------------------------------------------------------- |
-| `User`, `Account`         | Credentials/OAuth identity, role, password reset, Stripe customer.      |
-| `Category`                | Unique product category name and slug.                                  |
-| `Product`, `ProductImage` | Catalog data, soft-active state, primary and alternate images.          |
-| `Specification`           | Per-product color/size variant and quantity.                            |
-| `CartItem`                | User/product/variant quantity and cart-expiry timestamps.               |
-| `Order`, `OrderItem`      | Shipping, payment/order lifecycle, retry state, and purchased variants. |
-| `Notification`            | Per-user order notifications and read state.                            |
+| Model                     | Responsibility                                                                |
+| ------------------------- | ----------------------------------------------------------------------------- |
+| `User`, `Account`         | Credentials/OAuth identity, role, password reset, Stripe customer.            |
+| `Category`                | Unique product category name and slug.                                        |
+| `Color`, `Size`           | Shared catalog for SKU color codes and size names (e.g. BLK, Free Size).      |
+| `Product`, `ProductImage` | Catalog data, `titlePrefix`/`code` base SKU, soft-active state, images.       |
+| `Specification`           | Per-product color/size variant, quantity, and unique variant `sku`.           |
+| `CartItem`                | User/product/variant quantity and cart-expiry timestamps.                     |
+| `Order`, `OrderItem`      | Shipping, payment/order lifecycle, retry state, purchased variants, line SKU. |
+| `Notification`            | Per-user order notifications and read state.                                  |
 
 Order statuses are `PENDING`, `PROCESSING`, `SHIPPED`, `DELIVERED`, `CANCELLED`, and
 `REJECTED`. Payment statuses are `UNPAID`, `PENDING`, `PROCESSING`, `PAID`,
@@ -591,8 +630,30 @@ Order statuses are `PENDING`, `PROCESSING`, `SHIPPED`, `DELIVERED`, `CANCELLED`,
 
 The application calculates 10% tax. Products are normally deactivated instead of
 physically deleted so historical order items remain valid. Variant inventory is kept
-in `Specification.qty`, with aggregate stock synchronized where background
-cancellation restores items.
+in `Specification.qty`, with aggregate `Product.stock` synchronized from the sum of
+specifications. Background cancellation restores specification quantities.
+
+## SKU system
+
+Format:
+
+- **Base SKU:** `{TITLE_PREFIX}-{CODE}` — e.g. `CHAI-001`, `GLAS-001`
+- **Variant SKU:** `{TITLE_PREFIX}-{CODE}-{SIZE}-{COLOR}` — e.g. `CHAI-001-FreeSize-BLK`
+
+Rules implemented in `lib/sku.ts` and `jobs-scheduale/app/sku.py`:
+
+- `TITLE_PREFIX` is the first word of the title, alphanumeric, padded/truncated to 4 chars.
+- `CODE` is a zero-padded integer unique per prefix (`@@unique([titlePrefix, code])`).
+- Color codes come from the `Color` table / defaults (`Black` → `BLK`). Size spaces are
+  stripped in the SKU segment (`Free Size` → `FreeSize`).
+- Blank / `NA` sizes are treated as **Free Size** for matching during bulk restock.
+
+After deploying the SKU migration, backfill existing products:
+
+```bash
+npm run db:backfill-skus -- --dry-run   # preview
+npm run db:backfill-skus                # apply
+```
 
 ### Prisma commands
 
@@ -600,6 +661,7 @@ cancellation restores items.
 npm run db:generate       # regenerate @prisma/client
 npm run db:migrate        # prisma migrate dev (established development DB)
 npm run db:seed           # destructive demo reset and seed
+npm run db:backfill-skus  # assign titlePrefix/code and specification SKUs
 npm run db:studio         # inspect data in Prisma Studio
 npx prisma validate       # validate schema/config
 ```
@@ -611,21 +673,22 @@ migrations with `npx prisma migrate deploy`, not `db push` or `migrate dev`.
 
 ### Application scripts
 
-| Command                   | Purpose                                                         |
-| ------------------------- | --------------------------------------------------------------- |
-| `npm run dev`             | Start the custom Next.js + Socket.IO development server.        |
-| `npm run dev:next`        | Start plain Next.js/Turbopack without the custom socket server. |
-| `npm run dev:socket`      | Alias of `npm run dev`.                                         |
-| `npm run build`           | Generate Prisma Client and create a production Next.js build.   |
-| `npm start`               | Run `next start` after a build.                                 |
-| `npm run lint`            | Run ESLint.                                                     |
-| `npm run lint:fix`        | Run ESLint with automatic fixes.                                |
-| `npm run format`          | Format the repository with Prettier.                            |
-| `npm run check`           | Check formatting without writes.                                |
-| `npm test`                | Run all Jest suites once.                                       |
-| `npm run test:watch`      | Run Jest in watch mode.                                         |
-| `npm run test:coverage`   | Generate text, LCOV, and HTML coverage reports.                 |
-| `npm run images:supabase` | Upload local product images and update matching DB URLs.        |
+| Command                    | Purpose                                                               |
+| -------------------------- | --------------------------------------------------------------------- |
+| `npm run dev`              | Start the custom Next.js + Socket.IO development server.              |
+| `npm run dev:next`         | Start plain Next.js/Turbopack without the custom socket server.       |
+| `npm run dev:socket`       | Alias of `npm run dev`.                                               |
+| `npm run build`            | Generate Prisma Client and create a production Next.js build.         |
+| `npm start`                | Run `next start` after a build.                                       |
+| `npm run lint`             | Run ESLint.                                                           |
+| `npm run lint:fix`         | Run ESLint with automatic fixes.                                      |
+| `npm run format`           | Format the repository with Prettier.                                  |
+| `npm run check`            | Check formatting without writes.                                      |
+| `npm test`                 | Run all Jest suites once.                                             |
+| `npm run test:watch`       | Run Jest in watch mode.                                               |
+| `npm run test:coverage`    | Generate text, LCOV, and HTML coverage reports.                       |
+| `npm run images:supabase`  | Upload local product images and update matching DB URLs.              |
+| `npm run db:backfill-skus` | Assign base/variant SKUs to existing products (supports `--dry-run`). |
 
 Husky's pre-commit hook runs the Prettier check and ESLint. The GitHub Actions
 workflow runs install, Prisma generation, lint, TypeScript, and the production build;
