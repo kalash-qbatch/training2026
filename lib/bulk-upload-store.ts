@@ -13,19 +13,33 @@ export type BulkDraftImage = {
 export type BulkDraftVariant = {
   color: string;
   size: string;
-  qty: number;
+  /** Empty string while the user clears the field; coerced to 0 on submit. */
+  qty: number | "";
+  sku?: string;
+  /** True when this color/size (or SKU) already exists on the matched product. */
+  isExisting?: boolean;
 };
 
 export type BulkDraftProduct = {
   id: string;
   title: string;
   price: number;
-  stock: number;
+  /** Empty string while the user clears the Total Quantity field. */
+  stock: number | "";
   categoryName: string;
   /** Original category from CSV/XLSX — kept even when it doesn't match DB yet. */
   fileCategoryName?: string;
   variants: BulkDraftVariant[];
   images: BulkDraftImage[];
+  /** Lookup SKUs from CSV for validate-skus. */
+  skus?: string[];
+  isUpdate?: boolean;
+  existingProductId?: string;
+  /** SKU that matched an existing product (for update badge). */
+  matchedSku?: string;
+  unmatchedSkus?: string[];
+  /** Specs already on the matched product — used to mark variants Existing vs New. */
+  existingVariants?: Array<{ color: string; size: string; sku?: string }>;
 };
 
 type BulkUploadState = {

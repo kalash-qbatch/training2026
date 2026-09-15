@@ -31,6 +31,7 @@ const COLOR_HEX: Record<string, string> = {
 };
 
 const PRODUCT_HEADERS = [
+  "sku",
   "title",
   "price",
   "categoryName",
@@ -43,6 +44,7 @@ const PRODUCT_HEADERS = [
 const DATA_ROWS = 1000;
 
 type TemplateRow = {
+  sku: string;
   title: string;
   price: number;
   categoryName: string;
@@ -69,6 +71,7 @@ async function sampleProductRows(): Promise<TemplateRow[]> {
 
   return [
     {
+      sku: "",
       title: "Classic Denim Jacket",
       price: 49.99,
       categoryName: cat(0),
@@ -78,6 +81,7 @@ async function sampleProductRows(): Promise<TemplateRow[]> {
       imagePath: "jacket_blue.jpeg",
     },
     {
+      sku: "",
       title: "Classic Denim Jacket",
       price: 49.99,
       categoryName: cat(0),
@@ -87,6 +91,7 @@ async function sampleProductRows(): Promise<TemplateRow[]> {
       imagePath: "jacket_black.jpeg",
     },
     {
+      sku: "",
       title: "Wireless Headphones",
       price: 129.99,
       categoryName: cat(1),
@@ -96,6 +101,7 @@ async function sampleProductRows(): Promise<TemplateRow[]> {
       imagePath: "headphones_black.jpeg",
     },
     {
+      sku: "",
       title: "Wireless Headphones",
       price: 129.99,
       categoryName: cat(1),
@@ -163,18 +169,20 @@ export async function buildBulkProductsTemplateBuffer(): Promise<Buffer> {
     views: [{ state: "frozen", ySplit: 1 }],
   });
   products.columns = [
-    { header: PRODUCT_HEADERS[0], key: "title", width: 28 },
-    { header: PRODUCT_HEADERS[1], key: "price", width: 10 },
-    { header: PRODUCT_HEADERS[2], key: "categoryName", width: 18 },
-    { header: PRODUCT_HEADERS[3], key: "colorName", width: 14 },
-    { header: PRODUCT_HEADERS[4], key: "sizeName", width: 12 },
-    { header: PRODUCT_HEADERS[5], key: "stock", width: 10 },
-    { header: PRODUCT_HEADERS[6], key: "imagePath", width: 28 },
+    { header: PRODUCT_HEADERS[0], key: "sku", width: 22 },
+    { header: PRODUCT_HEADERS[1], key: "title", width: 28 },
+    { header: PRODUCT_HEADERS[2], key: "price", width: 10 },
+    { header: PRODUCT_HEADERS[3], key: "categoryName", width: 18 },
+    { header: PRODUCT_HEADERS[4], key: "colorName", width: 14 },
+    { header: PRODUCT_HEADERS[5], key: "sizeName", width: 12 },
+    { header: PRODUCT_HEADERS[6], key: "stock", width: 10 },
+    { header: PRODUCT_HEADERS[7], key: "imagePath", width: 28 },
   ];
   styleHeaderRow(products.getRow(1));
 
   for (const row of sampleRows) {
     products.addRow({
+      sku: row.sku,
       title: row.title,
       price: row.price,
       categoryName: row.categoryName,
@@ -230,13 +238,15 @@ export async function buildBulkProductsTemplateBuffer(): Promise<Buffer> {
   styleHeaderRow(instructions.getRow(1));
   const tips = [
     "1. Fill the Products sheet — one row per color/size variant.",
-    "2. categoryName, colorName, and sizeName have dropdowns — pick from the list.",
-    "3. Dropdown values come from Categories / Color Reference / Size Reference sheets.",
-    "4. stock = quantity for that color+size row (not total product stock).",
-    "5. imagePath = image file name in your upload folder (e.g. jacket_blue.jpeg).",
-    "6. Same title + price on multiple rows = one product with multiple variants.",
-    "7. Replace sample rows with your new products — avoid titles in Existing Names.",
-    "8. Save as .xlsx and upload in Admin → Upload Multiple Products.",
+    "2. sku (column A): leave blank to create new. Enter full variant SKU (SHIR-001-S-BLK) or base SKU (SHIR-001) to update an existing product.",
+    "3. categoryName, colorName, and sizeName have dropdowns — pick from the list.",
+    "4. Dropdown values come from Categories / Color Reference / Size Reference sheets.",
+    "5. stock = quantity for that color+size row (not total product stock).",
+    "6. imagePath = image file name in your upload folder (e.g. jacket_blue.jpeg).",
+    "7. Same title + price on multiple rows = one product with multiple variants.",
+    "8. If any row in a product group has a matching SKU, the whole product is treated as an update.",
+    "9. Replace sample rows with your products — avoid titles in Existing Names for brand-new items.",
+    "10. Save as .xlsx and upload in Admin → Upload Multiple Products.",
   ];
   tips.forEach((tip, i) => {
     instructions.getCell(i + 2, 1).value = tip;
@@ -249,19 +259,19 @@ export async function buildBulkProductsTemplateBuffer(): Promise<Buffer> {
 
   addListValidation(
     products,
-    `C2:C${DATA_ROWS}`,
+    `D2:D${DATA_ROWS}`,
     `Categories!$A$2:$A$${catEnd}`,
     "Select a category from the list"
   );
   addListValidation(
     products,
-    `D2:D${DATA_ROWS}`,
+    `E2:E${DATA_ROWS}`,
     `'Color Reference'!$A$2:$A$${colorEnd}`,
     "Select a color from the list"
   );
   addListValidation(
     products,
-    `E2:E${DATA_ROWS}`,
+    `F2:F${DATA_ROWS}`,
     `'Size Reference'!$A$2:$A$${sizeEnd}`,
     "Select a size from the list"
   );

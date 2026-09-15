@@ -54,6 +54,7 @@ const OrderDetailLineItem = memo(function OrderDetailLineItem({ item }: { item: 
           <p className="line-clamp-2 max-w-65 font-medium text-neutral-text">{item.title}</p>
         </div>
       </TableCell>
+      <TableCell className="font-mono text-[12px] tabular-nums">{item.sku || "—"}</TableCell>
       <TableCell>{formatLineColor(item.color)}</TableCell>
       <TableCell>{formatLineSize(item.size)}</TableCell>
       <TableCell className="tabular-nums">{formatCurrency(item.price)}</TableCell>
@@ -162,6 +163,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
         <TableHeader>
           <TableRow className="border-b border-[#e5e7eb] hover:bg-transparent">
             <TableHead>Title</TableHead>
+            <TableHead>SKU</TableHead>
             <TableHead>Color</TableHead>
             <TableHead>Size</TableHead>
             <TableHead>Price</TableHead>

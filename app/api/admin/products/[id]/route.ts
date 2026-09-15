@@ -11,9 +11,12 @@ export async function PUT(request: Request, context: Ctx) {
     return NextResponse.json(result.body, { status: result.status });
   } catch (err) {
     console.error("admin products PUT:", err);
-    return NextResponse.json(
-      { success: false, error: "Failed to update product" },
-      { status: 500 }
-    );
+    const message =
+      err instanceof Error && err.message.includes("Unique constraint")
+        ? "Update failed due to a SKU/color conflict. Try again."
+        : err instanceof Error
+          ? err.message
+          : "Failed to update product";
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

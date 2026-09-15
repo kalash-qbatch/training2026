@@ -4,6 +4,15 @@ import { prisma } from "@/lib/db";
 import { duplicateProductError } from "@/lib/errors/products";
 import { mapProduct } from "@/lib/mappers";
 import { resolveCategoryId } from "@/lib/services/categories";
+import {
+  allocateProductCode,
+  buildVariantSku,
+  ensureColorAndSizeCatalog,
+  ensureColorExists,
+  ensureSizeExists,
+  extractTitlePrefix,
+  loadColorSizeLists,
+} from "@/lib/services/sku";
 import type { ColorFilter, Product, ProductSort, SizeFilter } from "@/types";
 
 export type { ColorFilter, ProductSort, SizeFilter };
@@ -41,6 +50,32 @@ async function assertTitleAvailable(title: string, excludeId?: string) {
   }
 }
 
+function skuSearchWhere(q: string): Prisma.ProductWhereInput {
+  const parts = q.toUpperCase().split("-").filter(Boolean);
+  return {
+    OR: [
+      { title: { contains: q, mode: "insensitive" } },
+      { titlePrefix: { equals: q.toUpperCase(), mode: "insensitive" } },
+      { code: { equals: q.padStart(3, "0") } },
+      ...(parts.length >= 2
+        ? [
+            {
+              AND: [
+                { titlePrefix: { equals: parts[0], mode: "insensitive" as const } },
+                { code: { equals: parts[1].padStart(3, "0") } },
+              ],
+            },
+          ]
+        : []),
+      {
+        specifications: {
+          some: { sku: { contains: q, mode: "insensitive" } },
+        },
+      },
+    ],
+  };
+}
+
 export async function findProducts(opts?: {
   search?: string;
   sort?: ProductSort;
@@ -55,11 +90,7 @@ export async function findProducts(opts?: {
   const where: Prisma.ProductWhereInput = {
     AND: [
       { isActive: true },
-      q
-        ? {
-            OR: [{ title: { contains: q, mode: "insensitive" } }],
-          }
-        : {},
+      q ? skuSearchWhere(q) : {},
       opts?.categoryId ? { categoryId: opts.categoryId } : {},
       opts?.categorySlug ? { category: { slug: opts.categorySlug } } : {},
     ],
@@ -83,7 +114,6 @@ export async function findProducts(opts?: {
     }),
   ]);
 
-  // Compute live stock in memory if specifications exist, avoiding DB write locks on read path
   for (const row of rows) {
     if (row.specifications.length > 0) {
       row.stock = row.specifications.reduce((acc, s) => acc + s.qty, 0);
@@ -121,11 +151,7 @@ export async function findAdminProducts(opts: {
 
   const where: Prisma.ProductWhereInput = {
     AND: [
-      q
-        ? {
-            OR: [{ title: { contains: q, mode: "insensitive" } }],
-          }
-        : {},
+      q ? skuSearchWhere(q) : {},
       opts.categoryId ? { categoryId: opts.categoryId } : {},
       opts.isActive != null ? { isActive: opts.isActive } : {},
     ],
@@ -162,14 +188,6 @@ export async function findAdminProducts(opts: {
 type ProductVariantInput = { color: string; size: string; qty: number };
 type ProductImageInput = { url: string; color?: string };
 
-function variantCreates(variants: ProductVariantInput[]) {
-  return variants.map((v) => ({
-    color: v.color.trim(),
-    size: v.size.trim(),
-    qty: v.qty,
-  }));
-}
-
 function imageCreates(images: ProductImageInput[]) {
   return images.map((img, i) => ({
     url: img.url,
@@ -185,14 +203,51 @@ function primaryImage(images?: ProductImageInput[], fallback?: string) {
   return fallback || "/products/tee.jpg";
 }
 
-async function syncSpecifications(productId: string, variants?: ProductVariantInput[]) {
-  // Fetch all current specs for this product
+async function syncSpecifications(
+  productId: string,
+  titlePrefix: string,
+  productCode: string,
+  variants?: ProductVariantInput[],
+  options?: { addQty?: boolean }
+) {
+  const addQty = Boolean(options?.addQty);
   const existing = await prisma.specification.findMany({
     where: { productId },
   });
+  const lists = await loadColorSizeLists();
+
+  const sizeKey = (size: string) => {
+    const s = (size ?? "")
+      .trim()
+      .toLowerCase()
+      .replace(/[\s_\-]+/g, "");
+    if (!s || s === "na" || s === "n/a" || s === "none" || s === "freesize" || s === "onesize") {
+      return "freesize";
+    }
+    return s;
+  };
+  const colorKey = (color: string) =>
+    (color ?? "")
+      .trim()
+      .toLowerCase()
+      .replace(/[\s_\-]+/g, "");
+  const canonicalSize = (size: string) => {
+    const raw = (size ?? "").trim();
+    return sizeKey(raw) === "freesize" ? "Free Size" : raw;
+  };
 
   if (!variants?.length) {
-    // No variants → delete all specs (also clear cart items pointing to them)
+    if (addQty) {
+      const agg = await prisma.specification.aggregate({
+        where: { productId },
+        _sum: { qty: true },
+      });
+      await prisma.product.update({
+        where: { id: productId },
+        data: { stock: agg._sum.qty ?? 0 },
+      });
+      return;
+    }
     const existingIds = existing.map((s) => s.id);
     if (existingIds.length) {
       await prisma.cartItem.deleteMany({
@@ -200,55 +255,68 @@ async function syncSpecifications(productId: string, variants?: ProductVariantIn
       });
       await prisma.specification.deleteMany({ where: { productId } });
     }
+    await prisma.product.update({
+      where: { id: productId },
+      data: { stock: 0 },
+    });
     return;
   }
 
   const incomingKeys = new Set(
-    variants.map((v) => `${(v.color ?? "").toLowerCase()}::${(v.size ?? "").toLowerCase()}`)
+    variants.map((v) => `${colorKey(v.color ?? "")}::${sizeKey(v.size ?? "")}`)
   );
 
-  // Step 1 – Delete specs (and their cart refs) that are no longer in the incoming list
-  const toDelete = existing.filter(
-    (s) => !incomingKeys.has(`${(s.color ?? "").toLowerCase()}::${(s.size ?? "").toLowerCase()}`)
-  );
-  if (toDelete.length) {
-    const deleteIds = toDelete.map((s) => s.id);
-    await prisma.cartItem.deleteMany({
-      where: { specificationId: { in: deleteIds } },
-    });
-    await prisma.specification.deleteMany({
-      where: { id: { in: deleteIds } },
-    });
+  // Bulk restock keeps other variants; edit/replace mode removes missing ones
+  if (!addQty) {
+    const toDelete = existing.filter(
+      (s) => !incomingKeys.has(`${colorKey(s.color ?? "")}::${sizeKey(s.size ?? "")}`)
+    );
+    if (toDelete.length) {
+      const deleteIds = toDelete.map((s) => s.id);
+      await prisma.cartItem.deleteMany({
+        where: { specificationId: { in: deleteIds } },
+      });
+      await prisma.specification.deleteMany({
+        where: { id: { in: deleteIds } },
+      });
+    }
   }
 
-  // Step 2 – Upsert each incoming variant (update qty if same color+size exists, create if new)
+  const remaining = await prisma.specification.findMany({ where: { productId } });
+
   for (const v of variants) {
-    const colorKey = (v.color ?? "").toLowerCase();
-    const sizeKey = (v.size ?? "").toLowerCase();
-    const match = existing.find(
-      (s) => (s.color ?? "").toLowerCase() === colorKey && (s.size ?? "").toLowerCase() === sizeKey
+    const color = (v.color ?? "").trim();
+    const size = canonicalSize(v.size ?? "");
+    const match = remaining.find(
+      (s) => colorKey(s.color ?? "") === colorKey(color) && sizeKey(s.size ?? "") === sizeKey(size)
     );
+    const sku = await buildVariantSku(titlePrefix, productCode, color, size, lists);
+    await ensureColorExists(prisma as never, color);
+    await ensureSizeExists(prisma as never, size);
 
     if (match) {
-      // Update qty only — spec ID stays the same, cart items remain valid
       await prisma.specification.update({
         where: { id: match.id },
-        data: { qty: v.qty },
+        data: {
+          qty: addQty ? match.qty + v.qty : v.qty,
+          sku,
+          color,
+          size,
+        },
       });
     } else {
-      // Genuinely new variant — create it
       await prisma.specification.create({
         data: {
           productId,
-          color: v.color ?? "",
-          size: v.size ?? "",
+          color,
+          size,
           qty: v.qty,
+          sku,
         },
       });
     }
   }
 
-  // Step 3 – Sync product.stock to sum of all spec qtys
   const agg = await prisma.specification.aggregate({
     where: { productId },
     _sum: { qty: true },
@@ -261,30 +329,24 @@ async function syncSpecifications(productId: string, variants?: ProductVariantIn
 
 async function syncImages(productId: string, images?: ProductImageInput[]) {
   if (images == null) return;
+  const seen = new Set<string>();
+  const unique = images.filter((img) => {
+    const url = img.url?.trim();
+    if (!url || seen.has(url)) return false;
+    seen.add(url);
+    return true;
+  });
   await prisma.product.update({
     where: { id: productId },
     data: {
       images: {
         deleteMany: {},
-        ...(images.length ? { create: imageCreates(images) } : {}),
+        ...(unique.length ? { create: imageCreates(unique) } : {}),
       },
+      ...(unique[0]?.url ? { image: unique[0].url } : {}),
     },
   });
 }
-
-/** Keep Product.stock column aligned with Specification qtys (API source of truth). */
-// async function reconcileProductStock(productId: string) {
-//   const specs = await prisma.specification.findMany({
-//     where: { productId },
-//     select: { qty: true },
-//   });
-//   if (!specs.length) return;
-//   const sum = specs.reduce((acc, s) => acc + s.qty, 0);
-//   await prisma.product.update({
-//     where: { id: productId },
-//     data: { stock: sum },
-//   });
-// }
 
 export async function createProduct(data: {
   title: string;
@@ -312,27 +374,50 @@ export async function createProduct(data: {
   });
   const image = primaryImage(data.images, data.image);
 
-  const row = await prisma.product.create({
-    data: {
-      title,
-      price: data.price,
-      stock,
-      image,
-      color: data.variants?.length ? data.color || data.variants[0].color || null : null,
-      size: data.variants?.length ? data.size || data.variants[0].size || null : null,
-      isActive: data.isActive ?? true,
-      ...(categoryId ? { categoryId } : {}),
-      ...(data.variants?.length
-        ? { specifications: { create: variantCreates(data.variants) } }
-        : {}),
-      ...(data.images?.length
-        ? { images: { create: imageCreates(data.images) } }
-        : data.image
-          ? { images: { create: imageCreates([{ url: data.image }]) } }
-          : {}),
-    },
-    include: productInclude,
+  const row = await prisma.$transaction(async (tx) => {
+    await ensureColorAndSizeCatalog(tx);
+    const { titlePrefix, code } = await allocateProductCode(tx, title);
+    const lists = await loadColorSizeLists(tx);
+
+    const variants = data.variants?.length
+      ? await Promise.all(
+          data.variants.map(async (v) => {
+            await ensureColorExists(tx, v.color);
+            await ensureSizeExists(tx, v.size);
+            const sku = await buildVariantSku(titlePrefix, code, v.color, v.size, lists);
+            return {
+              color: v.color.trim(),
+              size: v.size.trim(),
+              qty: v.qty,
+              sku,
+            };
+          })
+        )
+      : [];
+
+    return tx.product.create({
+      data: {
+        title,
+        titlePrefix,
+        code,
+        price: data.price,
+        stock,
+        image,
+        color: variants.length ? data.color || variants[0].color || null : null,
+        size: variants.length ? data.size || variants[0].size || null : null,
+        isActive: data.isActive ?? true,
+        ...(categoryId ? { categoryId } : {}),
+        ...(variants.length ? { specifications: { create: variants } } : {}),
+        ...(data.images?.length
+          ? { images: { create: imageCreates(data.images) } }
+          : data.image
+            ? { images: { create: imageCreates([{ url: data.image }]) } }
+            : {}),
+      },
+      include: productInclude,
+    });
   });
+
   return mapProduct(row);
 }
 
@@ -350,15 +435,19 @@ export async function updateProduct(
     categoryId?: string | null;
     categoryName?: string | null;
     isActive?: boolean;
+    /** When true, variant qtys are added to existing stock (bulk restock). */
+    addStock?: boolean;
   }
 ) {
   if (data.title != null) {
     await assertTitleAvailable(normalizeTitle(data.title), id);
   }
 
-  const stock = data.variants?.length
-    ? data.variants.reduce((sum, v) => sum + v.qty, 0)
-    : data.stock;
+  const stock = data.addStock
+    ? undefined
+    : data.variants?.length
+      ? data.variants.reduce((sum, v) => sum + v.qty, 0)
+      : data.stock;
 
   const categoryId = await resolveCategoryId({
     categoryId: data.categoryId,
@@ -366,10 +455,41 @@ export async function updateProduct(
   });
   const image = data.images != null ? primaryImage(data.images, data.image) : data.image;
 
+  const existing = await prisma.product.findUnique({ where: { id } });
+  if (!existing) throw new Error("Product not found");
+
+  let titlePrefix = existing.titlePrefix;
+  let code = existing.code;
+
+  if (data.title != null) {
+    const newTitle = normalizeTitle(data.title);
+    const newPrefix = extractTitlePrefix(newTitle);
+    // Only re-allocate when an existing prefix is changing to a different one
+    if (existing.titlePrefix && newPrefix !== existing.titlePrefix) {
+      const allocated = await prisma.$transaction(async (tx) => {
+        await ensureColorAndSizeCatalog(tx);
+        return allocateProductCode(tx, newTitle);
+      });
+      titlePrefix = allocated.titlePrefix;
+      code = allocated.code;
+    }
+  }
+
+  if (!titlePrefix || !code) {
+    const allocated = await prisma.$transaction(async (tx) => {
+      await ensureColorAndSizeCatalog(tx);
+      return allocateProductCode(tx, data.title ? normalizeTitle(data.title) : existing.title);
+    });
+    titlePrefix = allocated.titlePrefix;
+    code = allocated.code;
+  }
+
   const row = await prisma.product.update({
     where: { id },
     data: {
       ...(data.title != null ? { title: normalizeTitle(data.title) } : {}),
+      titlePrefix,
+      code,
       ...(data.price != null ? { price: data.price } : {}),
       ...(stock != null ? { stock } : {}),
       ...(image != null ? { image } : {}),
@@ -390,9 +510,20 @@ export async function updateProduct(
       ...(data.isActive != null ? { isActive: data.isActive } : {}),
     },
   });
+
   if (data.variants != null) {
-    await syncSpecifications(id, data.variants);
+    await syncSpecifications(id, titlePrefix!, code!, data.variants, {
+      addQty: Boolean(data.addStock),
+    });
+  } else if (data.title != null && titlePrefix && code) {
+    const specs = await prisma.specification.findMany({ where: { productId: id } });
+    const lists = await loadColorSizeLists();
+    for (const s of specs) {
+      const sku = await buildVariantSku(titlePrefix, code, s.color, s.size, lists);
+      await prisma.specification.update({ where: { id: s.id }, data: { sku } });
+    }
   }
+
   if (data.images != null) {
     await syncImages(id, data.images);
   }
@@ -412,6 +543,11 @@ export async function createProductsBulk(
     price: number;
     stock: number;
     image?: string;
+    images?: ProductImageInput[];
+    color?: string;
+    size?: string;
+    variants?: ProductVariantInput[];
+    categoryName?: string | null;
   }>
 ) {
   const seenTitles = new Set<string>();
@@ -428,4 +564,80 @@ export async function createProductsBulk(
     created.push(await createProduct(item));
   }
   return created;
+}
+
+export async function findProductBySkuLookup(sku: string) {
+  const trimmed = sku.trim();
+  if (!trimmed) return null;
+
+  const byVariant = await prisma.specification.findFirst({
+    where: { sku: { equals: trimmed, mode: "insensitive" } },
+    include: { product: { include: productInclude } },
+  });
+  if (byVariant?.product) {
+    return {
+      product: mapProduct(byVariant.product),
+      specificationId: byVariant.id,
+      matchedSku: byVariant.sku,
+    };
+  }
+
+  const parts = trimmed.toUpperCase().split("-");
+  if (parts.length >= 2) {
+    const titlePrefix = parts[0];
+    const code = parts[1].padStart(3, "0");
+    const product = await prisma.product.findFirst({
+      where: { titlePrefix, code },
+      include: productInclude,
+    });
+    if (product) {
+      return {
+        product: mapProduct(product),
+        specificationId: undefined,
+        matchedSku: `${titlePrefix}-${code}`,
+      };
+    }
+  }
+
+  return null;
+}
+
+export async function validateSkus(skus: string[]) {
+  const matched: Array<{
+    sku: string;
+    productId: string;
+    productTitle: string;
+    specificationId?: string;
+    existingVariants: Array<{ color: string; size: string; sku?: string }>;
+  }> = [];
+  const unmatched: string[] = [];
+  const variantsByProduct = new Map<string, Array<{ color: string; size: string; sku?: string }>>();
+
+  for (const raw of skus) {
+    const sku = raw.trim();
+    if (!sku) continue;
+    const hit = await findProductBySkuLookup(sku);
+    if (hit) {
+      let existingVariants = variantsByProduct.get(hit.product.id);
+      if (!existingVariants) {
+        existingVariants = (hit.product.variants ?? []).map((v) => ({
+          color: v.color,
+          size: v.size,
+          sku: v.sku,
+        }));
+        variantsByProduct.set(hit.product.id, existingVariants);
+      }
+      matched.push({
+        sku,
+        productId: hit.product.id,
+        productTitle: hit.product.name,
+        specificationId: hit.specificationId,
+        existingVariants,
+      });
+    } else {
+      unmatched.push(sku);
+    }
+  }
+
+  return { matched, unmatched };
 }

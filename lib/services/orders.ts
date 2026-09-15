@@ -73,6 +73,7 @@ export async function createOrder(
         price: number;
         color?: string;
         size?: string;
+        sku?: string;
       }> = [];
 
       for (const item of items) {
@@ -115,6 +116,7 @@ export async function createOrder(
         let color = item.color?.trim() || undefined;
         let size = item.size?.trim() || undefined;
         let specificationId: string | undefined = item.specificationId?.trim() || undefined;
+        let sku: string | undefined;
 
         if (hasSpecs) {
           let spec = specificationId
@@ -141,6 +143,7 @@ export async function createOrder(
           specificationId = spec.id;
           color = spec.color;
           size = spec.size;
+          sku = spec.sku ?? undefined;
 
           // Atomic decrement — fails if concurrent order already consumed stock
           const decremented = await tx.specification.updateMany({
@@ -173,6 +176,10 @@ export async function createOrder(
           specificationId = undefined;
           color = undefined;
           size = undefined;
+          sku =
+            product.titlePrefix && product.code
+              ? `${product.titlePrefix}-${product.code}`
+              : undefined;
         }
 
         const imageUrl = selectInvoiceProductImage(product, color);
@@ -186,6 +193,7 @@ export async function createOrder(
           price: Number(product.price),
           color,
           size,
+          sku,
         });
       }
 
@@ -223,6 +231,7 @@ export async function createOrder(
               price: line.price,
               color: line.color,
               size: line.size,
+              sku: line.sku,
             })),
           },
         },

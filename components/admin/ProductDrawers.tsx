@@ -2,11 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { Loader2, Plus, Trash2, Upload, X } from "lucide-react";
+import { Check, Copy, Loader2, Plus, Trash2, Upload, X } from "lucide-react";
 
 import { Drawer } from "@/components/ui/Drawer";
 import { Select } from "@/components/ui/Select";
-import { fetchAdminCategories } from "@/lib/api/admin";
+import { fetchAdminCategories, fetchNextSku } from "@/lib/api/admin";
+import { PRODUCT_SIZE_OPTIONS } from "@/lib/product-options";
+import {
+  baseSku,
+  DEFAULT_COLOR_CODES,
+  extractTitlePrefix,
+  generateVariantSku,
+  resolveColorCode,
+} from "@/lib/sku";
 import type { Category, Product, ProductSavePayload, ProductVariant } from "@/types";
 
 const COLOR_OPTIONS = [
@@ -30,7 +38,7 @@ const COLOR_OPTIONS = [
   "Iron",
   "Yellow",
 ];
-const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL"];
+const SIZE_OPTIONS: string[] = [...PRODUCT_SIZE_OPTIONS];
 const NEW_CATEGORY = "__new__";
 
 type FormState = {
@@ -54,6 +62,9 @@ type DraftVariant = {
   qty: string;
 };
 
+/** Editable variant row — qty may be "" while the user clears the field. */
+type FormVariant = Omit<ProductVariant, "qty"> & { qty: number | "" };
+
 const fieldClass =
   "mt-1.5 h-10 w-full rounded-md border border-neutral-border bg-white px-3 text-[13px] text-neutral-text outline-none placeholder:text-neutral-muted focus:border-[#2563EB]";
 
@@ -72,15 +83,81 @@ function emptyDraft(): DraftVariant {
   return { color: "", size: "", qty: "" };
 }
 
-function variantsFromProduct(product: Product): ProductVariant[] {
-  return product.variants?.length ? product.variants : [];
+function variantsFromProduct(product: Product): FormVariant[] {
+  return product.variants?.length ? product.variants.map((v) => ({ ...v })) : [];
 }
 
-function totalStock(variants: ProductVariant[], fallback: string) {
+function totalStock(variants: FormVariant[], fallback: string) {
   if (variants.length > 0) {
-    return String(variants.reduce((sum, v) => sum + v.qty, 0));
+    return String(variants.reduce((sum, v) => sum + (typeof v.qty === "number" ? v.qty : 0), 0));
   }
   return fallback;
+}
+
+function coerceVariantQty(qty: number | ""): number {
+  if (qty === "" || qty == null) return 0;
+  const n = Number(qty);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
+}
+
+function previewVariantSku(
+  titlePrefix: string | undefined,
+  code: string | undefined,
+  color: string,
+  size: string
+) {
+  if (!titlePrefix || !code || !color.trim() || !size.trim()) return null;
+  const colorCode = resolveColorCode(
+    color,
+    Object.entries(DEFAULT_COLOR_CODES).map(([name, c]) => ({ name, code: c }))
+  );
+  return generateVariantSku(titlePrefix, code, size, colorCode);
+}
+
+function SkuBadge({ sku, preview = false }: { sku: string; preview?: boolean }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copySku() {
+    try {
+      await navigator.clipboard.writeText(sku);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-2">
+      <button
+        type="button"
+        onClick={() => void copySku()}
+        title="Copy SKU"
+        className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-[#dbeafe] bg-[#eff6ff] px-2 py-1 text-left transition hover:border-[#93c5fd] hover:bg-[#dbeafe]"
+      >
+        <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-[#3b82f6]">
+          SKU
+        </span>
+        <span className="truncate font-mono text-[12px] font-semibold tabular-nums text-[#1e3a8a]">
+          {sku}
+        </span>
+        {copied ? (
+          <Check className="h-3.5 w-3.5 shrink-0 text-green-600" />
+        ) : (
+          <Copy className="h-3.5 w-3.5 shrink-0 text-[#60a5fa]" />
+        )}
+      </button>
+      {preview ? (
+        <span className="rounded bg-[#f1f5f9] px-1.5 py-0.5 text-[10px] font-medium text-[#64748b]">
+          Preview — confirmed on save
+        </span>
+      ) : (
+        <span className="rounded bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-700">
+          Confirmed
+        </span>
+      )}
+    </div>
+  );
 }
 
 function ProductFormFields({
@@ -103,13 +180,15 @@ function ProductFormFields({
   fileRef,
   onUpload,
   uploadingCount,
+  skuPrefix,
+  skuCode,
 }: {
   form: FormState;
   setForm: React.Dispatch<React.SetStateAction<FormState>>;
   draft: DraftVariant;
   setDraft: React.Dispatch<React.SetStateAction<DraftVariant>>;
-  variants: ProductVariant[];
-  setVariants: React.Dispatch<React.SetStateAction<ProductVariant[]>>;
+  variants: FormVariant[];
+  setVariants: React.Dispatch<React.SetStateAction<FormVariant[]>>;
   images: ProductImageDraft[];
   setImages: React.Dispatch<React.SetStateAction<ProductImageDraft[]>>;
   categories: Category[];
@@ -123,8 +202,11 @@ function ProductFormFields({
   fileRef: React.RefObject<HTMLInputElement | null>;
   onUpload: (file: File) => Promise<void>;
   uploadingCount: number;
+  skuPrefix?: string;
+  skuCode?: string;
 }) {
-  const hasVariants = variants.length > 0;
+  const productCode = skuPrefix && skuCode ? baseSku(skuPrefix, skuCode) : undefined;
+  const draftSku = previewVariantSku(skuPrefix, skuCode, draft.color, draft.size);
 
   function saveNewCategory() {
     const name = newCategoryName.trim();
@@ -136,8 +218,12 @@ function ProductFormFields({
   }
 
   function addVariant() {
-    if (!draft.color && !draft.size) {
-      setError("Select at least a color or a size");
+    if (!draft.color.trim()) {
+      setError("Select a color");
+      return;
+    }
+    if (!draft.size.trim()) {
+      setError("Select a size (use Free Size if the product has no size)");
       return;
     }
     if (draft.qty === "") {
@@ -160,7 +246,10 @@ function ProductFormFields({
     }
     const next = [...variants, { color: draft.color, size: draft.size, qty }];
     setVariants(next);
-    setForm((f) => ({ ...f, stock: String(next.reduce((sum, v) => sum + v.qty, 0)) }));
+    setForm((f) => ({
+      ...f,
+      stock: String(next.reduce((sum, v) => sum + coerceVariantQty(v.qty), 0)),
+    }));
     setDraft(emptyDraft());
     setError("");
   }
@@ -175,14 +264,40 @@ function ProductFormFields({
   }
 
   function updateVariantQty(index: number, raw: string) {
-    const qty = Number(raw);
+    if (raw.trim() === "") {
+      const next = variants.map((v, i) => (i === index ? { ...v, qty: "" as const } : v));
+      setVariants(next);
+      setForm((f) => ({
+        ...f,
+        stock: String(next.reduce((sum, v) => sum + coerceVariantQty(v.qty), 0)),
+      }));
+      return;
+    }
+    if (!/^\d+$/.test(raw.trim())) return;
+    const qty = Math.floor(Number(raw));
     if (!Number.isFinite(qty) || qty < 0) return;
-    const next = variants.map((v, i) => (i === index ? { ...v, qty: Math.floor(qty) } : v));
+    const next = variants.map((v, i) => (i === index ? { ...v, qty } : v));
     setVariants(next);
     setForm((f) => ({
       ...f,
-      stock: String(next.reduce((sum, v) => sum + v.qty, 0)),
+      stock: String(next.reduce((sum, v) => sum + coerceVariantQty(v.qty), 0)),
     }));
+  }
+
+  function updateVariantField(index: number, field: "color" | "size", value: string) {
+    setVariants((prev) =>
+      prev.map((v, i) => (i === index ? { ...v, [field]: value, sku: undefined } : v))
+    );
+    setError("");
+  }
+
+  function validateVariants(): string | null {
+    if (!variants.length) return null;
+    const missing = variants.findIndex((v) => !v.color?.trim() || !v.size?.trim());
+    if (missing >= 0) {
+      return `Variant ${missing + 1} needs both a color and a size (use Free Size if there is no size)`;
+    }
+    return null;
   }
 
   function removeImage(index: number) {
@@ -200,6 +315,11 @@ function ProductFormFields({
       className="flex h-full flex-col"
       onSubmit={async (e) => {
         e.preventDefault();
+        const variantError = validateVariants();
+        if (variantError) {
+          setError(variantError);
+          return;
+        }
         await onSubmit();
       }}
     >
@@ -304,6 +424,17 @@ function ProductFormFields({
               className={fieldClass}
             />
           </label>
+          {productCode ? (
+            <div className="-mt-1 flex flex-wrap items-center gap-2 rounded-md border border-[#e2e8f0] bg-[#f8fafc] px-2.5 py-2">
+              <span className="text-[11px] text-[#64748b]">Product code</span>
+              <span className="font-mono text-[12px] font-semibold tabular-nums text-[#0f172a]">
+                {productCode}
+              </span>
+              <span className="text-[11px] text-[#94a3b8]">· shared by all variants</span>
+            </div>
+          ) : form.title.trim().length >= 2 ? (
+            <p className="-mt-1 text-[11px] text-[#94a3b8]">Resolving next SKU code…</p>
+          ) : null}
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-[12px] font-medium text-[#6b7280]">
               Price <span className="text-red-500">*</span>
@@ -321,14 +452,27 @@ function ProductFormFields({
             <label className="block text-[12px] font-medium text-[#6b7280]">
               Total Quantity
               <input
-                required
-                type="number"
-                min={0}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={form.stock}
-                readOnly={hasVariants}
-                onChange={(e) => setForm((f) => ({ ...f, stock: e.target.value }))}
+                readOnly={variants.length > 1}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value !== "" && !/^\d+$/.test(value)) return;
+                  setForm((f) => ({ ...f, stock: value }));
+                  if (variants.length === 1) {
+                    const qty: number | "" = value.trim() === "" ? "" : Math.floor(Number(value));
+                    setVariants([{ ...variants[0], qty }]);
+                  }
+                }}
                 className={`${fieldClass} read-only:bg-[#f8fafc]`}
               />
+              {variants.length > 1 ? (
+                <span className="mt-1 block text-[11px] font-normal text-[#94a3b8]">
+                  Sum of variant quantities — edit qtys below to update stock
+                </span>
+              ) : null}
             </label>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -417,11 +561,16 @@ function ProductFormFields({
                 ariaLabel="Size"
               />
               <input
-                type="number"
-                min={0}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 placeholder="Enter Qty"
                 value={draft.qty}
-                onChange={(e) => setDraft((d) => ({ ...d, qty: e.target.value }))}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value !== "" && !/^\d+$/.test(value)) return;
+                  setDraft((d) => ({ ...d, qty: value }));
+                }}
                 className="h-10 w-full rounded-md border border-neutral-border px-3 text-[13px] text-neutral-text outline-none focus:border-[#2563EB]"
                 aria-label="Quantity"
               />
@@ -435,35 +584,81 @@ function ProductFormFields({
               </button>
             </div>
             <div className="mt-2 space-y-2">
-              {variants.map((v, index) => (
-                <div
-                  key={`${v.color}-${v.size}`}
-                  className="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-2"
-                >
-                  <div className="flex h-10 items-center rounded-md border border-neutral-border px-3 text-[13px] text-neutral-text">
-                    {v.color || "—"}
-                  </div>
-                  <div className="flex h-10 items-center rounded-md border border-neutral-border px-3 text-[13px] text-neutral-text">
-                    {v.size || "—"}
-                  </div>
-                  <input
-                    type="number"
-                    min={0}
-                    value={v.qty}
-                    onChange={(e) => updateVariantQty(index, e.target.value)}
-                    className="h-10 w-full rounded-md border border-neutral-border px-3 text-[13px] tabular-nums text-neutral-text outline-none focus:border-[#2563EB]"
-                    aria-label={`Quantity for ${v.color} ${v.size}`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeVariant(index)}
-                    className="flex h-10 w-10 items-center justify-center rounded-md text-[#EF4444] hover:bg-red-50"
-                    aria-label="Remove variant"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+              {draftSku ? (
+                <div className="rounded-md border border-dashed border-[#bfdbfe] bg-[#f8fbff] px-3 py-2">
+                  <p className="mb-1 text-[11px] text-[#64748b]">Next variant will get</p>
+                  <SkuBadge sku={draftSku} preview />
                 </div>
-              ))}
+              ) : null}
+              {variants.map((v, index) => {
+                const sku =
+                  (v.size?.trim() && v.color?.trim()
+                    ? v.sku || previewVariantSku(skuPrefix, skuCode, v.color, v.size)
+                    : null) || null;
+                const isPreview = !v.sku;
+                const sizeMissing = !v.size?.trim();
+                return (
+                  <div
+                    key={`${v.color}-${v.size}-${index}`}
+                    className={`rounded-lg border bg-white ${
+                      sizeMissing ? "border-red-300" : "border-[#e5e7eb]"
+                    }`}
+                  >
+                    <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-2 p-2">
+                      <Select
+                        value={v.color}
+                        onChange={(color) => updateVariantField(index, "color", color)}
+                        options={[
+                          { value: "", label: "Select Color" },
+                          ...COLOR_OPTIONS.map((c) => ({ value: c, label: c })),
+                          ...(v.color && !COLOR_OPTIONS.includes(v.color)
+                            ? [{ value: v.color, label: v.color }]
+                            : []),
+                        ]}
+                        ariaLabel={`Color for variant ${index + 1}`}
+                      />
+                      <Select
+                        value={v.size}
+                        onChange={(size) => updateVariantField(index, "size", size)}
+                        options={[
+                          { value: "", label: "Select Size" },
+                          ...SIZE_OPTIONS.map((s) => ({ value: s, label: s })),
+                          ...(v.size && !SIZE_OPTIONS.includes(v.size)
+                            ? [{ value: v.size, label: v.size }]
+                            : []),
+                        ]}
+                        ariaLabel={`Size for variant ${index + 1}`}
+                      />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={v.qty === "" ? "" : String(v.qty)}
+                        onChange={(e) => updateVariantQty(index, e.target.value)}
+                        className="h-10 w-full rounded-md border border-neutral-border px-3 text-[13px] tabular-nums text-neutral-text outline-none focus:border-[#2563EB]"
+                        aria-label={`Quantity for ${v.color} ${v.size}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeVariant(index)}
+                        className="flex h-10 w-10 items-center justify-center rounded-md text-[#EF4444] hover:bg-red-50"
+                        aria-label="Remove variant"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                    {sizeMissing ? (
+                      <p className="rounded-b-lg border-t border-red-100 bg-red-50 px-3 py-2 text-[11px] text-red-600">
+                        Size is required — pick Free Size if this product has no size
+                      </p>
+                    ) : sku ? (
+                      <div className="rounded-b-lg border-t border-[#eef2f7] bg-[#f8fafc] px-3 py-2">
+                        <SkuBadge sku={sku} preview={isPreview} />
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -494,12 +689,18 @@ function revokeDraftImages(items: ProductImageDraft[]) {
 
 function buildSavePayload(
   form: FormState,
-  variants: ProductVariant[],
+  variants: FormVariant[],
   images: ProductImageDraft[],
   newCategoryName: string
 ): ProductSavePayload {
+  const normalizedVariants = variants.map((v) => ({
+    ...v,
+    qty: coerceVariantQty(v.qty),
+  }));
   const stock =
-    variants.length > 0 ? variants.reduce((sum, v) => sum + v.qty, 0) : Number(form.stock);
+    normalizedVariants.length > 0
+      ? normalizedVariants.reduce((sum, v) => sum + v.qty, 0)
+      : Number(form.stock) || 0;
   const isNewCategory = form.categoryId === NEW_CATEGORY;
   return {
     title: form.title,
@@ -507,9 +708,9 @@ function buildSavePayload(
     stock,
     image: images[0]?.file ? undefined : images[0]?.url,
     images,
-    color: variants[0]?.color,
-    size: variants[0]?.size,
-    variants,
+    color: normalizedVariants[0]?.color,
+    size: normalizedVariants[0]?.size,
+    variants: normalizedVariants,
     categoryId: isNewCategory ? null : form.categoryId,
     categoryName: isNewCategory ? newCategoryName.trim() : undefined,
     isActive: form.isActive,
@@ -541,11 +742,13 @@ export function AddProductDrawer({
 }) {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [draft, setDraft] = useState<DraftVariant>(emptyDraft);
-  const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [variants, setVariants] = useState<FormVariant[]>([]);
   const [images, setImages] = useState<ProductImageDraft[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploadingCount, setUploadingCount] = useState(0);
   const [error, setError] = useState("");
+  const [skuPrefix, setSkuPrefix] = useState<string>();
+  const [skuCode, setSkuCode] = useState<string>();
   const fileRef = useRef<HTMLInputElement>(null);
   const { categories, newCategoryName, setNewCategoryName } = useCategoryLoader(open);
 
@@ -564,8 +767,32 @@ export function AddProductDrawer({
       setUploadingCount(0);
       setNewCategoryName("");
       setError("");
+      setSkuPrefix(undefined);
+      setSkuCode(undefined);
     }
   }
+
+  useEffect(() => {
+    if (!open) return;
+    const title = form.title.trim();
+    if (title.length < 2) {
+      setTimeout(() => setSkuPrefix(undefined), 0);
+      setTimeout(() => setSkuCode(undefined), 0);
+      return;
+    }
+    setTimeout(() => setSkuPrefix(extractTitlePrefix(title)), 0);
+    const t = window.setTimeout(() => {
+      void fetchNextSku(title)
+        .then((data) => {
+          if (data.titlePrefix) setSkuPrefix(data.titlePrefix);
+          if (data.nextCode) setSkuCode(data.nextCode);
+        })
+        .catch(() => {
+          /* preview only */
+        });
+    }, 350);
+    return () => window.clearTimeout(t);
+  }, [form.title, open]);
 
   async function onUpload(file: File) {
     const url = URL.createObjectURL(file);
@@ -597,6 +824,8 @@ export function AddProductDrawer({
         fileRef={fileRef}
         onUpload={onUpload}
         uploadingCount={uploadingCount}
+        skuPrefix={skuPrefix}
+        skuCode={skuCode}
         onSubmit={async () => {
           if (!form.categoryId || (form.categoryId === NEW_CATEGORY && !newCategoryName.trim())) {
             setError("Select or create a category first");
@@ -635,11 +864,13 @@ export function EditProductDrawer({
 }) {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [draft, setDraft] = useState<DraftVariant>(emptyDraft);
-  const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [variants, setVariants] = useState<FormVariant[]>([]);
   const [images, setImages] = useState<ProductImageDraft[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploadingCount, setUploadingCount] = useState(0);
   const [error, setError] = useState("");
+  const [skuPrefix, setSkuPrefix] = useState<string>();
+  const [skuCode, setSkuCode] = useState<string>();
   const fileRef = useRef<HTMLInputElement>(null);
   const { categories, newCategoryName, setNewCategoryName } = useCategoryLoader(open);
 
@@ -652,8 +883,14 @@ export function EditProductDrawer({
   if (prev.open !== open || prev.product !== product) {
     setPrev({ open, product });
     if (open && product) {
-      const nextVariants = variantsFromProduct(product);
-      const nextImages = product.images?.length
+      const nextVariants = variantsFromProduct(product).map((v) => ({
+        ...v,
+        size:
+          !v.size?.trim() || ["na", "n/a", "-"].includes(v.size.trim().toLowerCase())
+            ? "Free Size"
+            : v.size,
+      }));
+      const rawImages = product.images?.length
         ? product.images.map((img) => ({
             url: img.url,
             color: img.color ?? "",
@@ -661,6 +898,12 @@ export function EditProductDrawer({
         : product.imageUrl
           ? [{ url: product.imageUrl, color: "" }]
           : [];
+      const seenUrls = new Set<string>();
+      const nextImages = rawImages.filter((img) => {
+        if (!img.url || seenUrls.has(img.url)) return false;
+        seenUrls.add(img.url);
+        return true;
+      });
       setForm({
         title: product.name,
         price: String(product.price),
@@ -678,8 +921,32 @@ export function EditProductDrawer({
       setDraft(emptyDraft());
       setNewCategoryName("");
       setError("");
+      setSkuPrefix(product.titlePrefix || extractTitlePrefix(product.name));
+      setSkuCode(product.code);
     }
   }
+
+  useEffect(() => {
+    if (!open || !product) return;
+    const title = form.title.trim();
+    if (title.length < 2) return;
+    const prefix = extractTitlePrefix(title);
+    setTimeout(() => setSkuPrefix(prefix), 0);
+    // Title prefix change → preview next code for new prefix; same prefix keeps existing code
+    if (product.titlePrefix && prefix === product.titlePrefix && product.code) {
+      setTimeout(() => setSkuCode(product.code), 0);
+      return;
+    }
+    const t = window.setTimeout(() => {
+      void fetchNextSku(title)
+        .then((data) => {
+          if (data.titlePrefix) setSkuPrefix(data.titlePrefix);
+          if (data.nextCode) setSkuCode(data.nextCode);
+        })
+        .catch(() => {});
+    }, 350);
+    return () => window.clearTimeout(t);
+  }, [form.title, open, product]);
 
   async function onUpload(file: File) {
     const url = URL.createObjectURL(file);
@@ -716,6 +983,8 @@ export function EditProductDrawer({
         fileRef={fileRef}
         onUpload={onUpload}
         uploadingCount={uploadingCount}
+        skuPrefix={skuPrefix}
+        skuCode={skuCode}
         onSubmit={async () => {
           if (!form.categoryId || (form.categoryId === NEW_CATEGORY && !newCategoryName.trim())) {
             setError("Select or create a category first");

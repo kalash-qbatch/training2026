@@ -36,11 +36,30 @@ class Category(Base):
 
     products = relationship("Product", back_populates="category")
 
+class Color(Base):
+    __tablename__ = "Color"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, unique=True, nullable=False)
+    code = Column(String, unique=True, nullable=False)
+    createdAt = Column(DateTime, default=datetime.utcnow)
+    updatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class Size(Base):
+    __tablename__ = "Size"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, unique=True, nullable=False)
+    createdAt = Column(DateTime, default=datetime.utcnow)
+    updatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 class Product(Base):
     __tablename__ = "Product"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     title = Column(String, nullable=False)
+    titlePrefix = Column(String, nullable=True)
+    code = Column(String, nullable=True)
     price = Column(Numeric(10, 2), nullable=False)
     image = Column(String, nullable=False)
     color = Column(String, nullable=True)
@@ -74,6 +93,7 @@ class Specification(Base):
     color = Column(String, nullable=False)
     size = Column(String, nullable=False)
     qty = Column(Integer, default=0)
+    sku = Column(String, unique=True, nullable=True)
     productId = Column(String, ForeignKey("Product.id"), nullable=False)
 
     product = relationship("Product", back_populates="specifications")
@@ -127,6 +147,7 @@ class OrderItem(Base):
     price = Column(Numeric(10, 2), nullable=False)
     color = Column(String, nullable=True)
     size = Column(String, nullable=True)
+    sku = Column(String, nullable=True)
     orderId = Column(String, ForeignKey("Order.id"), nullable=False)
     productId = Column(String, ForeignKey("Product.id"), nullable=False)
     specificationId = Column(String, nullable=True)

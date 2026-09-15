@@ -185,6 +185,47 @@ Classic jeans,49.99,Jeans,Black,L,20
     expect(result.assignedCount).toBe(3);
   });
 
+  it("fuzzy-matches CSV image names with hyphen/underscore differences", () => {
+    const products = parseBulkProductsCsv(`title,price,category,color,size,qty,image
+chair,49.99,Chair,Black,Free Size,22,chair_black.jpeg
+glasess modren,49.99,glasses,Green,Free Size,10,glasess-green.jpg
+glasess modren,49.99,glasses,Blue,Free Size,12,glasess_blue.jpg
+`);
+
+    const folder = [
+      fakeFile("chair-black.jpeg"),
+      fakeFile("glasess-green.jpg"),
+      fakeFile("glasess blue.jpg"),
+    ];
+
+    const result = matchProductImagesFromFolder(products, folder);
+    const chair = products[0];
+    const glasses = products[1];
+
+    expect((result.byProductId.get(chair.id) ?? []).map((f) => f.name)).toEqual([
+      "chair-black.jpeg",
+    ]);
+    expect((result.byProductId.get(glasses.id) ?? []).map((f) => f.name).sort()).toEqual([
+      "glasess blue.jpg",
+      "glasess-green.jpg",
+    ]);
+    expect(result.unmatchedFolderFiles).toEqual([]);
+    expect(result.assignedCount).toBe(3);
+  });
+
+  it("assigns an ambiguous color filename to the product that still needs images", () => {
+    const products = parseBulkProductsCsv(`title,price,category,color,size,qty,image
+chair,49.99,Chair,Black,Free Size,22,chair_black.jpeg
+glasess modren,49.99,glasses,Black,Free Size,10,glasses_black.jpeg
+`);
+
+    const folder = [fakeFile("chair_black.jpeg"), fakeFile("glasses_black.jpeg")];
+
+    const result = matchProductImagesFromFolder(products, folder);
+    expect(result.assignedCount).toBe(2);
+    expect(result.unmatchedFolderFiles).toEqual([]);
+  });
+
   it("guards against attaching an image to the wrong product", () => {
     const [jeans] = parseBulkProductsCsv(`title,price,category,color,size,qty,image
 Classic jeans,49.99,Jeans,Black,L,20,jeans-black.jpg

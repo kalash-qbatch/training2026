@@ -3,12 +3,7 @@ import path from "path";
 import { TABLE_INITIAL_PAGE, TABLE_PAGE_SIZE } from "@/lib/constants";
 import { requireAdminUser } from "@/lib/controllers/http";
 import { getProductError, productErrorStatus } from "@/lib/errors/products";
-import {
-  createProduct,
-  createProductsBulk,
-  findAdminProducts,
-  updateProduct,
-} from "@/lib/services/products";
+import { createProduct, findAdminProducts, updateProduct } from "@/lib/services/products";
 import { uploadProductImage } from "@/lib/supabase";
 import { adminProductSchema } from "@/lib/validations/admin";
 
@@ -310,6 +305,9 @@ export async function bulkCreateAdminProducts(request: Request) {
           size: v.size,
           categoryName: v.categoryName ?? undefined,
           variants: v.variants,
+          isUpdate: v.isUpdate,
+          existingProductId: v.existingProductId ?? undefined,
+          sku: v.sku,
         }))
       );
       return {
@@ -322,21 +320,45 @@ export async function bulkCreateAdminProducts(request: Request) {
       };
     } catch (schedErr) {
       console.warn("Scheduler unavailable, processing directly in NextJS:", schedErr);
-      const products = await createProductsBulk(
-        validated.map((v) => ({
-          title: v.title,
-          price: v.price,
-          stock: v.stock,
-          image: v.image,
-        }))
-      );
+      const products = [];
+      for (const v of validated) {
+        if (v.isUpdate && v.existingProductId) {
+          products.push(
+            await updateProduct(v.existingProductId, {
+              title: v.title,
+              price: v.price,
+              image: v.image,
+              images: v.images,
+              color: v.color,
+              size: v.size,
+              variants: v.variants,
+              categoryName: v.categoryName,
+              addStock: true,
+            })
+          );
+        } else {
+          products.push(
+            await createProduct({
+              title: v.title,
+              price: v.price,
+              stock: v.stock,
+              image: v.image,
+              images: v.images,
+              color: v.color,
+              size: v.size,
+              variants: v.variants,
+              categoryName: v.categoryName,
+            })
+          );
+        }
+      }
 
       return {
         status: 200,
         body: {
           success: true,
           products,
-          message: `${products.length} products uploaded successfully`,
+          message: `${products.length} products processed successfully`,
         },
       };
     }

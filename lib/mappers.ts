@@ -13,6 +13,7 @@ type DbSpecification = {
   color: string;
   size: string;
   qty: number;
+  sku?: string | null;
 };
 
 type DbProductImage = {
@@ -39,6 +40,7 @@ function mapVariants(row: DbProductRow): ProductVariant[] {
     color: s.color,
     size: s.size,
     qty: s.qty,
+    sku: s.sku ?? undefined,
   }));
 }
 
@@ -62,6 +64,9 @@ export function mapProduct(row: DbProductRow): Product {
     }));
   const imageUrl = images.find((img) => !img.color)?.url ?? images[0]?.url ?? row.image;
 
+  const titlePrefix = (row as { titlePrefix?: string | null }).titlePrefix ?? undefined;
+  const code = (row as { code?: string | null }).code ?? undefined;
+
   return {
     id: row.id,
     name: row.title,
@@ -76,6 +81,9 @@ export function mapProduct(row: DbProductRow): Product {
     categoryId: row.categoryId ?? undefined,
     category: row.category ? mapCategory(row.category) : undefined,
     isActive: row.isActive,
+    titlePrefix,
+    code,
+    baseSku: titlePrefix && code ? `${titlePrefix}-${code}` : undefined,
   };
 }
 
@@ -164,6 +172,8 @@ export function mapOrder(row: DbOrderWithRelations): Order {
       qty: item.quantity,
       color: item.color || undefined,
       size: item.size || undefined,
+      // Frozen at order time — never resolve via live Specification.sku join
+      sku: (item as { sku?: string | null }).sku || undefined,
       stock: item.product.stock,
     })),
   };

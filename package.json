@@ -12,6 +12,7 @@
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
     "db:seed": "tsx prisma/seed.ts",
+    "db:backfill-skus": "tsx scripts/backfill-skus.ts",
     "db:studio": "prisma studio",
     "images:supabase": "tsx scripts/migrate-images-to-supabase.ts",
     "lint": "eslint",

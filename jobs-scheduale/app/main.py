@@ -42,6 +42,7 @@ class ProductVariantItem(BaseModel):
     color: Optional[str] = ""
     size: Optional[str] = ""
     qty: int = 0
+    sku: Optional[str] = None
 
 class ProductImageItem(BaseModel):
     url: str
@@ -58,6 +59,10 @@ class BulkProductItem(BaseModel):
     category: Optional[str] = None
     categoryName: Optional[str] = None
     variants: Optional[List[ProductVariantItem]] = None
+    sku: Optional[str] = None
+    isUpdate: Optional[bool] = False
+    existingProductId: Optional[str] = None
+    productId: Optional[str] = None
 
 class BulkProductsRequest(BaseModel):
     products: List[BulkProductItem]

@@ -44,6 +44,7 @@ export type ProductVariant = {
   color: string;
   size: string;
   qty: number;
+  sku?: string;
 };
 
 export type ProductImage = {
@@ -83,6 +84,9 @@ export type Product = {
   categoryId?: string;
   category?: Category;
   isActive: boolean;
+  titlePrefix?: string;
+  code?: string;
+  baseSku?: string;
 };
 
 export type ProductSort = "price-asc" | "price-desc" | "newest";
@@ -203,6 +207,7 @@ export type OrderItem = {
   qty: number;
   color?: string;
   size?: string;
+  sku?: string;
   stock?: number;
 };
 

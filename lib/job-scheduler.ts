@@ -80,7 +80,10 @@ export async function enqueueBulkProductsJob(
     size?: string;
     category?: string;
     categoryName?: string;
-    variants?: Array<{ color: string; size: string; qty: number }>;
+    variants?: Array<{ color: string; size: string; qty: number; sku?: string }>;
+    isUpdate?: boolean;
+    existingProductId?: string;
+    sku?: string;
   }>
 ): Promise<JobEnqueueResponse> {
   return postJob("/api/jobs/products/bulk", { products });

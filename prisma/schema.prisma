@@ -54,9 +54,26 @@ model Category {
   products  Product[]
 }
 
+model Color {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  code      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Size {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Product {
   id          String      @id @default(uuid())
   title       String
+  titlePrefix String?
+  code        String?
   price       Decimal     @db.Decimal(10, 2)
   image       String
   color       String?
@@ -72,8 +89,10 @@ model Product {
   specifications Specification[]
   images      ProductImage[]
 
+  @@unique([titlePrefix, code])
   @@index([categoryId])
   @@index([isActive])
+  @@index([titlePrefix])
 }
 
 model ProductImage {
@@ -92,12 +111,14 @@ model Specification {
   color      String
   size       String
   qty        Int         @default(0)
+  sku        String?     @unique
   productId  String
   product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
   cartItems  CartItem[]
   orderItems OrderItem[]
 
   @@unique([productId, color, size])
+  @@index([sku])
 }
 
 model CartItem {
@@ -151,6 +172,7 @@ model OrderItem {
   price           Decimal        @db.Decimal(10, 2)
   color           String?
   size            String?
+  sku             String?
   orderId         String
   productId       String
   specificationId String?

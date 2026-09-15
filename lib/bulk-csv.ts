@@ -13,6 +13,7 @@ export type BulkCsvVariant = {
   color: string;
   size: string;
   qty: number;
+  sku?: string;
 };
 
 /** Image referenced on a CSV row, with that row's color/size/qty for binding. */
@@ -35,6 +36,8 @@ export type BulkCsvProduct = {
   imageFileNames: string[];
   /** Per-row image → color/size from the file (preferred over filename detection). */
   imageRefs: BulkCsvImageRef[];
+  /** SKUs seen on any row for this product group (for match/update). */
+  skus: string[];
 };
 
 function splitCsvLine(line: string, delimiter = ","): string[] {
@@ -155,6 +158,7 @@ export function parseBulkProductsCsv(text: string): BulkCsvProduct[] {
   }
 
   const catIdx = idx("category", "categoryname", "category_name", "cat");
+  const skuIdx = idx("sku", "skucode", "productsku", "variantsku");
   const colorIdx = idx(
     "color",
     "colorname",
@@ -205,6 +209,7 @@ export function parseBulkProductsCsv(text: string): BulkCsvProduct[] {
     const images = imageIdx >= 0 ? parseImageList(cols[imageIdx] || "") : [];
     let color = normalizeColor(colorIdx >= 0 ? cleanCell(cols[colorIdx]) : "");
     let size = normalizeSize(sizeIdx >= 0 ? cleanCell(cols[sizeIdx]) : "");
+    const rowSku = skuIdx >= 0 ? cleanCell(cols[skuIdx]) : "";
 
     // Infer missing color/size from the row's image filename when the sheet left them blank.
     if (images.length) {
@@ -237,11 +242,18 @@ export function parseBulkProductsCsv(text: string): BulkCsvProduct[] {
         variants: [],
         imageFileNames: [],
         imageRefs: [],
+        skus: [],
       };
       byTitle.set(key, product);
     } else {
       if (!product.categoryName && categoryName) product.categoryName = categoryName;
       product.price = price;
+    }
+
+    if (rowSku) {
+      if (!product.skus.some((s) => s.toLowerCase() === rowSku.toLowerCase())) {
+        product.skus.push(rowSku);
+      }
     }
 
     // Every row with color, size, or qty is a variant row — never dump qty into product.stock only.
@@ -253,8 +265,9 @@ export function parseBulkProductsCsv(text: string): BulkCsvProduct[] {
       );
       if (existing) {
         existing.qty += qty;
+        if (rowSku && !existing.sku) existing.sku = rowSku;
       } else {
-        product.variants.push({ color, size, qty });
+        product.variants.push({ color, size, qty, ...(rowSku ? { sku: rowSku } : {}) });
       }
     } else if (stockIdx >= 0 && cleanCell(cols[stockIdx]) !== "") {
       product.stock += Math.max(0, Math.floor(parseNumber(cols[stockIdx]) || 0));
@@ -327,11 +340,11 @@ export function resolveBulkVariants(
   if (hasFileVariants) return variants;
 
   const fileNames = [...product.imageFileNames, ...attachedFileNames].filter(Boolean);
-  variants = ensureVariantsFromImageNames([], fileNames);
+  variants = ensureVariantsFromImageNames([], fileNames) as BulkCsvVariant[];
   if (!variants.length && product.stock > 0) {
-    return [{ color: "", size: "", qty: product.stock }];
+    return [{ color: "", size: "", qty: product.stock }] as BulkCsvVariant[];
   }
-  return assignFallbackStockToVariants(variants, product.stock);
+  return assignFallbackStockToVariants(variants, product.stock) as BulkCsvVariant[];
 }
 
 /** Convert an Excel workbook (xlsx/xls) ArrayBuffer into CSV text for parsing. */
@@ -427,18 +440,43 @@ function slugify(value: string): string {
     .replace(/[^a-z0-9]+/g, "");
 }
 
+function stripExt(name: string): string {
+  return name.replace(/\.[^.]+$/, "");
+}
+
+/** Fuzzy equality for CSV image names vs folder filenames (hyphen/underscore/case). */
+export function imageNamesFuzzyMatch(listed: string, fileName: string): boolean {
+  const a = basename(listed).toLowerCase();
+  const b = basename(fileName).toLowerCase();
+  if (!a || !b) return false;
+  if (a === b) return true;
+
+  const aNoExt = stripExt(a);
+  const bNoExt = stripExt(b);
+  if (aNoExt === bNoExt) return true;
+  if (b.endsWith(a) || b.endsWith(aNoExt) || a.endsWith(bNoExt)) return true;
+
+  const aSlug = slugify(a);
+  const bSlug = slugify(b);
+  if (!aSlug || !bSlug) return false;
+  if (aSlug === bSlug) return true;
+  if (aSlug.length >= 4 && bSlug.includes(aSlug)) return true;
+  if (bSlug.length >= 4 && aSlug.includes(bSlug)) return true;
+
+  // Normalize separators: chair_black ≈ chair-black ≈ chair black
+  const norm = (s: string) =>
+    stripExt(s)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-");
+  return norm(a) === norm(b);
+}
+
 /** True when `fileName` was explicitly listed on this product's CSV image column. */
 export function isImageMappedToProduct(
   product: Pick<BulkCsvProduct, "id" | "title" | "imageFileNames">,
   fileName: string
 ): boolean {
-  const target = basename(fileName).toLowerCase();
-  const targetNoExt = target.replace(/\.[^.]+$/, "");
-  return product.imageFileNames.some((listed) => {
-    const lower = listed.toLowerCase();
-    const noExt = lower.replace(/\.[^.]+$/, "");
-    return lower === target || noExt === targetNoExt || target.endsWith(lower);
-  });
+  return product.imageFileNames.some((listed) => imageNamesFuzzyMatch(listed, fileName));
 }
 
 /**
@@ -476,10 +514,40 @@ function pushImageToProduct(
   return true;
 }
 
+function findFileForCsvName(name: string, imageFiles: File[], used: Set<string>): File | undefined {
+  const lower = basename(name).toLowerCase();
+  const noExt = stripExt(lower);
+  const slug = slugify(lower);
+
+  const unused = imageFiles.filter((f) => !used.has(fileKey(f)));
+
+  const exact =
+    unused.find((f) => fileKey(f) === lower) ||
+    unused.find((f) => stripExt(fileKey(f)) === noExt) ||
+    unused.find((f) => {
+      const key = fileKey(f);
+      return key.endsWith(`/${lower}`) || key.endsWith(lower);
+    });
+  if (exact) return exact;
+
+  const fuzzy = unused.filter((f) => imageNamesFuzzyMatch(name, fileBaseName(f)));
+  if (fuzzy.length === 1) return fuzzy[0];
+
+  // Prefer the shortest unused name that still fuzzy-matches (avoid over-broad hits)
+  if (fuzzy.length > 1) {
+    fuzzy.sort((a, b) => fileBaseName(a).length - fileBaseName(b).length);
+    const best = fuzzy[0];
+    const bestSlug = slugify(fileBaseName(best));
+    if (slug && bestSlug === slug) return best;
+    if (fuzzy.every((f) => slugify(fileBaseName(f)) === bestSlug)) return best;
+  }
+
+  return undefined;
+}
+
 /**
  * Score how well a folder file maps to a product when the CSV image column is empty
  * or the exact filename was not found. Higher = better. 0 = no match.
- * Ambiguous files (score on multiple products) are left unmatched — never round-robin.
  */
 function scoreFileForProduct(product: BulkCsvProduct, file: File): number {
   const name = fileBaseName(file);
@@ -488,14 +556,14 @@ function scoreFileForProduct(product: BulkCsvProduct, file: File): number {
 
   let score = 0;
   const titleSlug = slugify(product.title);
-  if (titleSlug.length >= 4) {
+  if (titleSlug.length >= 3) {
     if (base === titleSlug) score += 100;
     else if (base.includes(titleSlug) || titleSlug.includes(base)) score += 60;
     else {
       const tokens = product.title
         .toLowerCase()
         .split(/[^a-z0-9]+/)
-        .filter((t) => t.length >= 4);
+        .filter((t) => t.length >= 3);
       for (const token of tokens) {
         if (base.includes(token)) {
           score += 25;
@@ -513,14 +581,55 @@ function scoreFileForProduct(product: BulkCsvProduct, file: File): number {
     if (colorHit) score += 40;
   }
 
+  // Bonus when filename fuzzy-matches a CSV-listed image for this product
+  if (product.imageFileNames.some((listed) => imageNamesFuzzyMatch(listed, name))) {
+    score += 80;
+  }
+
   return score;
+}
+
+function productNeedsMoreImages(
+  product: BulkCsvProduct,
+  byProductId: Map<string, File[]>
+): boolean {
+  const assigned = byProductId.get(product.id)?.length ?? 0;
+  if (product.imageFileNames.length) return assigned < product.imageFileNames.length;
+  return assigned === 0;
+}
+
+function pickUniqueWinner(
+  scored: Array<{ product: BulkCsvProduct; score: number }>,
+  byProductId: Map<string, File[]>,
+  file: File
+): BulkCsvProduct | null {
+  if (!scored.length) return null;
+  scored.sort((a, b) => b.score - a.score);
+  const topScore = scored[0].score;
+  let top = scored.filter((row) => row.score === topScore);
+  if (top.length === 1) return top[0].product;
+
+  const needing = top.filter((row) => productNeedsMoreImages(row.product, byProductId));
+  if (needing.length === 1) return needing[0].product;
+  if (needing.length > 1) top = needing;
+
+  const fuzzyListed = top.filter((row) =>
+    row.product.imageFileNames.some((listed) => imageNamesFuzzyMatch(listed, fileBaseName(file)))
+  );
+  if (fuzzyListed.length === 1) return fuzzyListed[0].product;
+  if (fuzzyListed.length > 1) top = fuzzyListed;
+
+  const empty = top.filter((row) => (byProductId.get(row.product.id)?.length ?? 0) === 0);
+  if (empty.length === 1) return empty[0].product;
+
+  return null;
 }
 
 /**
  * Match folder images to products:
- * 1) Exact CSV `image` filenames (preferred, no cross-product leak)
- * 2) Unique title/color fallback when CSV image column is empty or names differ
- * Never round-robins leftovers onto other products.
+ * 1) CSV `image` filenames (exact + fuzzy hyphen/underscore)
+ * 2) Unique title/color fallback; ties broken by products that still need images
+ * Never round-robins truly unrelated leftovers onto other products.
  */
 export function matchProductImagesFromFolder(
   products: BulkCsvProduct[],
@@ -540,13 +649,6 @@ export function matchProductImagesFromFolder(
     return file.type.startsWith("image/") || /\.(jpe?g|png|webp|gif|avif|heic|bmp)$/i.test(name);
   });
 
-  const byName = new Map<string, File>();
-  for (const file of imageFiles) {
-    byName.set(fileKey(file), file);
-    const base = fileKey(file).replace(/\.[^.]+$/, "");
-    if (!byName.has(base)) byName.set(base, file);
-  }
-
   const used = new Set<string>();
   const byProductId = new Map<string, File[]>();
   const byProductTitle = new Map<string, File[]>();
@@ -558,17 +660,10 @@ export function matchProductImagesFromFolder(
   let matchedCount = 0;
   const csvNames = collectCsvImageFileNames(products);
 
+  // Pass 1: resolve each CSV-listed image name (exact then fuzzy)
   for (const product of products) {
     for (const name of product.imageFileNames) {
-      const lower = name.toLowerCase();
-      const file =
-        byName.get(lower) ||
-        byName.get(lower.replace(/\.[^.]+$/, "")) ||
-        imageFiles.find((f) => {
-          const key = fileKey(f);
-          return key === lower || key.endsWith(`/${lower}`) || key.endsWith(lower);
-        });
-
+      const file = findFileForCsvName(name, imageFiles, used);
       if (!file) continue;
       if (!isImageMappedToProduct(product, fileBaseName(file))) continue;
       if (pushImageToProduct(product, file, byProductId, byProductTitle, used)) {
@@ -577,17 +672,22 @@ export function matchProductImagesFromFolder(
     }
   }
 
+  // Pass 2: leftover folder files → unique best product (title/color/CSV fuzzy)
   for (const file of imageFiles) {
     if (used.has(fileKey(file))) continue;
 
     const scored = products
       .map((product) => ({ product, score: scoreFileForProduct(product, file) }))
-      .filter((row) => row.score > 0)
-      .sort((a, b) => b.score - a.score);
+      .filter((row) => row.score > 0);
 
-    if (!scored.length) continue;
-    if (scored.length > 1 && scored[0].score === scored[1].score) continue;
-    const winner = scored[0].product;
+    const winner = pickUniqueWinner(scored, byProductId, file);
+    if (!winner) continue;
+    // If winner listed CSV images, only attach when fuzzy-listed or still needs images via title match with empty CSV
+    if (winner.imageFileNames.length && !isImageMappedToProduct(winner, fileBaseName(file))) {
+      // Allow title/color attach only when product still has open slots and file clearly matches title
+      const titleScore = scoreFileForProduct({ ...winner, imageFileNames: [] }, file);
+      if (titleScore < 60 || !productNeedsMoreImages(winner, byProductId)) continue;
+    }
     if (pushImageToProduct(winner, file, byProductId, byProductTitle, used)) {
       matchedCount += 1;
     }

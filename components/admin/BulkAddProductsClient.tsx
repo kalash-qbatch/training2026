@@ -17,6 +17,7 @@ import {
   fetchAdminCategories,
   fetchAdminJobStatus,
   uploadAdminImage,
+  validateAdminSkus,
 } from "@/lib/api/admin";
 import {
   type BulkDraftImage,
@@ -35,6 +36,13 @@ import {
   resolveCategoryName,
   selectSizeValue,
 } from "@/lib/product-options";
+import {
+  DEFAULT_COLOR_CODES,
+  extractTitlePrefix,
+  generateVariantSku,
+  parseSku,
+  resolveColorCode,
+} from "@/lib/sku";
 import type { Category } from "@/types";
 
 const COLOR_OPTIONS = [...PRODUCT_COLOR_OPTIONS];
@@ -62,9 +70,28 @@ function uid() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-function variantStock(variants: BulkDraftVariant[], fallback: number) {
-  if (variants.length) return variants.reduce((sum, v) => sum + v.qty, 0);
-  return fallback;
+function qtyNumber(qty: number | "" | undefined) {
+  if (qty === "" || qty == null) return 0;
+  const n = Number(qty);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
+}
+
+/** Keep "" while clearing/typing; only accept non-negative integers. */
+function parseQtyInput(raw: string): number | "" | null {
+  if (raw.trim() === "") return "";
+  if (!/^\d+$/.test(raw.trim())) return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.floor(n);
+}
+
+function qtyInputValue(qty: number | "" | undefined) {
+  return qty === "" || qty == null ? "" : String(qty);
+}
+
+function variantStock(variants: BulkDraftVariant[], fallback: number | "") {
+  if (variants.length) return variants.reduce((sum, v) => sum + qtyNumber(v.qty), 0);
+  return qtyNumber(fallback);
 }
 
 function colorOptionsFor(product: BulkDraftProduct) {
@@ -102,6 +129,60 @@ function selectColorValue(raw: string, options: string[]) {
   return match || normalized;
 }
 
+/** Preview SKU for a variant — uses real code when updating an existing product. */
+function previewVariantSku(product: BulkDraftProduct, variant: BulkDraftVariant): string | null {
+  if (variant.sku?.trim()) return variant.sku.trim();
+  if (!product.title.trim()) return null;
+
+  const matched =
+    parseSku(product.matchedSku || "") ||
+    (product.skus ?? []).map((s) => parseSku(s)).find(Boolean) ||
+    null;
+
+  const titlePrefix = matched?.titlePrefix || extractTitlePrefix(product.title);
+  const code = matched?.code || "???";
+  const size = variant.size?.trim();
+  if (!size) return null;
+  const colorCode = resolveColorCode(
+    variant.color,
+    Object.entries(DEFAULT_COLOR_CODES).map(([name, c]) => ({ name, code: c }))
+  );
+
+  return generateVariantSku(titlePrefix, code, size, colorCode);
+}
+
+function variantMatchesExisting(
+  variant: BulkDraftVariant,
+  existing: Array<{ color: string; size: string; sku?: string }> | undefined,
+  previewSku?: string | null
+): boolean {
+  if (!existing?.length) return false;
+  const color = variant.color.trim().toLowerCase();
+  const size = variant.size.trim().toLowerCase();
+  const sku = (variant.sku || previewSku || "").trim().toLowerCase();
+
+  return existing.some((e) => {
+    if (sku && e.sku?.trim().toLowerCase() === sku) return true;
+    return e.color.trim().toLowerCase() === color && e.size.trim().toLowerCase() === size;
+  });
+}
+
+function markVariantsExisting(
+  product: BulkDraftProduct,
+  existingVariants?: Array<{ color: string; size: string; sku?: string }>
+): BulkDraftVariant[] {
+  return product.variants.map((v) => {
+    const preview = previewVariantSku(
+      { ...product, existingVariants: existingVariants ?? product.existingVariants },
+      v
+    );
+    return {
+      ...v,
+      isExisting: variantMatchesExisting(v, existingVariants ?? product.existingVariants, preview),
+    };
+  });
+}
+
 function ProductCard({
   index,
   product,
@@ -130,7 +211,6 @@ function ProductCard({
   const [newCategoryName, setNewCategoryName] = useState("");
   const [savingCategory, setSavingCategory] = useState(false);
   const [categoryError, setCategoryError] = useState("");
-  const hasVariants = product.variants.length > 0;
   const colors = colorOptionsFor(product);
   const sizes = sizeOptionsFor(product);
   const isErrorCard = !!validationError?.errors.length;
@@ -176,8 +256,12 @@ function ProductCard({
   };
 
   const addVariant = () => {
-    if (!draft.color && !draft.size) {
-      setLocalError("Select at least a color or a size");
+    if (!draft.color.trim()) {
+      setLocalError("Select a color");
+      return;
+    }
+    if (!draft.size.trim()) {
+      setLocalError("Select a size (use Free Size if the product has no size)");
       return;
     }
     if (draft.qty === "") {
@@ -200,7 +284,12 @@ function ProductCard({
     }
     const variants = [
       ...product.variants,
-      { color: normalizeColor(draft.color), size: normalizeSize(draft.size), qty },
+      {
+        color: normalizeColor(draft.color),
+        size: normalizeSize(draft.size),
+        qty,
+        isExisting: false,
+      },
     ];
     patch({ ...product, variants, stock: variantStock(variants, product.stock) });
     setDraft({ color: "", size: "", qty: "" });
@@ -211,7 +300,7 @@ function ProductCard({
     if (!files?.length) return;
     const nextImages: BulkDraftImage[] = [...product.images];
     const addedNames: string[] = [];
-    const hasFileVariants = product.variants.some((v) => v.color || v.size || v.qty > 0);
+    const hasFileVariants = product.variants.some((v) => v.color || v.size || qtyNumber(v.qty) > 0);
 
     for (const file of Array.from(files)) {
       if (!file.type.startsWith("image/")) continue;
@@ -236,7 +325,7 @@ function ProductCard({
         ...product.images.map((img) => img.fileName),
         ...addedNames,
       ]);
-      variants = assignFallbackStockToVariants(variants, product.stock);
+      variants = assignFallbackStockToVariants(variants, qtyNumber(product.stock));
     }
 
     patch({
@@ -261,15 +350,49 @@ function ProductCard({
         isErrorCard ? "border-red-400 ring-2 ring-red-200" : "border-[#e5e7eb]"
       }`}
     >
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-[16px] font-semibold text-[#111827]">
-          <span className="text-[#2563EB]">#{index + 1}</span>{" "}
-          {product.title.trim() || "Untitled Product"}
-        </h2>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1.5">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <h2 className="text-[16px] font-semibold text-[#111827]">
+              <span className="text-[#2563EB]">#{index + 1}</span>{" "}
+              {product.title.trim() || "Untitled Product"}
+            </h2>
+            {product.isUpdate && product.existingProductId ? (
+              <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-medium text-blue-700">
+                Update Product
+              </span>
+            ) : (
+              <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700">
+                New Product
+              </span>
+            )}
+          </div>
+          {product.isUpdate && product.existingProductId ? (
+            <p className="text-[12px] leading-snug text-[#64748b]">
+              SKU{" "}
+              <span className="font-mono font-medium text-[#334155]">
+                {product.matchedSku || product.skus?.[0] || "—"}
+              </span>{" "}
+              already exists — submitted quantities will be added to current stock.
+            </p>
+          ) : product.unmatchedSkus?.length ? (
+            <p className="text-[12px] leading-snug text-[#64748b]">
+              SKU{" "}
+              <span className="font-mono font-medium text-[#334155]">
+                {product.unmatchedSkus.join(", ")}
+              </span>{" "}
+              not found — creating as a new product.
+            </p>
+          ) : !product.skus?.length ? (
+            <p className="text-[12px] leading-snug text-[#64748b]">
+              No SKU provided — creating as a new product.
+            </p>
+          ) : null}
+        </div>
         <button
           type="button"
           onClick={onRemove}
-          className="rounded-md p-1.5 text-[#EF4444] transition hover:bg-red-50"
+          className="shrink-0 rounded-md p-1.5 text-[#EF4444] transition hover:bg-red-50"
           aria-label={`Remove product ${index + 1}`}
         >
           <Trash2 className="h-4 w-4" />
@@ -279,7 +402,12 @@ function ProductCard({
       <div className="grid gap-6 lg:grid-cols-[minmax(240px,0.9fr)_1.1fr]">
         <div data-field="images">
           <p className="mb-1.5 text-[12px] font-medium text-[#6b7280]">
-            Product Images <span className="text-red-500">*</span>
+            Product Images{" "}
+            {product.isUpdate && product.existingProductId ? (
+              <span className="font-normal text-[#94a3b8]">(optional — keep existing)</span>
+            ) : (
+              <span className="text-red-500">*</span>
+            )}
           </p>
           <button
             type="button"
@@ -291,7 +419,11 @@ function ProductCard({
             }`}
           >
             <Upload className="mb-2 h-6 w-6" />
-            <span className="text-[12px]">Upload multiple images</span>
+            <span className="text-[12px]">
+              {product.isUpdate && product.existingProductId
+                ? "Add more images (optional)"
+                : "Upload multiple images"}
+            </span>
           </button>
           <input
             ref={fileRef}
@@ -385,13 +517,38 @@ function ProductCard({
             <label className="block text-[12px] font-medium text-[#6b7280]">
               Total Quantity
               <input
-                type="number"
-                min={0}
-                value={product.stock}
-                readOnly={hasVariants}
-                onChange={(e) => patch({ ...product, stock: parseInt(e.target.value, 10) || 0 })}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={
+                  product.variants.length === 1
+                    ? qtyInputValue(product.variants[0].qty)
+                    : product.variants.length > 1
+                      ? String(variantStock(product.variants, product.stock))
+                      : qtyInputValue(product.stock)
+                }
+                readOnly={product.variants.length > 1}
+                onChange={(e) => {
+                  const parsed = parseQtyInput(e.target.value);
+                  if (parsed === null) return;
+                  if (product.variants.length === 1) {
+                    const variants = [{ ...product.variants[0], qty: parsed }];
+                    patch({
+                      ...product,
+                      stock: parsed === "" ? "" : parsed,
+                      variants,
+                    });
+                    return;
+                  }
+                  patch({ ...product, stock: parsed === "" ? "" : parsed });
+                }}
                 className={`${fieldClass} read-only:bg-[#f8fafc]`}
               />
+              {product.variants.length > 1 ? (
+                <span className="mt-1 block text-[11px] font-normal text-[#94a3b8]">
+                  Sum of variant quantities — edit qtys below to update stock
+                </span>
+              ) : null}
             </label>
           </div>
 
@@ -478,11 +635,16 @@ function ProductCard({
                   ariaLabel="Size"
                 />
                 <input
-                  type="number"
-                  min={0}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   placeholder="Enter Qty"
                   value={draft.qty}
-                  onChange={(e) => setDraft((d) => ({ ...d, qty: e.target.value }))}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value !== "" && !/^\d+$/.test(value)) return;
+                    setDraft((d) => ({ ...d, qty: value }));
+                  }}
                   className="h-10 w-full rounded-md border border-[#e5e7eb] px-3 text-[13px] outline-none focus:border-[#2563EB]"
                   aria-label="Quantity"
                 />
@@ -497,73 +659,138 @@ function ProductCard({
               </div>
 
               <div className="mt-2 space-y-2">
-                {product.variants.map((v, vIdx) => (
-                  <div
-                    key={`${v.color}-${v.size}-${vIdx}`}
-                    className="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-2"
-                  >
-                    <Select
-                      value={selectColorValue(v.color, colors)}
-                      onChange={(color) => {
-                        const variants = product.variants.map((item, i) =>
-                          i === vIdx ? { ...item, color: normalizeColor(color) } : item
-                        );
-                        patch({ ...product, variants });
-                      }}
-                      options={[
-                        { value: "", label: "Select Color" },
-                        ...colors.map((c) => ({ value: c, label: c })),
-                      ]}
-                      ariaLabel={`Color for variant ${vIdx + 1}`}
-                    />
-                    <Select
-                      value={selectSizeValue(v.size, sizes)}
-                      onChange={(size) => {
-                        const variants = product.variants.map((item, i) =>
-                          i === vIdx ? { ...item, size: normalizeSize(size) } : item
-                        );
-                        patch({ ...product, variants });
-                      }}
-                      options={[
-                        { value: "", label: "Select Size" },
-                        ...sizes.map((s) => ({ value: s, label: s })),
-                      ]}
-                      ariaLabel={`Size for variant ${vIdx + 1}`}
-                    />
-                    <input
-                      type="number"
-                      min={0}
-                      value={v.qty}
-                      onChange={(e) => {
-                        const qty = Math.max(0, Math.floor(Number(e.target.value) || 0));
-                        const variants = product.variants.map((item, i) =>
-                          i === vIdx ? { ...item, qty } : item
-                        );
-                        patch({
-                          ...product,
-                          variants,
-                          stock: variantStock(variants, product.stock),
-                        });
-                      }}
-                      className="h-10 w-full rounded-md border border-[#e5e7eb] px-3 text-[13px] tabular-nums outline-none focus:border-[#2563EB]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const variants = product.variants.filter((_, i) => i !== vIdx);
-                        patch({
-                          ...product,
-                          variants,
-                          stock: variantStock(variants, product.stock),
-                        });
-                      }}
-                      className="flex h-10 w-10 items-center justify-center rounded-md text-[#EF4444] hover:bg-red-50"
-                      aria-label="Remove variant"
+                {product.variants.map((v, vIdx) => {
+                  const previewSku = previewVariantSku(product, v);
+                  const isCodePending = Boolean(previewSku?.includes("-???-"));
+                  const isExisting =
+                    v.isExisting ?? variantMatchesExisting(v, product.existingVariants, previewSku);
+                  return (
+                    <div
+                      key={`${v.color}-${v.size}-${vIdx}`}
+                      className={`space-y-1 rounded-lg border p-2 ${
+                        isExisting
+                          ? "border-blue-100 bg-blue-50/40"
+                          : "border-emerald-100 bg-emerald-50/30"
+                      }`}
                     >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
+                      <div className="flex items-center justify-between gap-2 px-0.5">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                            isExisting
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-emerald-100 text-emerald-700"
+                          }`}
+                        >
+                          {isExisting ? "Existing variant" : "New variant"}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-2">
+                        <Select
+                          value={selectColorValue(v.color, colors)}
+                          onChange={(color) => {
+                            const variants = product.variants.map((item, i) => {
+                              if (i !== vIdx) return item;
+                              const next = {
+                                ...item,
+                                color: normalizeColor(color),
+                                sku: undefined,
+                              };
+                              const preview = previewVariantSku(product, next);
+                              return {
+                                ...next,
+                                isExisting: variantMatchesExisting(
+                                  next,
+                                  product.existingVariants,
+                                  preview
+                                ),
+                              };
+                            });
+                            patch({ ...product, variants });
+                          }}
+                          options={[
+                            { value: "", label: "Select Color" },
+                            ...colors.map((c) => ({ value: c, label: c })),
+                          ]}
+                          ariaLabel={`Color for variant ${vIdx + 1}`}
+                        />
+                        <Select
+                          value={selectSizeValue(v.size, sizes)}
+                          onChange={(size) => {
+                            const variants = product.variants.map((item, i) => {
+                              if (i !== vIdx) return item;
+                              const next = { ...item, size: normalizeSize(size), sku: undefined };
+                              const preview = previewVariantSku(product, next);
+                              return {
+                                ...next,
+                                isExisting: variantMatchesExisting(
+                                  next,
+                                  product.existingVariants,
+                                  preview
+                                ),
+                              };
+                            });
+                            patch({ ...product, variants });
+                          }}
+                          options={[
+                            { value: "", label: "Select Size" },
+                            ...sizes.map((s) => ({ value: s, label: s })),
+                          ]}
+                          ariaLabel={`Size for variant ${vIdx + 1}`}
+                        />
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          value={qtyInputValue(v.qty)}
+                          onChange={(e) => {
+                            const parsed = parseQtyInput(e.target.value);
+                            if (parsed === null) return;
+                            const variants = product.variants.map((item, i) =>
+                              i === vIdx ? { ...item, qty: parsed } : item
+                            );
+                            patch({
+                              ...product,
+                              variants,
+                              stock: variantStock(variants, qtyNumber(product.stock)),
+                            });
+                          }}
+                          className="h-10 w-full rounded-md border border-[#e5e7eb] bg-white px-3 text-[13px] tabular-nums outline-none focus:border-[#2563EB]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const variants = product.variants.filter((_, i) => i !== vIdx);
+                            patch({
+                              ...product,
+                              variants,
+                              stock: variantStock(variants, product.stock),
+                            });
+                          }}
+                          className="flex h-10 w-10 items-center justify-center rounded-md text-[#EF4444] hover:bg-red-50"
+                          aria-label="Remove variant"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                      {previewSku ? (
+                        <p className="text-[11px] tabular-nums text-[#64748b]">
+                          SKU: <span className="font-medium text-[#111827]">{previewSku}</span>
+                          {isCodePending ? (
+                            <span className="ml-1 font-normal text-[#94a3b8]">
+                              (code assigned on submit)
+                            </span>
+                          ) : isExisting ? (
+                            <span className="ml-1 font-normal text-blue-600">
+                              · will add to stock
+                            </span>
+                          ) : (
+                            <span className="ml-1 font-normal text-emerald-600">· will create</span>
+                          )}
+                        </p>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
             </div>
             {hasFieldError("variants") ? (
@@ -633,6 +860,106 @@ export function BulkAddProductsClient() {
     void fetchAdminCategories()
       .then(setCategories)
       .catch(() => setCategories([]));
+  }, []);
+
+  // Validate CSV SKUs once when products land on the review page
+  useEffect(() => {
+    const snapshot = products;
+    if (!snapshot.length) return;
+
+    const allSkus = snapshot.flatMap((p) => p.skus ?? []).filter(Boolean);
+    let cancelled = false;
+
+    const applyClassification = (
+      matchedBySku: Map<
+        string,
+        {
+          sku: string;
+          productId: string;
+          productTitle: string;
+          specificationId?: string;
+          existingVariants?: Array<{ color: string; size: string; sku?: string }>;
+        }
+      >
+    ) => {
+      if (cancelled) return;
+      const next = snapshot.map((p) => {
+        const skus = (p.skus ?? []).map((s) => s.trim()).filter(Boolean);
+        if (!skus.length) {
+          return {
+            ...p,
+            isUpdate: false,
+            existingProductId: undefined,
+            matchedSku: undefined,
+            unmatchedSkus: [],
+            existingVariants: [],
+            variants: p.variants.map((v) => ({ ...v, isExisting: false })),
+          };
+        }
+        const hit = skus.map((s) => matchedBySku.get(s.toLowerCase())).find(Boolean);
+        const unmatched = skus.filter((s) => !matchedBySku.has(s.toLowerCase()));
+        if (hit) {
+          const existingVariants = hit.existingVariants ?? [];
+          const base: BulkDraftProduct = {
+            ...p,
+            isUpdate: true,
+            existingProductId: hit.productId,
+            matchedSku: hit.sku,
+            unmatchedSkus: unmatched,
+            existingVariants,
+          };
+          return {
+            ...base,
+            variants: markVariantsExisting(base, existingVariants),
+          };
+        }
+        return {
+          ...p,
+          isUpdate: false,
+          existingProductId: undefined,
+          matchedSku: undefined,
+          unmatchedSkus: unmatched,
+          existingVariants: [],
+          variants: p.variants.map((v) => ({ ...v, isExisting: false })),
+        };
+      });
+      setProducts(next);
+    };
+
+    if (!allSkus.length) {
+      applyClassification(new Map());
+      return;
+    }
+
+    void validateAdminSkus(allSkus)
+      .then((result) => {
+        if (cancelled) return;
+        const matchedBySku = new Map(result.matched.map((m) => [m.sku.toLowerCase(), m]));
+        if (result.unmatched.length) {
+          toast.warning(
+            result.unmatched.length === 1
+              ? `Product with SKU '${result.unmatched[0]}' not found; will be created as new.`
+              : `${result.unmatched.length} SKUs entered weren't found and will be created as new products`
+          );
+        }
+        if (result.matched.length) {
+          toast.info(
+            result.matched.length === 1
+              ? `SKU '${result.matched[0].sku}' matches an existing product — will update.`
+              : `${result.matched.length} SKUs match existing products — those rows will update.`
+          );
+        }
+        applyClassification(matchedBySku);
+      })
+      .catch(() => {
+        // On validation failure, treat all as new products
+        applyClassification(new Map());
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Only on initial product load from CSV
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Map CSV category onto existing Select options only; clear unmatched names.
@@ -735,7 +1062,7 @@ export function BulkAddProductsClient() {
           message: `Product "${label}" needs a category`,
         });
       }
-      if (!p.images.length) {
+      if (!p.images.length && !(p.isUpdate && p.existingProductId)) {
         errors.push({
           field: "images",
           message: `Product "${label}" needs at least one image`,
@@ -746,6 +1073,15 @@ export function BulkAddProductsClient() {
           field: "variants",
           message: `Product "${label}" needs at least one variant`,
         });
+      } else {
+        const missingSize = p.variants.findIndex((v) => !v.size?.trim());
+        const missingColor = p.variants.findIndex((v) => !v.color?.trim());
+        if (missingColor >= 0 || missingSize >= 0) {
+          errors.push({
+            field: "variants",
+            message: `Product "${label}" variants need both color and size (use Free Size if there is no size)`,
+          });
+        }
       }
 
       if (errors.length) {
@@ -765,9 +1101,11 @@ export function BulkAddProductsClient() {
 
     setValidationErrors([]);
 
-    const imageJobs = products.flatMap((p) =>
-      p.images.filter((img) => img.file).map((img) => ({ productId: p.id, image: img }))
-    );
+    const imageJobs = products.flatMap((p) => {
+      // Updates keep existing images — don't upload folder matches again
+      if (p.isUpdate && p.existingProductId) return [];
+      return p.images.filter((img) => img.file).map((img) => ({ productId: p.id, image: img }));
+    });
 
     setProgressOpen(true);
     setProgressError(undefined);
@@ -796,23 +1134,50 @@ export function BulkAddProductsClient() {
       setTotal(1);
 
       const payload = products.map((p) => {
-        const images = p.images.map((img) => ({
-          url: uploadedByKey.get(`${p.id}:${img.id}`) || img.url,
-          color: img.color || undefined,
-        }));
+        const isUpdate = Boolean(p.isUpdate && p.existingProductId);
+        const images = isUpdate
+          ? [] // keep existing gallery on update — never append duplicates
+          : p.images.map((img) => ({
+              url: uploadedByKey.get(`${p.id}:${img.id}`) || img.url,
+              color: img.color || undefined,
+            }));
         const stock = variantStock(p.variants, p.stock);
         return {
           title: p.title.trim(),
           price: p.price,
           stock,
-          image: images[0]?.url,
-          images,
+          ...(images.length ? { image: images[0]?.url, images } : {}),
           color: p.variants[0]?.color,
           size: p.variants[0]?.size,
           categoryName: p.categoryName.trim(),
-          variants: p.variants,
+          variants: p.variants.map((v) => ({
+            color: v.color,
+            size: v.size,
+            qty: qtyNumber(v.qty),
+            sku: v.sku,
+          })),
+          isUpdate,
+          existingProductId: p.existingProductId,
+          sku: p.matchedSku || p.skus?.[0],
         };
       });
+
+      // Re-validate matched SKUs at confirm time (stale review gap)
+      const updateSkus = payload
+        .filter((p) => p.isUpdate && p.sku)
+        .map((p) => p.sku!)
+        .filter(Boolean);
+      if (updateSkus.length) {
+        const recheck = await validateAdminSkus(updateSkus);
+        const stillMatched = new Set(recheck.matched.map((m) => m.sku.toLowerCase()));
+        for (const row of payload) {
+          if (row.isUpdate && row.sku && !stillMatched.has(row.sku.toLowerCase())) {
+            row.isUpdate = false;
+            row.existingProductId = undefined;
+            toast.warning(`Product with SKU '${row.sku}' not found; will be created as new.`);
+          }
+        }
+      }
 
       const res = await bulkUploadProductsJson(payload);
 

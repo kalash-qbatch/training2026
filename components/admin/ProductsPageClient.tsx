@@ -291,7 +291,7 @@ export function ProductsPageClient() {
               setSearch(e.target.value);
               resetPage();
             }}
-            placeholder="Search by name"
+            placeholder="Search by name or SKU"
             className={`${inputClass} pr-10`}
           />
           <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-muted" />
@@ -329,6 +329,7 @@ export function ProductsPageClient() {
         <TableHeader>
           <TableRow className="border-b border-[#e5e7eb] hover:bg-transparent">
             <TableHead>Title</TableHead>
+            <TableHead>SKU</TableHead>
             <TableHead>Category</TableHead>
             <TableHead>Price</TableHead>
             <TableHead>Stock</TableHead>
@@ -338,9 +339,9 @@ export function ProductsPageClient() {
         </TableHeader>
         <TableBody>
           {loading ? (
-            <AdminTableBodySkeleton rows={6} columns={6} />
+            <AdminTableBodySkeleton rows={6} columns={7} />
           ) : !products.length ? (
-            <TableEmpty colSpan={6}>No products found</TableEmpty>
+            <TableEmpty colSpan={7}>No products found</TableEmpty>
           ) : (
             products.map((p) => (
               <TableRow key={p.id}>
@@ -349,6 +350,11 @@ export function ProductsPageClient() {
                     <ProductThumbHover src={p.imageUrl} alt={p.name} />
                     <p className="font-medium text-neutral-text">{p.name}</p>
                   </div>
+                </TableCell>
+                <TableCell>
+                  <span className="font-mono text-[12px] tabular-nums text-[#475569]">
+                    {p.baseSku || "—"}
+                  </span>
                 </TableCell>
                 <TableCell>{p.category?.name ?? "—"}</TableCell>
                 <TableCell className="tabular-nums">{formatCurrency(p.price)}</TableCell>

@@ -71,6 +71,11 @@ function PreviewContent({ product }: { product: Product }) {
 
       <div className="px-5 pb-6 pt-4">
         <h3 className="text-[16px] font-semibold text-neutral-900">{product.name}</h3>
+        {selectedVariant?.sku || product.baseSku ? (
+          <p className="mt-1 font-mono text-[12px] tabular-nums text-[#64748b]">
+            SKU: {selectedVariant?.sku || product.baseSku}
+          </p>
+        ) : null}
 
         <p className="mt-3 text-[14px]">
           <span className="text-[#6b7280]">Price: </span>

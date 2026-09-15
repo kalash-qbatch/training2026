@@ -179,7 +179,7 @@ export function detectSizeFromFileName(fileName: string): string {
   return "";
 }
 
-type VariantLike = { color: string; size: string; qty: number };
+type VariantLike = { color: string; size: string; qty: number | "" };
 
 /**
  * Ensure product variants exist for colors/sizes from CSV and/or image filenames.
@@ -235,7 +235,7 @@ export function assignFallbackStockToVariants(
   fallbackStock: number
 ): VariantLike[] {
   if (!variants.length || fallbackStock <= 0) return variants;
-  const hasQty = variants.some((v) => v.qty > 0);
+  const hasQty = variants.some((v) => typeof v.qty === "number" && v.qty > 0);
   if (hasQty) return variants;
 
   if (variants.length === 1) {

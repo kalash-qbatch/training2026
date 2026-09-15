@@ -148,7 +148,10 @@ export async function bulkUploadProductsJson(
     size?: string;
     category?: string;
     categoryName?: string;
-    variants?: Array<{ color: string; size: string; qty: number }>;
+    variants?: Array<{ color: string; size: string; qty: number; sku?: string }>;
+    isUpdate?: boolean;
+    existingProductId?: string;
+    sku?: string;
   }>
 ) {
   const res = await fetch("/api/admin/products/bulk", {
@@ -158,6 +161,40 @@ export async function bulkUploadProductsJson(
   });
   const data = await parseJson<{ success: boolean; message?: string; jobId?: string }>(res);
   if (!res.ok || !data.success) throw new Error(data.error || "Bulk upload failed");
+  return data;
+}
+
+export async function fetchNextSku(title: string) {
+  const q = new URLSearchParams({ title });
+  const res = await fetch(`/api/admin/products/next-sku?${q}`);
+  const data = await parseJson<{
+    success: boolean;
+    titlePrefix?: string;
+    nextCode?: string;
+    baseSku?: string;
+  }>(res);
+  if (!res.ok || !data.success) throw new Error(data.error || "Failed to preview SKU");
+  return data;
+}
+
+export async function validateAdminSkus(skus: string[]) {
+  const res = await fetch("/api/admin/products/validate-skus", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ skus }),
+  });
+  const data = await parseJson<{
+    success: boolean;
+    matched: Array<{
+      sku: string;
+      productId: string;
+      productTitle: string;
+      specificationId?: string;
+      existingVariants?: Array<{ color: string; size: string; sku?: string }>;
+    }>;
+    unmatched: string[];
+  }>(res);
+  if (!res.ok || !data.success) throw new Error(data.error || "Failed to validate SKUs");
   return data;
 }
 

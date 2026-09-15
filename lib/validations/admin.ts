@@ -2,12 +2,13 @@ import { z } from "zod";
 
 export const productVariantSchema = z
   .object({
-    color: z.string().trim().optional().default(""),
-    size: z.string().trim().optional().default(""),
+    color: z.string().trim().min(1, "Color is required"),
+    size: z.string().trim().min(1, "Size is required"),
     qty: z.coerce.number().int().min(0),
+    sku: z.string().optional(),
   })
-  .refine((v) => v.color || v.size, {
-    message: "Each variant needs at least a color or a size",
+  .refine((v) => Boolean(v.color?.trim() && v.size?.trim()), {
+    message: "Each variant needs both a color and a size",
   });
 
 export const productImageSchema = z.object({
@@ -27,6 +28,9 @@ export const adminProductSchema = z.object({
   categoryId: z.string().uuid().optional().nullable(),
   categoryName: z.string().min(1).optional().nullable(),
   isActive: z.boolean().optional(),
+  isUpdate: z.boolean().optional(),
+  existingProductId: z.string().uuid().optional().nullable(),
+  sku: z.string().optional(),
 });
 
 export const adminCategorySchema = z.object({

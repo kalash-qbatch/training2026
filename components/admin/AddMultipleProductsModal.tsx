@@ -89,6 +89,7 @@ function toDraftProducts(
       fileCategoryName: p.categoryName.trim() || undefined,
       variants,
       images,
+      skus: p.skus ?? [],
     };
   });
 }
@@ -365,8 +366,8 @@ export function AddMultipleProductsModal({
                 </p>
                 <p className="mt-1 text-[13px] text-[#c2410c]">
                   Select the folder containing your images. Files are matched by CSV image filename
-                  first, then by product title / color in the filename. Unmatched files are skipped
-                  (never shared across products).
+                  first (including close name variants), then by product title / color in the
+                  filename. Unrelated files are skipped (never shared across products).
                 </p>
                 <button
                   type="button"
