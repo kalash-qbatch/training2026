@@ -54,24 +54,12 @@ export function AuthFrame({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <section className="relative z-10 flex h-dvh flex-col justify-center overflow-y-auto px-4 py-6 sm:px-6 min-[1000px]:bg-neutral-bg min-[1000px]:px-8">
+      <section className="relative z-10 flex h-dvh flex-col overflow-hidden px-4 py-6 sm:px-6 min-[1000px]:bg-neutral-bg min-[1000px]:px-8">
         <div
           className="pointer-events-none absolute inset-0 hidden bg-[radial-gradient(ellipse_at_top,_var(--color-brand-50)_0%,_transparent_55%)] min-[1000px]:block"
           aria-hidden
         />
-        <div className="relative mx-auto w-full max-w-[400px] animate-fade-in-up">
-          <div className="mb-5 flex justify-center min-[1000px]:hidden">
-            <span className="relative h-16 w-16 overflow-hidden rounded-xl shadow-lg ring-1 ring-black/10">
-              <Image
-                src={BRAND_LOGO_SRC}
-                alt={BRAND_NAME}
-                width={64}
-                height={64}
-                priority
-                className="h-full w-full object-cover"
-              />
-            </span>
-          </div>
+        <div className="relative m-auto flex max-h-full w-full max-w-[400px] min-h-0 flex-col animate-fade-in-up">
           {children}
         </div>
       </section>

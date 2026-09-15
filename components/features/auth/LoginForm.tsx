@@ -14,6 +14,7 @@ import { SocialAuthButtons } from "@/components/features/auth/SocialAuthButtons"
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toast";
+import { scrollToFirstError } from "@/lib/scroll-to-first-error";
 import { sessionToAuthUser } from "@/lib/session-user";
 import { useAuthStore } from "@/lib/store/useAuthStore";
 import { type LoginInput, loginSchema } from "@/lib/validations/auth";
@@ -32,6 +33,7 @@ export function LoginForm() {
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "", remember: false },
+    shouldFocusError: false,
   });
 
   useEffect(() => {
@@ -48,39 +50,44 @@ export function LoginForm() {
     toast.error(messages[error] ?? messages.Default);
   }, [searchParams, toast]);
 
-  const onSubmit = handleSubmit(async (values) => {
-    try {
-      const result = await signIn("credentials", {
-        email: values.email,
-        password: values.password,
-        rememberMe: values.remember ? "true" : "false",
-        redirect: false,
-      });
+  const onSubmit = handleSubmit(
+    async (values) => {
+      try {
+        const result = await signIn("credentials", {
+          email: values.email,
+          password: values.password,
+          rememberMe: values.remember ? "true" : "false",
+          redirect: false,
+        });
 
-      if (result?.error) {
+        if (result?.error) {
+          toast.error("Wrong username/password, please enter correct credentials");
+          return;
+        }
+
+        const session = await getSession();
+        const authUser = session ? sessionToAuthUser(session) : null;
+        if (authUser) {
+          login(authUser);
+        }
+
+        toast.success("Logged in successfully");
+        const next = searchParams.get("next");
+        const isAdmin = authUser?.role === "ADMIN";
+        const destination = isAdmin
+          ? next?.startsWith("/admin")
+            ? next
+            : "/admin/products"
+          : next || "/products";
+        window.location.assign(destination);
+      } catch {
         toast.error("Wrong username/password, please enter correct credentials");
-        return;
       }
-
-      const session = await getSession();
-      const authUser = session ? sessionToAuthUser(session) : null;
-      if (authUser) {
-        login(authUser);
-      }
-
-      toast.success("Logged in successfully");
-      const next = searchParams.get("next");
-      const isAdmin = authUser?.role === "ADMIN";
-      const destination = isAdmin
-        ? next?.startsWith("/admin")
-          ? next
-          : "/admin/products"
-        : next || "/products";
-      window.location.assign(destination);
-    } catch {
-      toast.error("Wrong username/password, please enter correct credentials");
+    },
+    (formErrors) => {
+      scrollToFirstError(formErrors);
     }
-  });
+  );
 
   return (
     <AuthCard>
@@ -88,61 +95,65 @@ export function LoginForm() {
         title="Login"
         description="Welcome back. Enter your details to continue shopping."
       />
-      <form onSubmit={onSubmit} className="space-y-3.5" noValidate>
-        <Input
-          label="Enter email address"
-          type="email"
-          placeholder="Please enter your email"
-          autoComplete="email"
-          important
-          className={fieldClassName}
-          error={errors.email?.message}
-          {...register("email")}
-        />
-        <Input
-          label="Password"
-          type="password"
-          placeholder="Please enter your password"
-          autoComplete="current-password"
-          important
-          className={fieldClassName}
-          error={errors.password?.message}
-          {...register("password")}
-        />
-        <div className="flex items-center justify-between gap-3">
-          <label className="flex cursor-pointer items-center gap-2.5 text-sm text-neutral-muted">
-            <input
-              type="checkbox"
-              className="h-4 w-4 rounded border-neutral-border text-brand-500 focus:ring-brand-500"
-              {...register("remember")}
-            />
-            Remember me
-          </label>
-          <Link
-            href="/forgot-password"
-            className="text-sm font-medium text-brand-500 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-          >
-            Forgot password?
-          </Link>
+      <form onSubmit={onSubmit} className="flex min-h-0 flex-col" noValidate>
+        <div className="min-h-0 space-y-3.5 overflow-y-auto overscroll-contain">
+          <Input
+            label="Enter email address"
+            type="email"
+            placeholder="Please enter your email"
+            autoComplete="email"
+            important
+            className={fieldClassName}
+            error={errors.email?.message}
+            {...register("email")}
+          />
+          <Input
+            label="Password"
+            type="password"
+            placeholder="Please enter your password"
+            autoComplete="current-password"
+            important
+            className={fieldClassName}
+            error={errors.password?.message}
+            {...register("password")}
+          />
+          <div className="flex items-center justify-between gap-3">
+            <label className="flex cursor-pointer items-center gap-2.5 text-sm text-neutral-muted">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-neutral-border text-brand-500 focus:ring-brand-500"
+                {...register("remember")}
+              />
+              Remember me
+            </label>
+            <Link
+              href="/forgot-password"
+              className="text-sm font-medium text-brand-500 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+            >
+              Forgot password?
+            </Link>
+          </div>
         </div>
         <Button
           type="submit"
           loading={isSubmitting}
-          className="rounded-xl py-3 text-[15px] font-semibold shadow-sm shadow-brand-500/20"
+          className="mt-4 shrink-0 rounded-xl py-3 text-[15px] font-semibold shadow-sm shadow-brand-500/20"
         >
           Login
         </Button>
       </form>
-      <SocialAuthButtons context="login" getRememberMe={() => !!getValues("remember")} />
-      <p className="mt-5 text-center text-sm text-neutral-muted">
-        Don&apos;t have an account?{" "}
-        <Link
-          href="/register"
-          className="font-semibold text-brand-500 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-        >
-          Sign up
-        </Link>
-      </p>
+      <div className="shrink-0">
+        <SocialAuthButtons context="login" getRememberMe={() => !!getValues("remember")} />
+        <p className="mt-5 text-center text-sm text-neutral-muted">
+          Don&apos;t have an account?{" "}
+          <Link
+            href="/register"
+            className="font-semibold text-brand-500 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+          >
+            Sign up
+          </Link>
+        </p>
+      </div>
     </AuthCard>
   );
 }

@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toast";
 import { resetPasswordRequest, validateResetTokenRequest } from "@/lib/api/auth";
 import { resetTokenExpiryLabel } from "@/lib/constants/auth";
+import { scrollToFirstError } from "@/lib/scroll-to-first-error";
 import { type ResetPasswordInput, resetPasswordSchema } from "@/lib/validations/auth";
 
 const fieldClassName = "rounded-xl px-3.5 py-2.5";
@@ -32,6 +33,7 @@ export function ResetPasswordForm() {
     formState: { errors, isSubmitting },
   } = useForm<ResetPasswordInput>({
     resolver: zodResolver(resetPasswordSchema),
+    shouldFocusError: false,
   });
 
   useEffect(() => {
@@ -65,20 +67,25 @@ export function ResetPasswordForm() {
     };
   }, [token]);
 
-  const onSubmit = handleSubmit(async (values) => {
-    try {
-      await resetPasswordRequest(token, values.password, values.confirmPassword);
-      toast.success("Your password has been updated. Please login with your new password.");
-      window.setTimeout(() => router.push("/login"), 1200);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Reset failed";
-      toast.error(message);
-      if (/invalid|expired/i.test(message)) {
-        setTokenStatus("invalid");
-        setTokenError(message);
+  const onSubmit = handleSubmit(
+    async (values) => {
+      try {
+        await resetPasswordRequest(token, values.password, values.confirmPassword);
+        toast.success("Your password has been updated. Please login with your new password.");
+        window.setTimeout(() => router.push("/login"), 1200);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Reset failed";
+        toast.error(message);
+        if (/invalid|expired/i.test(message)) {
+          setTokenStatus("invalid");
+          setTokenError(message);
+        }
       }
+    },
+    (formErrors) => {
+      scrollToFirstError(formErrors);
     }
-  });
+  );
 
   if (tokenStatus === "checking") {
     return (
