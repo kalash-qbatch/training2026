@@ -268,7 +268,7 @@ export function AddMultipleProductsModal({
     >
       <div>
         <div className="space-y-4 pb-1">
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-[#e8eef7] bg-[#f8fafc] px-4 py-3">
+          <div className="flex flex-col justify-between gap-3 rounded-xl border border-[#e8eef7] bg-[#f8fafc] px-4 py-3 sm:flex-row sm:items-center">
             <div className="min-w-0">
               <p className="text-[14px] font-semibold text-[#1e293b]">Need a template?</p>
               <p className="mt-0.5 text-[12px] text-[#94a3b8]">
@@ -278,7 +278,7 @@ export function AddMultipleProductsModal({
             <a
               href="/api/admin/products/bulk/template"
               download
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[#e8f0fe] px-3.5 py-2 text-[13px] font-medium text-[#3b82f6] transition hover:bg-[#dbe7fd]"
+              className="inline-flex w-full shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[#e8f0fe] px-3.5 py-2 text-[13px] font-medium text-[#3b82f6] transition hover:bg-[#dbe7fd] sm:w-auto"
             >
               <Download className="h-4 w-4" />
               Download

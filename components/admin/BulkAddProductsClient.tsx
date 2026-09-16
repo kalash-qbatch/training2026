@@ -601,7 +601,7 @@ function ProductCard({
                 hasFieldError("variants") ? "border border-red-300 bg-red-50/50 p-2" : ""
               }`}
             >
-              <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
                 <Select
                   value={draft.color}
                   onChange={(v) => setDraft((d) => ({ ...d, color: v }))}
@@ -637,10 +637,11 @@ function ProductCard({
                 <button
                   type="button"
                   onClick={addVariant}
-                  className="flex h-10 w-10 items-center justify-center rounded-md bg-[#2563EB] text-white hover:bg-brand-600"
+                  className="flex h-10 w-full items-center justify-center gap-1.5 rounded-md bg-[#2563EB] text-[13px] font-medium text-white transition hover:bg-brand-600 sm:w-10"
                   aria-label="Add variant"
                 >
                   <Plus className="h-5 w-5" strokeWidth={2.5} />
+                  <span className="sm:hidden">Add</span>
                 </button>
               </div>
 
@@ -670,7 +671,7 @@ function ProductCard({
                           {isExisting ? "Existing variant" : "New variant"}
                         </span>
                       </div>
-                      <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-2">
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-center">
                         <Select
                           value={selectColorValue(v.color, colors)}
                           onChange={(color) => {
@@ -752,10 +753,11 @@ function ProductCard({
                               stock: variantStock(variants, product.stock),
                             });
                           }}
-                          className="flex h-10 w-10 items-center justify-center rounded-md text-[#EF4444] hover:bg-red-50"
+                          className="flex h-10 w-full items-center justify-center gap-1.5 rounded-md text-[#EF4444] transition hover:bg-red-50 sm:w-10"
                           aria-label="Remove variant"
                         >
                           <Trash2 className="h-4 w-4" />
+                          <span className="text-[12px] font-medium sm:hidden">Remove</span>
                         </button>
                       </div>
                       {previewSku ? (
@@ -1285,11 +1287,11 @@ export function BulkAddProductsClient() {
                   </p>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-2 lg:shrink-0">
+              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto lg:shrink-0">
                 <button
                   type="button"
                   onClick={addProduct}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#2563EB] bg-white px-3.5 py-2 text-[13px] font-medium text-[#2563EB] transition hover:bg-brand-50"
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#2563EB] bg-white px-3.5 py-2 text-center text-[13px] font-medium text-[#2563EB] transition hover:bg-brand-50 sm:flex-initial"
                 >
                   <Plus className="h-4 w-4" />
                   Add Product Card
@@ -1298,7 +1300,7 @@ export function BulkAddProductsClient() {
                   type="button"
                   onClick={() => void handleSubmit()}
                   disabled={!hasProducts || (progressOpen && phase !== "error")}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#2563EB] px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-brand-600 disabled:opacity-60"
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#2563EB] px-4 py-2 text-center text-[13px] font-semibold text-white transition hover:bg-brand-600 disabled:opacity-60 sm:flex-initial"
                 >
                   <Send className="h-4 w-4" />
                   Submit All Products

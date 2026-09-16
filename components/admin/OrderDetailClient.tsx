@@ -50,16 +50,18 @@ const OrderDetailLineItem = memo(function OrderDetailLineItem({ item }: { item: 
       <TableCell>
         <div className="flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={item.imageUrl} alt="" className="h-10 w-10 rounded object-cover" />
-          <p className="line-clamp-2 max-w-65 font-medium text-neutral-text">{item.title}</p>
+          <img src={item.imageUrl} alt="" className="h-10 w-10 shrink-0 rounded object-cover" />
+          <p className="line-clamp-2 max-w-[260px] font-medium text-neutral-text">{item.title}</p>
         </div>
       </TableCell>
-      <TableCell className="font-mono text-[12px] tabular-nums">{item.sku || "—"}</TableCell>
-      <TableCell>{formatLineColor(item.color)}</TableCell>
-      <TableCell>{formatLineSize(item.size)}</TableCell>
-      <TableCell className="tabular-nums">{formatCurrency(item.price)}</TableCell>
-      <TableCell>{item.qty}</TableCell>
-      <TableCell className="pr-0">{item.stock ?? "—"}</TableCell>
+      <TableCell className="whitespace-nowrap font-mono text-[12px] tabular-nums">
+        {item.sku || "—"}
+      </TableCell>
+      <TableCell className="whitespace-nowrap">{formatLineColor(item.color)}</TableCell>
+      <TableCell className="whitespace-nowrap">{formatLineSize(item.size)}</TableCell>
+      <TableCell className="whitespace-nowrap tabular-nums">{formatCurrency(item.price)}</TableCell>
+      <TableCell className="whitespace-nowrap">{item.qty}</TableCell>
+      <TableCell className="whitespace-nowrap pr-0">{item.stock ?? "—"}</TableCell>
     </TableRow>
   );
 });
@@ -128,8 +130,8 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
         Order Detail
       </Link>
 
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-[#e5e7eb] pb-5">
-        <div className="grid flex-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+      <div className="mb-6 flex flex-col gap-5 border-b border-[#e5e7eb] pb-5 lg:flex-row lg:items-end lg:justify-between">
+        <div className="grid flex-1 grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-7 sm:gap-4">
           <Meta label="Date" value={formatDate(order.date)} />
           <Meta label="Order ID" value={order.id} />
           <Meta label="User" value={order.userName} />
@@ -138,7 +140,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
           <Meta label="Tax" value={formatCurrency(summary.tax)} />
           <Meta label="Total" value={formatCurrency(order.amount)} />
         </div>
-        <div className="flex flex-wrap items-end gap-6">
+        <div className="flex flex-wrap items-end gap-4 border-t border-[#f3f4f6] pt-4 sm:gap-6 lg:border-0 lg:pt-0">
           <div className="flex flex-col gap-2">
             <p className="text-[12px] text-neutral-muted">Payment</p>
             <span
@@ -159,16 +161,16 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
       </div>
 
       <h2 className="mb-4 text-[15px] font-semibold text-[#2563EB]">Product Information</h2>
-      <Table>
+      <Table className="min-w-[680px]">
         <TableHeader>
           <TableRow className="border-b border-[#e5e7eb] hover:bg-transparent">
-            <TableHead>Title</TableHead>
-            <TableHead>SKU</TableHead>
-            <TableHead>Color</TableHead>
-            <TableHead>Size</TableHead>
-            <TableHead>Price</TableHead>
-            <TableHead>Quantity</TableHead>
-            <TableHead className="pr-0">Stock</TableHead>
+            <TableHead className="min-w-[180px]">Title</TableHead>
+            <TableHead className="whitespace-nowrap">SKU</TableHead>
+            <TableHead className="whitespace-nowrap">Color</TableHead>
+            <TableHead className="whitespace-nowrap">Size</TableHead>
+            <TableHead className="whitespace-nowrap">Price</TableHead>
+            <TableHead className="whitespace-nowrap">Quantity</TableHead>
+            <TableHead className="whitespace-nowrap pr-0">Stock</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

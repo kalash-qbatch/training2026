@@ -8,6 +8,10 @@ export function scrollToFirstError<T extends FieldValues>(errors: FieldErrors<T>
   const el = document.querySelector<HTMLElement>(`[name="${CSS.escape(name)}"]`);
   if (!el) return;
 
-  el.scrollIntoView({ behavior: "smooth", block: "center" });
-  el.focus({ preventScroll: true });
+  if (typeof el.scrollIntoView === "function") {
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+  if (typeof el.focus === "function") {
+    el.focus({ preventScroll: true });
+  }
 }

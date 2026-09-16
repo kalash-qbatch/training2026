@@ -27,7 +27,7 @@ export function AuthFrame({ children }: { children: React.ReactNode }) {
         <div className="absolute inset-0 flex flex-col justify-between p-5 sm:p-8 min-[1000px]:p-8 lg:p-10 xl:p-12">
           <Link
             href="/products"
-            className="inline-flex w-fit items-center gap-2.5 rounded-full border border-white/20 bg-white/15 py-1.5 pl-1.5 pr-3 text-white shadow-[0_8px_30px_rgba(0,0,0,0.18)] backdrop-blur-md transition hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+            className="hidden w-fit items-center gap-2.5 rounded-full border border-white/20 bg-white/15 py-1.5 pl-1.5 pr-3 text-white shadow-[0_8px_30px_rgba(0,0,0,0.18)] backdrop-blur-md transition hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 min-[1000px]:inline-flex"
             aria-label={BRAND_NAME}
           >
             <span className="relative h-9 w-9 overflow-hidden rounded-full ring-1 ring-white/30">

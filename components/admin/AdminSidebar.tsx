@@ -14,9 +14,27 @@ const nav = [
   { href: "/admin/orders", label: "Orders", icon: ShoppingBag },
 ];
 
-export function AdminSidebar() {
+type AdminSidebarProps = {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+};
+
+export function AdminSidebar({
+  open: controlledOpen,
+  onOpenChange: setControlledOpen,
+}: AdminSidebarProps = {}) {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = (next: boolean) => {
+    if (isControlled) {
+      setControlledOpen?.(next);
+    } else {
+      setInternalOpen(next);
+    }
+  };
 
   const content = (
     <div className="flex h-full flex-col bg-white">
@@ -55,39 +73,41 @@ export function AdminSidebar() {
 
   return (
     <>
-      <button
-        type="button"
-        className="fixed left-3 top-3 z-40 cursor-pointer rounded-md border border-neutral-border bg-white p-2 shadow-sm transition-all duration-200 hover:bg-[#f8fafc] lg:hidden"
-        onClick={() => setOpen(true)}
-        aria-label="Open menu"
-      >
-        <Menu className="h-4 w-4" />
-      </button>
+      {!isControlled ? (
+        <button
+          type="button"
+          className="fixed left-3 top-3 z-40 cursor-pointer rounded-md border border-neutral-border bg-white p-2 shadow-sm transition-all duration-200 hover:bg-[#f8fafc] lg:hidden"
+          onClick={() => setOpen(true)}
+          aria-label="Open menu"
+        >
+          <Menu className="h-4 w-4" />
+        </button>
+      ) : null}
 
       <div
         className={cn(
-          "fixed inset-0 z-40 lg:hidden",
+          "fixed inset-0 z-50 lg:hidden",
           open ? "pointer-events-auto" : "pointer-events-none"
         )}
         aria-hidden={!open}
       >
         <div
           className={cn(
-            "absolute inset-0 bg-black/30 transition-opacity duration-300 ease-in-out",
+            "absolute inset-0 bg-black/40 transition-opacity duration-300 ease-in-out",
             open ? "opacity-100" : "opacity-0"
           )}
           onClick={() => setOpen(false)}
         />
         <aside
           className={cn(
-            "absolute left-0 top-0 h-full w-55 border-r border-[#e5e7eb] bg-white shadow-xl transition-transform duration-300 ease-in-out",
+            "absolute left-0 top-0 h-full w-[220px] max-w-[80vw] border-r border-[#e5e7eb] bg-white shadow-xl transition-transform duration-300 ease-in-out",
             open ? "translate-x-0" : "-translate-x-full"
           )}
           onClick={(e) => e.stopPropagation()}
         >
           <button
             type="button"
-            className="absolute right-2 top-2 z-10 cursor-pointer rounded p-1 text-gray-400 transition-colors duration-200 hover:bg-[#f3f4f6] hover:text-neutral-900"
+            className="absolute right-2 top-2 z-10 cursor-pointer rounded p-1.5 text-gray-400 transition-colors duration-200 hover:bg-[#f3f4f6] hover:text-neutral-900"
             onClick={() => setOpen(false)}
             aria-label="Close menu"
           >
@@ -97,7 +117,7 @@ export function AdminSidebar() {
         </aside>
       </div>
 
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-55 border-r border-[#e5e7eb] bg-white lg:block">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[220px] border-r border-[#e5e7eb] bg-white lg:block">
         {content}
       </aside>
     </>

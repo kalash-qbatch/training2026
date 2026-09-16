@@ -541,7 +541,7 @@ function ProductFormFields({
 
           <div className="pt-2">
             <p className="mb-2 text-[12px] font-medium text-[#6b7280]">Add Product Variants</p>
-            <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
               <Select
                 value={draft.color}
                 onChange={(v) => setDraft((d) => ({ ...d, color: v }))}
@@ -577,10 +577,11 @@ function ProductFormFields({
               <button
                 type="button"
                 onClick={addVariant}
-                className="flex h-10 w-10 items-center justify-center rounded-md bg-[#2563EB] text-white hover:bg-brand-600"
+                className="flex h-10 w-full items-center justify-center gap-1.5 rounded-md bg-[#2563EB] text-[13px] font-medium text-white transition hover:bg-brand-600 sm:w-10"
                 aria-label="Add color and size"
               >
                 <Plus className="h-5 w-5" strokeWidth={2.5} />
+                <span className="sm:hidden">Add</span>
               </button>
             </div>
             <div className="mt-2 space-y-2">
@@ -604,7 +605,7 @@ function ProductFormFields({
                       sizeMissing ? "border-red-300" : "border-[#e5e7eb]"
                     }`}
                   >
-                    <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-2 p-2">
+                    <div className="grid grid-cols-2 gap-2 p-2 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-center">
                       <Select
                         value={v.color}
                         onChange={(color) => updateVariantField(index, "color", color)}
@@ -641,10 +642,11 @@ function ProductFormFields({
                       <button
                         type="button"
                         onClick={() => removeVariant(index)}
-                        className="flex h-10 w-10 items-center justify-center rounded-md text-[#EF4444] hover:bg-red-50"
+                        className="flex h-10 w-full items-center justify-center gap-1.5 rounded-md text-[#EF4444] transition hover:bg-red-50 sm:w-10"
                         aria-label="Remove variant"
                       >
                         <Trash2 className="h-4 w-4" />
+                        <span className="text-[12px] font-medium sm:hidden">Remove</span>
                       </button>
                     </div>
                     {sizeMissing ? (

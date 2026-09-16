@@ -57,7 +57,7 @@ const StatCard = memo(function StatCard({
   valueClassName?: string;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-lg border border-[#e5e7eb] bg-white p-5">
+    <div className="flex items-center justify-between rounded-lg border border-[#e5e7eb] bg-white p-4 sm:p-5">
       <div>
         <p className="text-[12px] text-neutral-muted">{label}</p>
         <p className={`mt-1 text-xl font-bold text-neutral-900 ${valueClassName ?? ""}`}>{value}</p>
@@ -74,12 +74,14 @@ const AdminOrderRow = memo(function AdminOrderRow({ order }: { order: Order }) {
 
   return (
     <TableRow>
-      <TableCell>{formatDate(order.date)}</TableCell>
-      <TableCell className="font-medium break-all">{order.id}</TableCell>
-      <TableCell>{order.userName}</TableCell>
-      <TableCell>{productCount}</TableCell>
-      <TableCell className="font-medium tabular-nums">{formatCurrency(order.amount)}</TableCell>
-      <TableCell>
+      <TableCell className="whitespace-nowrap">{formatDate(order.date)}</TableCell>
+      <TableCell className="whitespace-nowrap font-medium">{order.id}</TableCell>
+      <TableCell className="whitespace-nowrap">{order.userName}</TableCell>
+      <TableCell className="whitespace-nowrap">{productCount}</TableCell>
+      <TableCell className="whitespace-nowrap font-medium tabular-nums">
+        {formatCurrency(order.amount)}
+      </TableCell>
+      <TableCell className="whitespace-nowrap">
         <div className="flex items-center gap-1">
           <span className="text-[13px] font-bold text-neutral-600">
             {order.paymentMethod === "COD" ? "COD" : "Card"}:
@@ -91,14 +93,14 @@ const AdminOrderRow = memo(function AdminOrderRow({ order }: { order: Order }) {
           </span>
         </div>
       </TableCell>
-      <TableCell>
+      <TableCell className="whitespace-nowrap">
         <span
           className={`inline-flex rounded px-2.5 py-1 text-[11px] font-semibold ${orderStatusClass(order.status)}`}
         >
           {orderStatusLabel(order.status)}
         </span>
       </TableCell>
-      <TableCell className="pr-0">
+      <TableCell className="whitespace-nowrap pr-0">
         <Link
           href={`/admin/orders/${orderRouteId(order)}`}
           className="inline-flex rounded p-1.5 text-[#6b7280] transition hover:bg-brand-50 hover:text-[#2563EB]"
@@ -203,17 +205,20 @@ export function OrdersPageClient() {
         </div>
       </div>
 
-      <Table wrapperClassName="h-[calc(100dvh-320px)] overflow-y-auto">
+      <Table
+        className="min-w-[820px]"
+        wrapperClassName="max-h-[calc(100dvh-220px)] overflow-y-auto lg:h-[calc(100dvh-320px)]"
+      >
         <TableHeader>
           <TableRow className="border-b border-[#e5e7eb] hover:bg-transparent">
-            <TableHead>Date</TableHead>
-            <TableHead>Order ID</TableHead>
-            <TableHead>User</TableHead>
-            <TableHead>Number of Product(s)</TableHead>
-            <TableHead>Amount</TableHead>
-            <TableHead>Payment</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="pr-0">Actions</TableHead>
+            <TableHead className="whitespace-nowrap">Date</TableHead>
+            <TableHead className="whitespace-nowrap">Order ID</TableHead>
+            <TableHead className="whitespace-nowrap">User</TableHead>
+            <TableHead className="whitespace-nowrap">Number of Product(s)</TableHead>
+            <TableHead className="whitespace-nowrap">Amount</TableHead>
+            <TableHead className="whitespace-nowrap">Payment</TableHead>
+            <TableHead className="whitespace-nowrap">Status</TableHead>
+            <TableHead className="whitespace-nowrap pr-0">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

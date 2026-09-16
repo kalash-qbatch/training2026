@@ -265,18 +265,18 @@ export function ProductsPageClient() {
             </span>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => setAddOpen(true)}
-            className="rounded-md border border-[#2563EB] bg-white px-3.5 py-2 text-[13px] font-medium text-[#2563EB] transition hover:bg-brand-50"
+            className="flex-1 rounded-md border border-[#2563EB] bg-white px-3.5 py-2 text-center text-[13px] font-medium text-[#2563EB] transition hover:bg-brand-50 sm:flex-initial"
           >
             + Add a Single Product
           </button>
           <button
             type="button"
             onClick={() => setBulkOpen(true)}
-            className="rounded-md bg-[#2563EB] px-3.5 py-2 text-[13px] font-medium text-white transition hover:bg-brand-600"
+            className="flex-1 rounded-md bg-[#2563EB] px-3.5 py-2 text-center text-[13px] font-medium text-white transition hover:bg-brand-600 sm:flex-initial"
           >
             + Add Multiple Products
           </button>
@@ -325,16 +325,19 @@ export function ProductsPageClient() {
         />
       </div>
 
-      <Table wrapperClassName="h-[calc(100vh-266px)] overflow-y-auto">
+      <Table
+        className="min-w-[760px]"
+        wrapperClassName="max-h-[calc(100dvh-220px)] overflow-y-auto lg:h-[calc(100dvh-266px)]"
+      >
         <TableHeader>
           <TableRow className="border-b border-[#e5e7eb] hover:bg-transparent">
-            <TableHead>Title</TableHead>
-            <TableHead>SKU</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead>Price</TableHead>
-            <TableHead>Stock</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="pr-0">Actions</TableHead>
+            <TableHead className="min-w-[200px]">Title</TableHead>
+            <TableHead className="whitespace-nowrap">SKU</TableHead>
+            <TableHead className="whitespace-nowrap">Category</TableHead>
+            <TableHead className="whitespace-nowrap">Price</TableHead>
+            <TableHead className="whitespace-nowrap">Stock</TableHead>
+            <TableHead className="whitespace-nowrap">Status</TableHead>
+            <TableHead className="whitespace-nowrap pr-0">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -348,20 +351,22 @@ export function ProductsPageClient() {
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <ProductThumbHover src={p.imageUrl} alt={p.name} />
-                    <p className="font-medium text-neutral-text">{p.name}</p>
+                    <p className="line-clamp-2 font-medium text-neutral-text">{p.name}</p>
                   </div>
                 </TableCell>
-                <TableCell>
+                <TableCell className="whitespace-nowrap">
                   <span className="font-mono text-[12px] tabular-nums text-[#475569]">
                     {p.baseSku || "—"}
                   </span>
                 </TableCell>
-                <TableCell>{p.category?.name ?? "—"}</TableCell>
-                <TableCell className="tabular-nums">{formatCurrency(p.price)}</TableCell>
+                <TableCell className="whitespace-nowrap">{p.category?.name ?? "—"}</TableCell>
+                <TableCell className="whitespace-nowrap tabular-nums">
+                  {formatCurrency(p.price)}
+                </TableCell>
                 <TableCell>
                   <StockColorCircles product={p} />
                 </TableCell>
-                <TableCell>
+                <TableCell className="whitespace-nowrap">
                   <span
                     className={
                       p.isActive
@@ -372,7 +377,7 @@ export function ProductsPageClient() {
                     {p.isActive ? "Active" : "Inactive"}
                   </span>
                 </TableCell>
-                <TableCell className="pr-0">
+                <TableCell className="whitespace-nowrap pr-0">
                   <div className="flex items-center gap-1">
                     <button
                       type="button"

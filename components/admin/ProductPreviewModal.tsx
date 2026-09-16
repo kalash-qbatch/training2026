@@ -153,7 +153,7 @@ export function ProductPreviewModal({
       onClose={onClose}
       title={product?.name ?? "Product preview"}
       hideHeader
-      className="relative max-w-100 overflow-hidden rounded-2xl p-0"
+      className="relative max-w-[420px] overflow-hidden rounded-2xl p-0"
     >
       <button
         type="button"
