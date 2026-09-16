@@ -15,7 +15,15 @@ const mockConfirmCardPayment = jest.fn();
 const mockGetElement = jest.fn();
 
 jest.mock("@stripe/react-stripe-js", () => ({
-  CardElement: () => <div data-testid="card-element" />,
+  CardElement: ({ onChange }: { onChange?: (event: { complete: boolean }) => void }) => (
+    <button
+      type="button"
+      data-testid="complete-card"
+      onClick={() => onChange?.({ complete: true })}
+    >
+      Complete card
+    </button>
+  ),
   useStripe: () => ({
     confirmCardPayment: mockConfirmCardPayment,
   }),
@@ -95,6 +103,37 @@ describe("CheckoutForm", () => {
     });
   });
 
+  it("keeps Pay disabled for new card until Stripe details are complete", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(screen.getByLabelText(/credit \/ debit card/i));
+    const payBtn = screen.getByRole("button", { name: /pay \$64\.78 securely/i });
+    expect(payBtn).toBeDisabled();
+
+    await user.click(screen.getByTestId("complete-card"));
+    expect(payBtn).toBeEnabled();
+  });
+
+  it("enables Pay when a saved card is selected", async () => {
+    const user = userEvent.setup();
+    renderForm({
+      savedPMs: [
+        {
+          id: "pm_1",
+          brand: "visa",
+          last4: "4242",
+          expMonth: 12,
+          expYear: 2030,
+          isDefault: true,
+        },
+      ],
+    });
+
+    await user.click(screen.getByLabelText(/credit \/ debit card/i));
+    expect(screen.getByRole("button", { name: /pay \$64\.78 securely/i })).toBeEnabled();
+  });
+
   it("completes card payment flow with new card", async () => {
     const user = userEvent.setup();
     mockGetElement.mockReturnValue({});
@@ -118,6 +157,7 @@ describe("CheckoutForm", () => {
     renderForm();
 
     await user.click(screen.getByLabelText(/credit \/ debit card/i));
+    await user.click(screen.getByTestId("complete-card"));
     await user.click(screen.getByRole("button", { name: /pay \$64\.78 securely/i }));
 
     await waitFor(() => {
@@ -154,6 +194,7 @@ describe("CheckoutForm", () => {
     renderForm();
 
     await user.click(screen.getByLabelText(/credit \/ debit card/i));
+    await user.click(screen.getByTestId("complete-card"));
     await user.click(screen.getByRole("button", { name: /pay \$64\.78 securely/i }));
 
     await waitFor(() => {

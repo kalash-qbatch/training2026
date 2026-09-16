@@ -117,8 +117,12 @@ export function CheckoutForm({
     savedPMs.find((p) => p.isDefault)?.id ?? savedPMs[0]?.id ?? "new"
   );
   const [saveCard, setSaveCard] = useState(false);
+  const [cardComplete, setCardComplete] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [pendingOrderId, setPendingOrderId] = useState<string | undefined>(retryOrderId);
+
+  const canSubmitCard = selectedPmId !== "new" || (selectedPmId === "new" && cardComplete);
+  const payDisabled = placing || (paymentOption === "CARD" && !canSubmitCard);
 
   const itemPayload = selectedItems.map((i) => ({
     productId: i.productId,
@@ -435,7 +439,10 @@ export function CheckoutForm({
                     name="saved-pm"
                     value={pm.id}
                     checked={selectedPmId === pm.id}
-                    onChange={() => setSelectedPmId(pm.id)}
+                    onChange={() => {
+                      setSelectedPmId(pm.id);
+                      setCardComplete(false);
+                    }}
                     className="sr-only"
                   />
                   <RadioDot selected={selectedPmId === pm.id} />
@@ -470,7 +477,10 @@ export function CheckoutForm({
               name="saved-pm"
               value="new"
               checked={selectedPmId === "new"}
-              onChange={() => setSelectedPmId("new")}
+              onChange={() => {
+                setSelectedPmId("new");
+                setCardComplete(false);
+              }}
               className="sr-only"
             />
             <RadioDot selected={selectedPmId === "new"} />
@@ -483,7 +493,10 @@ export function CheckoutForm({
           {selectedPmId === "new" ? (
             <div className="space-y-3">
               <div className="rounded-lg border border-neutral-border bg-neutral-bg px-3 py-3.5 sm:px-4">
-                <CardElement options={CARD_ELEMENT_OPTIONS} />
+                <CardElement
+                  options={CARD_ELEMENT_OPTIONS}
+                  onChange={(event) => setCardComplete(event.complete)}
+                />
               </div>
               <label className="flex cursor-pointer items-center gap-2 text-sm text-neutral-muted">
                 <input
@@ -526,7 +539,7 @@ export function CheckoutForm({
           type="button"
           className="h-12 w-full rounded-lg text-[15px] font-semibold"
           loading={placing}
-          disabled={placing}
+          disabled={payDisabled}
           onClick={paymentOption === "COD" ? handleCOD : handleCard}
         >
           {paymentOption === "COD" ? (
