@@ -35,17 +35,16 @@ function colorForImage(
     const listedNoExt = listed.replace(/\.[^.]+$/, "");
     return listed === base || listedNoExt === baseNoExt || base.endsWith(listed);
   });
-  // CSV row color wins (e.g. jacket_red.jpeg → Black in the sheet).
+  // Only use color from the CSV row — never invent from filename alone.
   if (fromCsv?.color) return normalizeColor(fromCsv.color);
 
   const fromName = detectColorFromFileName(fileName);
   if (fromName) {
-    const csvMatch = variants.find((v) => v.color.toLowerCase() === fromName.toLowerCase());
-    if (csvMatch) return csvMatch.color;
-    return normalizeColor(fromName);
+    const match = variants.find((v) => v.color.toLowerCase() === fromName.toLowerCase());
+    if (match) return match.color;
   }
 
-  return normalizeColor(variants[0]?.color || "");
+  return "";
 }
 
 /**

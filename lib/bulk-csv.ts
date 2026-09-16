@@ -1,13 +1,6 @@
 import * as XLSX from "xlsx";
 
-import {
-  assignFallbackStockToVariants,
-  detectColorFromFileName,
-  detectSizeFromFileName,
-  ensureVariantsFromImageNames,
-  normalizeColor,
-  normalizeSize,
-} from "@/lib/product-options";
+import { detectColorFromFileName, normalizeColor, normalizeSize } from "@/lib/product-options";
 
 export type BulkCsvVariant = {
   color: string;
@@ -207,15 +200,11 @@ export function parseBulkProductsCsv(text: string): BulkCsvProduct[] {
     lastPrice = priceRaw;
 
     const images = imageIdx >= 0 ? parseImageList(cols[imageIdx] || "") : [];
-    let color = normalizeColor(colorIdx >= 0 ? cleanCell(cols[colorIdx]) : "");
-    let size = normalizeSize(sizeIdx >= 0 ? cleanCell(cols[sizeIdx]) : "");
+    // Only use color/size from the sheet — never invent from image filenames
+    // (e.g. chair_black.jpeg must not force Black when the color cell is empty).
+    const color = normalizeColor(colorIdx >= 0 ? cleanCell(cols[colorIdx]) : "");
+    const size = normalizeSize(sizeIdx >= 0 ? cleanCell(cols[sizeIdx]) : "");
     const rowSku = skuIdx >= 0 ? cleanCell(cols[skuIdx]) : "";
-
-    // Infer missing color/size from the row's image filename when the sheet left them blank.
-    if (images.length) {
-      if (!color) color = normalizeColor(detectColorFromFileName(images[0]));
-      if (!size) size = normalizeSize(detectSizeFromFileName(images[0]));
-    }
 
     let qty = 0;
     if (qtyIdx >= 0 && cleanCell(cols[qtyIdx]) !== "") {
@@ -303,7 +292,7 @@ export function parseBulkProductsCsv(text: string): BulkCsvProduct[] {
  */
 export function resolveBulkVariants(
   product: BulkCsvProduct,
-  attachedFileNames: string[] = []
+  _attachedFileNames: string[] = []
 ): BulkCsvVariant[] {
   let variants = product.variants.map((v) => ({
     color: normalizeColor(v.color),
@@ -314,9 +303,9 @@ export function resolveBulkVariants(
   if (!variants.length && product.imageRefs.some((r) => r.color || r.size || r.qty > 0)) {
     const byKey = new Map<string, BulkCsvVariant>();
     for (const ref of product.imageRefs) {
-      const color =
-        normalizeColor(ref.color) || normalizeColor(detectColorFromFileName(ref.fileName));
-      const size = normalizeSize(ref.size) || normalizeSize(detectSizeFromFileName(ref.fileName));
+      // Prefer explicit CSV ref color/size only — do not invent from filenames.
+      const color = normalizeColor(ref.color);
+      const size = normalizeSize(ref.size);
       if (!color && !size && ref.qty <= 0) continue;
       const key = `${color.toLowerCase()}::${size.toLowerCase()}`;
       const existing = byKey.get(key);
@@ -339,12 +328,11 @@ export function resolveBulkVariants(
   const hasFileVariants = variants.some((v) => v.color || v.size || v.qty > 0);
   if (hasFileVariants) return variants;
 
-  const fileNames = [...product.imageFileNames, ...attachedFileNames].filter(Boolean);
-  variants = ensureVariantsFromImageNames([], fileNames) as BulkCsvVariant[];
-  if (!variants.length && product.stock > 0) {
+  // No CSV color/size/qty rows — keep a stock-only placeholder; never invent Black/etc from filenames.
+  if (product.stock > 0) {
     return [{ color: "", size: "", qty: product.stock }] as BulkCsvVariant[];
   }
-  return assignFallbackStockToVariants(variants, product.stock) as BulkCsvVariant[];
+  return [];
 }
 
 /** Convert an Excel workbook (xlsx/xls) ArrayBuffer into CSV text for parsing. */

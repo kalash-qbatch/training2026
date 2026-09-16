@@ -26,9 +26,7 @@ import {
   useBulkUploadStore,
 } from "@/lib/bulk-upload-store";
 import {
-  assignFallbackStockToVariants,
   detectColorFromFileName,
-  ensureVariantsFromImageNames,
   normalizeColor,
   normalizeSize,
   PRODUCT_COLOR_OPTIONS,
@@ -299,40 +297,28 @@ function ProductCard({
   const onUploadFiles = (files: FileList | null) => {
     if (!files?.length) return;
     const nextImages: BulkDraftImage[] = [...product.images];
-    const addedNames: string[] = [];
-    const hasFileVariants = product.variants.some((v) => v.color || v.size || qtyNumber(v.qty) > 0);
 
     for (const file of Array.from(files)) {
       if (!file.type.startsWith("image/")) continue;
       const fromName = detectColorFromFileName(file.name);
-      addedNames.push(file.name);
       const matching = product.variants.find(
         (v) => fromName && v.color.toLowerCase() === fromName.toLowerCase()
       );
+      // Tag image with a matching variant color only — never invent Black from the filename alone.
       nextImages.push({
         id: uid(),
         url: URL.createObjectURL(file),
         fileName: file.name,
-        color: fromName || matching?.color || normalizeColor(product.variants[0]?.color || ""),
+        color: matching?.color || "",
         file,
       });
     }
 
-    // Never invent/even-split over variants that came from the uploaded file.
-    let variants = product.variants;
-    if (!hasFileVariants) {
-      variants = ensureVariantsFromImageNames(product.variants, [
-        ...product.images.map((img) => img.fileName),
-        ...addedNames,
-      ]);
-      variants = assignFallbackStockToVariants(variants, qtyNumber(product.stock));
-    }
-
+    // Do not create/overwrite variants from image filenames (e.g. *_black.jpg → Black).
     patch({
       ...product,
       images: nextImages,
-      variants,
-      stock: variantStock(variants, product.stock),
+      stock: variantStock(product.variants, product.stock),
     });
   };
 
@@ -984,8 +970,8 @@ export function BulkAddProductsClient() {
       });
 
       const images = p.images.map((img) => {
-        const fromName = detectColorFromFileName(img.fileName);
-        const color = normalizeColor(img.color || fromName || variants[0]?.color || "");
+        // Keep whatever the user set — do not re-apply filename colors (cleared color stayed Black).
+        const color = normalizeColor(img.color);
         if (color !== img.color) changed = true;
         return { ...img, color };
       });
