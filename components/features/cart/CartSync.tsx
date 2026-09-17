@@ -11,13 +11,19 @@ export function CartSync() {
   const { status } = useSession();
   const fetchCart = useCartStore((s) => s.fetchCart);
   const clearLocal = useCartStore((s) => s.clearLocal);
-  const items = useCartStore((s) => s.items);
+  const earliestExpiry = useCartStore((s) => {
+    let min = Number.POSITIVE_INFINITY;
+    for (const item of s.items) {
+      const t = Date.parse(item.expiresAt ?? "");
+      if (Number.isFinite(t) && t < min) min = t;
+    }
+    return Number.isFinite(min) ? min : null;
+  });
 
   useEffect(() => {
     if (status === "loading") return;
     if (status === "unauthenticated") {
       clearLocal();
-      // Drop legacy localStorage cart
       try {
         window.localStorage.removeItem("user-module-cart");
       } catch {
@@ -28,22 +34,15 @@ export function CartSync() {
     void fetchCart();
   }, [status, fetchCart, clearLocal]);
 
+  // Refresh only when a line is about to expire — not on every window focus.
   useEffect(() => {
-    if (status !== "authenticated") return;
-    const deadlines = items.map((item) => Date.parse(item.expiresAt ?? "")).filter(Number.isFinite);
-    if (!deadlines.length) return;
-    // The backend decides what expired; the browser only refreshes its cache.
+    if (status !== "authenticated" || earliestExpiry == null) return;
     const timer = window.setTimeout(
       () => void fetchCart(),
-      Math.max(1_000, Math.min(...deadlines) - Date.now() + 100)
+      Math.max(1_000, earliestExpiry - Date.now() + 100)
     );
-    const refresh = () => void fetchCart();
-    window.addEventListener("focus", refresh);
-    return () => {
-      window.clearTimeout(timer);
-      window.removeEventListener("focus", refresh);
-    };
-  }, [status, items, fetchCart]);
+    return () => window.clearTimeout(timer);
+  }, [status, earliestExpiry, fetchCart]);
 
   return null;
 }

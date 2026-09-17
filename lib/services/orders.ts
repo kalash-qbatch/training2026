@@ -300,14 +300,21 @@ export async function createOrder(
 export async function findOrders(
   page = 1,
   pageSize = 5,
-  userId?: string
+  userId?: string,
+  search?: string
 ): Promise<{
   orders: Order[];
   total: number;
   page: number;
   pageSize: number;
 }> {
-  const where = userId ? { userId } : {};
+  const ref = search?.trim() ? parseOrderRef(search.trim()) : "";
+  const where = {
+    AND: [
+      userId ? { userId } : {},
+      ref ? { id: { contains: ref, mode: "insensitive" as const } } : {},
+    ],
+  };
   const total = await prisma.order.count({ where });
   const rows = await prisma.order.findMany({
     where,

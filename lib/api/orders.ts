@@ -3,7 +3,8 @@ import type { CartItem, ColorFilter, Order, SizeFilter } from "@/types";
 /** Browser-safe: loads orders from `/api/orders` (Postgres). */
 export async function getOrders(
   page = 1,
-  pageSize = 5
+  pageSize = 5,
+  search = ""
 ): Promise<{
   orders: Order[];
   total: number;
@@ -16,6 +17,7 @@ export async function getOrders(
     size: "all",
     color: "all",
   });
+  if (search.trim()) params.set("search", search.trim());
   const res = await fetch(`/api/orders?${params.toString()}`, {
     cache: "no-store",
   });

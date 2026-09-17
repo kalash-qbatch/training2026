@@ -24,6 +24,7 @@ function lineKey(productId: string, specificationId?: string) {
 /** One queued PATCH per click (sequential, no coalesce). */
 const qtyQueues = new Map<string, number[]>();
 const inflightQty = new Set<string>();
+let cartFetchInflight: Promise<void> | null = null;
 
 export const useCartStore = create<CartState>()((set, get) => ({
   items: [],
@@ -31,12 +32,18 @@ export const useCartStore = create<CartState>()((set, get) => ({
   setItems: (items) => set({ items, loaded: true }),
   clearLocal: () => set({ items: [], loaded: false }),
   fetchCart: async () => {
-    try {
-      const items = await fetchCart();
-      set({ items, loaded: true });
-    } catch {
-      set({ items: [], loaded: true });
-    }
+    if (cartFetchInflight) return cartFetchInflight;
+    cartFetchInflight = (async () => {
+      try {
+        const items = await fetchCart();
+        set({ items, loaded: true });
+      } catch {
+        set({ items: [], loaded: true });
+      } finally {
+        cartFetchInflight = null;
+      }
+    })();
+    return cartFetchInflight;
   },
   getCartQty: (productId, specificationId) => {
     const item = get().items.find((i) => matchesLine(i, productId, specificationId));

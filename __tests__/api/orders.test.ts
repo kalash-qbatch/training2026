@@ -76,7 +76,16 @@ describe("Orders — list controller with pagination", () => {
 
     expect(result.status).toBe(200);
     expect(apiBody<{ orders: unknown[] }>(result.body).orders).toHaveLength(1);
-    expect(mockedOrders.findOrders).toHaveBeenCalledWith(1, 5, mockUser.id);
+    expect(mockedOrders.findOrders).toHaveBeenCalledWith(1, 5, mockUser.id, "");
+  });
+
+  it("passes search query to findOrders", async () => {
+    const result = await listOrders(
+      getRequest("http://localhost/api/orders?page=1&pageSize=5&search=78e4aafb")
+    );
+
+    expect(result.status).toBe(200);
+    expect(mockedOrders.findOrders).toHaveBeenCalledWith(1, 5, mockUser.id, "78e4aafb");
   });
 });
 
@@ -384,6 +393,6 @@ describe("Orders — admin cannot bypass user scoping via listOrders", () => {
 
     await listOrders(getRequest("http://localhost/api/orders"));
 
-    expect(mockedOrders.findOrders).toHaveBeenCalledWith(1, 5, mockAdmin.id);
+    expect(mockedOrders.findOrders).toHaveBeenCalledWith(1, 5, mockAdmin.id, "");
   });
 });

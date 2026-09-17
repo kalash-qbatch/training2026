@@ -87,6 +87,7 @@ export function NotificationsPopover() {
   const rootRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const lastListFetchAtRef = useRef(0);
 
   const fetchPage = useCallback(
     async (pageNum: number, isFirstPage: boolean, withDelay = false) => {
@@ -115,6 +116,7 @@ export function NotificationsPopover() {
 
         if (controller.signal.aborted) return;
 
+        lastListFetchAtRef.current = Date.now();
         setNotifications((prev) =>
           isFirstPage ? data.notifications : [...prev, ...data.notifications]
         );
@@ -144,19 +146,10 @@ export function NotificationsPopover() {
     void fetchPage(1, true, true);
   }, [fetchPage]);
 
-  // Initial load on component mount
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      void fetchPage(1, true, false);
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [fetchPage]);
-
-  // Real-time socket subscription (no background polling)
+  // Badge + list sync comes from the socket/poll hook only (one shared fetch).
   useSocketNotifications({
     onNewNotification: (newNotif) => {
       setNotifications((prev) => {
-        // Prevent duplicates
         if (prev.some((item) => item.id === newNotif.id)) return prev;
         return [newNotif, ...prev];
       });
@@ -166,6 +159,8 @@ export function NotificationsPopover() {
       setUnreadCount(count);
     },
     onSync: (latestNotifications, count) => {
+      lastListFetchAtRef.current = Date.now();
+      setLoading(false);
       setUnreadCount(count);
       setNotifications((prev) => {
         if (!prev.length) return latestNotifications;
@@ -178,7 +173,10 @@ export function NotificationsPopover() {
 
   useEffect(() => {
     if (!open) return;
-    const startId = window.setTimeout(loadInitial, 0);
+
+    // Refresh on open only when list is empty or stale — avoid a second fetch every open.
+    const stale = Date.now() - lastListFetchAtRef.current > 30_000;
+    const startId = stale ? window.setTimeout(loadInitial, 0) : undefined;
 
     function onPointerDown(e: PointerEvent) {
       if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
@@ -189,7 +187,7 @@ export function NotificationsPopover() {
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
     return () => {
-      window.clearTimeout(startId);
+      if (startId !== undefined) window.clearTimeout(startId);
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };

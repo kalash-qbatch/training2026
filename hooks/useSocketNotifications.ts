@@ -6,7 +6,7 @@ import type { Socket } from "socket.io-client";
 
 import { fetchNotifications } from "@/lib/api/notifications";
 import { NOTIFICATION_PAGE_SIZE, NOTIFICATION_POLL_INTERVAL_MS } from "@/lib/constants";
-import { disconnectSocketClient, getSocketClient, isSocketEnabled } from "@/lib/socket/client";
+import { getSocketClient, isSocketEnabled } from "@/lib/socket/client";
 import { useAuthStore } from "@/lib/store/useAuthStore";
 import type { AppNotification } from "@/types";
 
@@ -16,12 +16,54 @@ interface UseSocketNotificationsProps {
   onSync?: (notifications: AppNotification[], unreadCount: number) => void;
 }
 
+/** Skip back-to-back syncs from remount / reconnect storms. */
+const SYNC_DEDUP_MS = 5_000;
+let lastSyncAt = 0;
+let syncInFlight: Promise<void> | null = null;
+let subscriberCount = 0;
+
+async function syncNotificationsOnce(
+  onCount?: (count: number) => void,
+  onSync?: (notifications: AppNotification[], unreadCount: number) => void
+) {
+  const now = Date.now();
+  if (syncInFlight) return syncInFlight;
+  if (now - lastSyncAt < SYNC_DEDUP_MS) return;
+
+  lastSyncAt = now;
+  syncInFlight = (async () => {
+    try {
+      const data = await fetchNotifications({
+        page: 1,
+        pageSize: NOTIFICATION_PAGE_SIZE,
+      });
+      onCount?.(data.unreadCount);
+      onSync?.(data.notifications, data.unreadCount);
+    } catch {
+      // ignore background sync errors
+    } finally {
+      syncInFlight = null;
+    }
+  })();
+
+  return syncInFlight;
+}
+
+function startVisiblePoll(runSync: () => void) {
+  runSync();
+  const interval = setInterval(() => {
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+    runSync();
+  }, NOTIFICATION_POLL_INTERVAL_MS);
+  return () => clearInterval(interval);
+}
+
 export function useSocketNotifications({
   onNewNotification,
   onUnreadCountChange,
   onSync,
 }: UseSocketNotificationsProps = {}) {
-  const user = useAuthStore((s) => s.user);
+  const userId = useAuthStore((s) => s.user?.id);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const socketRef = useRef<Socket | null>(null);
 
@@ -36,57 +78,38 @@ export function useSocketNotifications({
   });
 
   useEffect(() => {
-    if (!isAuthenticated || !user?.id) {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
-      disconnectSocketClient();
+    if (!isAuthenticated || !userId) {
       return;
     }
 
     let isSubscribed = true;
+    subscriberCount += 1;
 
-    async function syncOnce() {
-      try {
-        const data = await fetchNotifications({
-          page: 1,
-          pageSize: NOTIFICATION_PAGE_SIZE,
-        });
+    const runSync = () => {
+      if (!isSubscribed) return;
+      void syncNotificationsOnce(
+        (count) => onCountRef.current?.(count),
+        (notifications, count) => onSyncRef.current?.(notifications, count)
+      );
+    };
 
-        if (!isSubscribed) return;
-
-        onCountRef.current?.(data.unreadCount);
-        onSyncRef.current?.(data.notifications, data.unreadCount);
-      } catch {
-        // ignore background sync errors
-      }
-    }
-
-    // Deployed / Production: Poll every 10 seconds
+    // Deployed / sockets disabled: light polling (deduped, only while tab visible)
     if (!isSocketEnabled()) {
-      void syncOnce();
-      const interval = setInterval(() => {
-        void syncOnce();
-      }, NOTIFICATION_POLL_INTERVAL_MS);
-
+      const stopPoll = startVisiblePoll(runSync);
       return () => {
         isSubscribed = false;
-        clearInterval(interval);
+        subscriberCount = Math.max(0, subscriberCount - 1);
+        stopPoll();
       };
     }
 
-    // Local: Connect via Socket.IO
-    const socket = getSocketClient(user.id);
+    const socket = getSocketClient(userId);
     if (!socket) {
-      void syncOnce();
-      const interval = setInterval(() => {
-        void syncOnce();
-      }, NOTIFICATION_POLL_INTERVAL_MS);
-
+      const stopPoll = startVisiblePoll(runSync);
       return () => {
         isSubscribed = false;
-        clearInterval(interval);
+        subscriberCount = Math.max(0, subscriberCount - 1);
+        stopPoll();
       };
     }
 
@@ -101,28 +124,34 @@ export function useSocketNotifications({
     };
 
     const handleConnect = () => {
-      socket.emit("join-user-room", user.id);
-      void syncOnce();
+      socket.emit("join-user-room", userId);
+      runSync();
     };
 
     socket.on("connect", handleConnect);
     socket.on("notification:new", handleNew);
     socket.on("notification:unread-count", handleUnreadCount);
 
-    if (!socket.connected) {
-      socket.connect();
-    } else {
+    // One mount sync; connect handler covers first connect + reconnects (deduped).
+    if (socket.connected) {
       handleConnect();
+    } else {
+      runSync();
+      socket.connect();
     }
 
     return () => {
       isSubscribed = false;
+      subscriberCount = Math.max(0, subscriberCount - 1);
       socket.off("connect", handleConnect);
       socket.off("notification:new", handleNew);
       socket.off("notification:unread-count", handleUnreadCount);
-      socket.disconnect();
       socketRef.current = null;
-      disconnectSocketClient();
+      // Keep the shared socket alive while other subscribers (or remounts) may reuse it.
+      // Only leave the room; do not disconnect/destroy the singleton.
+      if (subscriberCount === 0 && socket.connected) {
+        socket.emit("leave-user-room", userId);
+      }
     };
-  }, [isAuthenticated, user?.id]);
+  }, [isAuthenticated, userId]);
 }

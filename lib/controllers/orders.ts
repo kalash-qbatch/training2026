@@ -16,7 +16,8 @@ export async function listOrders(request: Request) {
   const { searchParams } = new URL(request.url);
   const page = Number(searchParams.get("page") || 1);
   const pageSize = Number(searchParams.get("pageSize") || 5);
-  const result = await findOrders(page, pageSize, userId);
+  const search = searchParams.get("search") || "";
+  const result = await findOrders(page, pageSize, userId, search);
   return { status: 200, body: { success: true, ...result } };
 }
 
