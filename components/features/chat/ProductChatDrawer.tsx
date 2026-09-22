@@ -59,12 +59,74 @@ export type StoreAiOpenDetail = {
   productName?: string;
 };
 
-const QUICK_PROMPTS = [
+const QUICK_PROMPTS_STORE = [
   "What watches do you have in stock?",
   "Show me products under $40",
   "Do you have black color items?",
   "Which products come in Free Size?",
 ];
+
+const QUICK_PROMPTS_ADMIN = [
+  "What is our total revenue?",
+  "How many orders by status?",
+  "How many products are active?",
+  "How do I update order status?",
+];
+
+const ADMIN_SESSION_PREFIX = "[Admin] ";
+
+export type AssistantVariant = "store" | "admin";
+
+type AssistantConfig = {
+  variant: AssistantVariant;
+  chatUrl: string;
+  title: string;
+  fabLabel: string;
+  emptyTitle: string;
+  emptySubtitle: string;
+  loadingHint: string;
+  placeholder: string;
+  footerNote: string;
+  quickPrompts: string[];
+  dialogLabel: string;
+  showProductMatches: boolean;
+  enableStoreOpenEvent: boolean;
+};
+
+function getAssistantConfig(variant: AssistantVariant): AssistantConfig {
+  if (variant === "admin") {
+    return {
+      variant,
+      chatUrl: "/api/admin/chat",
+      title: "Admin Assistant",
+      fabLabel: "Ask Admin AI",
+      emptyTitle: "Ask the admin assistant",
+      emptySubtitle: "Revenue, orders, products, inventory, and admin how-tos.",
+      loadingHint: "Working on it…",
+      placeholder: "Ask about admin tasks… (Enter to send)",
+      footerNote: "Admin-only · refuses non-admin questions.",
+      quickPrompts: QUICK_PROMPTS_ADMIN,
+      dialogLabel: "Admin AI assistant",
+      showProductMatches: false,
+      enableStoreOpenEvent: false,
+    };
+  }
+  return {
+    variant,
+    chatUrl: "/api/chat",
+    title: "Store Assistant",
+    fabLabel: "Ask Store AI",
+    emptyTitle: "Ask the store",
+    emptySubtitle: "Prices, sizes, stock, and recommendations from live inventory.",
+    loadingHint: "Searching catalog…",
+    placeholder: "Ask about products… (Enter to send)",
+    footerNote: "Ai Can Do mistakes, so please check the product details before buying.",
+    quickPrompts: QUICK_PROMPTS_STORE,
+    dialogLabel: "Store AI assistant",
+    showProductMatches: true,
+    enableStoreOpenEvent: true,
+  };
+}
 
 const MD_QUERY = "(min-width: 768px)";
 export const STORE_AI_OPEN_EVENT = "store-ai:open";
@@ -99,9 +161,11 @@ function useIsDesktop() {
   return isDesktop;
 }
 
-export function ProductChatDrawer() {
+export function ProductChatDrawer({ variant = "store" }: { variant?: AssistantVariant } = {}) {
+  const config = getAssistantConfig(variant);
+  const isAdmin = variant === "admin";
   const { data: authSession, status: authStatus } = useSession();
-  const isLoggedIn = authStatus === "authenticated" && Boolean(authSession?.user?.id);
+  const isLoggedIn = isAdmin || (authStatus === "authenticated" && Boolean(authSession?.user?.id));
   const isDesktop = useIsDesktop();
   const pathname = usePathname();
 
@@ -143,13 +207,18 @@ export function ProductChatDrawer() {
       const res = await fetch("/api/chat/sessions");
       if (!res.ok) return;
       const data = await res.json();
-      setSessions(data.sessions ?? []);
+      const allSessions: HistorySession[] = data.sessions ?? [];
+      setSessions(
+        isAdmin
+          ? allSessions.filter((s) => s.title.startsWith(ADMIN_SESSION_PREFIX))
+          : allSessions.filter((s) => !s.title.startsWith(ADMIN_SESSION_PREFIX))
+      );
     } catch {
       // Ignore
     } finally {
       setIsLoadingSessions(false);
     }
-  }, [isLoggedIn]);
+  }, [isLoggedIn, isAdmin]);
 
   useEffect(() => {
     if (isOpen && isLoggedIn) {
@@ -201,6 +270,7 @@ export function ProductChatDrawer() {
   }, [isOpen]);
 
   useEffect(() => {
+    if (!config.enableStoreOpenEvent) return;
     const onOpen = (event: Event) => {
       const detail = (event as CustomEvent<StoreAiOpenDetail>).detail ?? {};
       setIsOpen(true);
@@ -216,9 +286,9 @@ export function ProductChatDrawer() {
     };
     window.addEventListener(STORE_AI_OPEN_EVENT, onOpen);
     return () => window.removeEventListener(STORE_AI_OPEN_EVENT, onOpen);
-  }, []);
+  }, [config.enableStoreOpenEvent]);
 
-  const displayProductHint = pathname?.startsWith("/products/") ? productHint : null;
+  const displayProductHint = !isAdmin && pathname?.startsWith("/products/") ? productHint : null;
 
   const scrollToBottom = useCallback((smooth = true) => {
     messagesEndRef.current?.scrollIntoView({
@@ -357,7 +427,7 @@ export function ProductChatDrawer() {
         content: m.content,
       }));
 
-      const res = await fetch("/api/chat", {
+      const res = await fetch(config.chatUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: controller.signal,
@@ -662,10 +732,12 @@ export function ProductChatDrawer() {
           "h-12 w-12 justify-center sm:h-auto sm:w-auto sm:justify-start",
           isOpen && "pointer-events-none scale-0 opacity-0"
         )}
-        aria-label="Open AI shopping assistant"
+        aria-label={config.dialogLabel}
       >
         <Sparkles className="h-5 w-5 text-amber-300 sm:h-[18px] sm:w-[18px]" />
-        <span className="hidden text-sm font-semibold tracking-wide sm:inline">Ask Store AI</span>
+        <span className="hidden text-sm font-semibold tracking-wide sm:inline">
+          {config.fabLabel}
+        </span>
       </button>
 
       {isOpen && (
@@ -673,7 +745,7 @@ export function ProductChatDrawer() {
           className="fixed inset-0 z-50 flex items-stretch justify-end overscroll-none"
           role="dialog"
           aria-modal="true"
-          aria-label="Store AI assistant"
+          aria-label={config.dialogLabel}
         >
           <button
             type="button"
@@ -730,13 +802,13 @@ export function ProductChatDrawer() {
 
                 <div className="min-w-0 flex-1">
                   <h3 className="truncate text-sm font-semibold text-neutral-900">
-                    Store Assistant
+                    {config.title}
                   </h3>
                   <p className="truncate text-[10px] text-neutral-muted sm:text-[11px]">
                     {statusHint
                       ? statusHint
                       : isLoading
-                        ? "Searching catalog…"
+                        ? config.loadingHint
                         : isLoggedIn
                           ? "History saved"
                           : "Guest · not saved"}
@@ -795,14 +867,16 @@ export function ProductChatDrawer() {
                       <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
                         <Sparkles className="h-5 w-5" />
                       </div>
-                      <h4 className="text-base font-semibold text-neutral-900">Ask the store</h4>
+                      <h4 className="text-base font-semibold text-neutral-900">
+                        {config.emptyTitle}
+                      </h4>
                       <p className="mx-auto mt-1 max-w-[260px] text-[11px] leading-relaxed text-neutral-muted sm:text-xs">
-                        Prices, sizes, stock, and recommendations from live inventory.
+                        {config.emptySubtitle}
                       </p>
                     </div>
 
                     <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                      {QUICK_PROMPTS.map((prompt) => (
+                      {config.quickPrompts.map((prompt) => (
                         <button
                           key={prompt}
                           type="button"
@@ -858,7 +932,7 @@ export function ProductChatDrawer() {
                                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-brand-500 [animation-delay:150ms]" />
                                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-brand-500 [animation-delay:300ms]" />
                                   </span>
-                                  Searching catalog…
+                                  {config.loadingHint}
                                 </span>
                               ) : isUser || msg.failed ? (
                                 <span className="whitespace-pre-wrap">{msg.content}</span>
@@ -880,80 +954,83 @@ export function ProductChatDrawer() {
                             </button>
                           )}
 
-                          {!isUser && msg.products && msg.products.length > 0 && (
-                            <div className="w-full max-w-[min(100%,28rem)] space-y-1.5 pl-8">
-                              <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-muted">
-                                <Tag className="h-3 w-3" />
-                                Matches ({msg.products.length})
-                              </p>
-                              <div className="space-y-1.5">
-                                {msg.products.map((prod) => (
-                                  <div
-                                    key={prod.id}
-                                    className="flex items-center gap-2.5 rounded-xl border border-neutral-border/60 bg-white p-2"
-                                  >
-                                    {prod.image ? (
-                                      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-neutral-bg">
-                                        <Image
-                                          src={prod.image}
-                                          alt={prod.title}
-                                          fill
-                                          sizes="40px"
-                                          className="object-cover"
-                                        />
-                                      </div>
-                                    ) : (
-                                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-neutral-bg text-neutral-muted">
-                                        <Tag className="h-3.5 w-3.5" />
-                                      </div>
-                                    )}
-                                    <div className="min-w-0 flex-1">
-                                      <p className="truncate text-xs font-semibold text-neutral-900">
-                                        {prod.title}
-                                      </p>
-                                      <p className="mt-0.5 text-[11px] text-neutral-muted">
-                                        <span className="font-semibold text-brand-600">
-                                          ${prod.price.toFixed(2)}
-                                        </span>
-                                        {prod.color ? (
-                                          <>
-                                            {" · "}
-                                            <span>{prod.color}</span>
-                                          </>
-                                        ) : null}
-                                        {prod.size ? (
-                                          <>
-                                            {" · "}
-                                            <span>{prod.size}</span>
-                                          </>
-                                        ) : null}
-                                        {" · "}
-                                        <span
-                                          className={
-                                            prod.stock > 0 ? "text-emerald-600" : "text-rose-500"
-                                          }
-                                        >
-                                          {prod.stock > 0
-                                            ? `${prod.stock} in stock`
-                                            : "Out of stock"}
-                                        </span>
-                                      </p>
-                                    </div>
-                                    <Link
-                                      href={`/products/${prod.id}`}
-                                      className="shrink-0 rounded-lg bg-brand-50 px-2 py-1 text-[10px] font-semibold text-brand-600 hover:bg-brand-500 hover:text-white"
-                                      onClick={closeDrawer}
+                          {!isUser &&
+                            config.showProductMatches &&
+                            msg.products &&
+                            msg.products.length > 0 && (
+                              <div className="w-full max-w-[min(100%,28rem)] space-y-1.5 pl-8">
+                                <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-muted">
+                                  <Tag className="h-3 w-3" />
+                                  Matches ({msg.products.length})
+                                </p>
+                                <div className="space-y-1.5">
+                                  {msg.products.map((prod) => (
+                                    <div
+                                      key={prod.id}
+                                      className="flex items-center gap-2.5 rounded-xl border border-neutral-border/60 bg-white p-2"
                                     >
-                                      <span className="inline-flex items-center gap-0.5">
-                                        View
-                                        <ExternalLink className="h-2.5 w-2.5" />
-                                      </span>
-                                    </Link>
-                                  </div>
-                                ))}
+                                      {prod.image ? (
+                                        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-neutral-bg">
+                                          <Image
+                                            src={prod.image}
+                                            alt={prod.title}
+                                            fill
+                                            sizes="40px"
+                                            className="object-cover"
+                                          />
+                                        </div>
+                                      ) : (
+                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-neutral-bg text-neutral-muted">
+                                          <Tag className="h-3.5 w-3.5" />
+                                        </div>
+                                      )}
+                                      <div className="min-w-0 flex-1">
+                                        <p className="truncate text-xs font-semibold text-neutral-900">
+                                          {prod.title}
+                                        </p>
+                                        <p className="mt-0.5 text-[11px] text-neutral-muted">
+                                          <span className="font-semibold text-brand-600">
+                                            ${prod.price.toFixed(2)}
+                                          </span>
+                                          {prod.color ? (
+                                            <>
+                                              {" · "}
+                                              <span>{prod.color}</span>
+                                            </>
+                                          ) : null}
+                                          {prod.size ? (
+                                            <>
+                                              {" · "}
+                                              <span>{prod.size}</span>
+                                            </>
+                                          ) : null}
+                                          {" · "}
+                                          <span
+                                            className={
+                                              prod.stock > 0 ? "text-emerald-600" : "text-rose-500"
+                                            }
+                                          >
+                                            {prod.stock > 0
+                                              ? `${prod.stock} in stock`
+                                              : "Out of stock"}
+                                          </span>
+                                        </p>
+                                      </div>
+                                      <Link
+                                        href={`/products/${prod.id}`}
+                                        className="shrink-0 rounded-lg bg-brand-50 px-2 py-1 text-[10px] font-semibold text-brand-600 hover:bg-brand-500 hover:text-white"
+                                        onClick={closeDrawer}
+                                      >
+                                        <span className="inline-flex items-center gap-0.5">
+                                          View
+                                          <ExternalLink className="h-2.5 w-2.5" />
+                                        </span>
+                                      </Link>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            )}
                         </div>
                       );
                     })}
@@ -990,7 +1067,7 @@ export function ProductChatDrawer() {
                     value={input}
                     onChange={(e) => onInputChange(e.target.value)}
                     onKeyDown={onInputKeyDown}
-                    placeholder="Ask about products… (Enter to send)"
+                    placeholder={config.placeholder}
                     className="max-h-[120px] min-h-[36px] min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-neutral-text placeholder:text-neutral-muted focus:outline-none"
                   />
                   {isLoading ? (
@@ -1015,7 +1092,7 @@ export function ProductChatDrawer() {
                   )}
                 </form>
                 <p className="mt-1.5 text-center text-[10px] text-neutral-muted">
-                  Ai Can Do mistakes, so please check the product details before buying.
+                  {config.footerNote}
                 </p>
               </footer>
             </div>
