@@ -11,10 +11,12 @@ import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 
 /** Bump when schema models/relations change so the cached client is recreated. */
-const PRISMA_CLIENT_VERSION = 22;
+const PRISMA_CLIENT_VERSION = 26;
 
 const RETRY_ATTEMPTS = 3;
 const RETRY_BASE_DELAY_MS = 300;
+
+const REQUIRED_MODELS = ["user", "product", "chatSession", "chatMessage"] as const;
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -91,7 +93,20 @@ function createPrismaClient() {
   });
 }
 
+function clientHasRequiredModels(client: PrismaClient): boolean {
+  const record = client as unknown as Record<string, unknown>;
+  return REQUIRED_MODELS.every((name) => {
+    const model = Reflect.get(record, name, client);
+    return Boolean(model && typeof model === "object");
+  });
+}
+
 function getPrismaClient(): PrismaClient {
+  if (globalForPrisma.prisma && !clientHasRequiredModels(globalForPrisma.prisma)) {
+    globalForPrisma.prisma.$disconnect().catch(() => {});
+    globalForPrisma.prisma = undefined;
+  }
+
   if (!globalForPrisma.prisma) {
     globalForPrisma.prisma = createPrismaClient();
   }
@@ -117,24 +132,27 @@ async function runWithRetry<T>(operation: (client: PrismaClient) => Promise<T>):
   throw lastError;
 }
 
-function createRetryProxy(client: PrismaClient): PrismaClient {
-  return new Proxy(client, {
-    get(target, prop, receiver) {
-      const value = Reflect.get(target, prop, receiver);
+function createRetryProxy(): PrismaClient {
+  return new Proxy({} as PrismaClient, {
+    get(_ignored, prop) {
+      // Always resolve against the current client — never a stale module-load instance.
+      const target = getPrismaClient();
+      const value = Reflect.get(target as object, prop, target);
 
       if (value && typeof value === "object" && typeof prop === "string" && !prop.startsWith("$")) {
         return new Proxy(value, {
           get(modelTarget, modelProp) {
-            const method = Reflect.get(modelTarget, modelProp);
+            const method = Reflect.get(modelTarget, modelProp, modelTarget);
             if (typeof method !== "function") return method;
 
             return (...args: unknown[]) =>
               runWithRetry(async (fresh) => {
-                const model = (fresh as unknown as Record<string, unknown>)[prop];
+                const model = Reflect.get(fresh as object, prop, fresh as object) as
+                  Record<string, unknown> | undefined;
                 if (!model || typeof model !== "object") {
                   throw new Error(`Prisma model "${prop}" is unavailable`);
                 }
-                const fn = (model as Record<string, unknown>)[modelProp as string];
+                const fn = Reflect.get(model, modelProp, model);
                 if (typeof fn !== "function") {
                   throw new Error(`Prisma method "${String(modelProp)}" is unavailable`);
                 }
@@ -147,7 +165,7 @@ function createRetryProxy(client: PrismaClient): PrismaClient {
       if (typeof value === "function") {
         return (...args: unknown[]) =>
           runWithRetry(async (fresh) => {
-            const fn = (fresh as unknown as Record<string, unknown>)[prop as string];
+            const fn = Reflect.get(fresh as object, prop, fresh as object);
             if (typeof fn !== "function") {
               throw new Error(`Prisma method "${String(prop)}" is unavailable`);
             }
@@ -173,10 +191,8 @@ function resetPrismaClientForSchemaBump() {
 
 resetPrismaClientForSchemaBump();
 
-const basePrisma = getPrismaClient();
-export const prisma = createRetryProxy(basePrisma);
+export const prisma = createRetryProxy();
 
 if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = basePrisma;
   globalForPrisma.pgPool = getPool();
 }

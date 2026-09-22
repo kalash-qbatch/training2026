@@ -205,10 +205,7 @@ export function OrdersPageClient() {
         </div>
       </div>
 
-      <Table
-        className="min-w-[820px]"
-        wrapperClassName="max-h-[calc(100dvh-220px)] overflow-y-auto lg:h-[calc(100dvh-320px)]"
-      >
+      <Table wrapperClassName="max-h-[calc(100dvh-220px)] overflow-y-auto lg:h-[calc(100dvh-320px)]">
         <TableHeader>
           <TableRow className="border-b border-[#e5e7eb] hover:bg-transparent">
             <TableHead className="whitespace-nowrap">Date</TableHead>
