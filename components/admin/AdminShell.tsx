@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { Menu } from "lucide-react";
 
+import { AdminChatDrawer } from "@/components/admin/AdminChatDrawer";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminTopBar } from "@/components/admin/AdminTopBar";
 import { BrandLogo } from "@/components/brand/BrandLogo";
@@ -32,6 +33,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </header>
         <main className="px-4 py-5 sm:px-6 lg:px-8">{children}</main>
       </div>
+      <AdminChatDrawer />
     </div>
   );
 }

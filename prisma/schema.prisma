@@ -25,6 +25,7 @@ model User {
   cartItems     CartItem[]
   orders        Order[]
   notifications Notification[]
+  chatSessions  ChatSession[]
 }
 
 model Account {
@@ -88,6 +89,7 @@ model Product {
   orderItems  OrderItem[]
   specifications Specification[]
   images      ProductImage[]
+  embedding   Unsupported("vector(384)")?
 
   @@unique([titlePrefix, code])
   @@index([categoryId])
@@ -215,4 +217,28 @@ enum PaymentStatus {
   SUCCEEDED
   FAILED
   REFUNDED
+}
+
+model ChatSession {
+  id        String        @id @default(uuid())
+  userId    String
+  title     String        @default("New Chat")
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  ChatMessage[]
+
+  @@index([userId, createdAt])
+}
+
+model ChatMessage {
+  id        String      @id @default(uuid())
+  sessionId String
+  role      String
+  content   String      @db.Text
+  metadata  Json?
+  createdAt DateTime    @default(now())
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
 }
