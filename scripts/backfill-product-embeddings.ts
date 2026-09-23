@@ -47,7 +47,7 @@ async function main() {
   console.log(`Starting product embeddings backfill... [force=${force}, batchSize=${BATCH_SIZE}]`);
 
   // Find products to embed
-  // If force, all products; otherwise only products with null embedding
+  // If force, all products; otherwise only products with null embedding!
   let targetProductIds: string[] = [];
 
   if (force) {
