@@ -9,9 +9,11 @@ import { cn } from "@/lib/utils";
 type ChatMarkdownProps = {
   content: string;
   className?: string;
+  /** Called when the user clicks an internal link (close drawer, keep chat). */
+  onNavigate?: () => void;
 };
 
-export function ChatMarkdown({ content, className }: ChatMarkdownProps) {
+export function ChatMarkdown({ content, className, onNavigate }: ChatMarkdownProps) {
   return (
     <div className={cn("chat-md text-[12px] leading-relaxed sm:text-sm", className)}>
       <ReactMarkdown
@@ -36,6 +38,7 @@ export function ChatMarkdown({ content, className }: ChatMarkdownProps) {
               return (
                 <Link
                   href={url}
+                  onClick={() => onNavigate?.()}
                   className="font-semibold text-brand-600 underline underline-offset-2 hover:text-brand-700"
                 >
                   {children}

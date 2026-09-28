@@ -4,7 +4,8 @@ import type { CartItem, ColorFilter, Order, SizeFilter } from "@/types";
 export async function getOrders(
   page = 1,
   pageSize = 5,
-  search = ""
+  search = "",
+  status = ""
 ): Promise<{
   orders: Order[];
   total: number;
@@ -18,6 +19,7 @@ export async function getOrders(
     color: "all",
   });
   if (search.trim()) params.set("search", search.trim());
+  if (status.trim()) params.set("status", status.trim());
   const res = await fetch(`/api/orders?${params.toString()}`, {
     cache: "no-store",
   });

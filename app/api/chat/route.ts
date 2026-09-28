@@ -5,7 +5,8 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { createEmbedding } from "@/lib/ai/embeddings";
 import { rewriteFollowupQuery, streamChatWithGroq } from "@/lib/ai/groq";
-import { getOffTopicRefusal } from "@/lib/ai/store-topic";
+import { getOffTopicRefusal, getSmallTalkReply, OFF_TOPIC_REFUSAL } from "@/lib/ai/store-topic";
+import { buildUserOrderReply, detectUserOrderIntent } from "@/lib/ai/user-orders";
 import { prisma } from "@/lib/db";
 import {
   buildRagPromptContext,
@@ -34,6 +35,44 @@ function titleFromMessage(message: string) {
   const cleaned = message.replace(/\s+/g, " ").trim();
   if (cleaned.length <= 48) return cleaned || "New Chat";
   return `${cleaned.slice(0, 45)}...`;
+}
+
+function sseTextResponse(
+  text: string,
+  meta: { sessionId: string | null; standaloneQuery: string }
+) {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        controller.enqueue(
+          encoder.encode(
+            `event: metadata\ndata: ${JSON.stringify({
+              standaloneQuery: meta.standaloneQuery,
+              products: [],
+              sessionId: meta.sessionId,
+            })}\n\n`
+          )
+        );
+        controller.enqueue(encoder.encode(`event: delta\ndata: ${JSON.stringify({ text })}\n\n`));
+        controller.enqueue(
+          encoder.encode(`event: done\ndata: ${JSON.stringify({ sessionId: meta.sessionId })}\n\n`)
+        );
+        controller.close();
+      } catch (streamError) {
+        console.error("Chat text stream error:", streamError);
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+    },
+  });
 }
 
 /** Persist via SQL so we never depend on Prisma model delegates for chat. */
@@ -145,50 +184,53 @@ export async function POST(request: Request) {
 
     const offTopicRefusal = getOffTopicRefusal(message);
     if (offTopicRefusal) {
-      const encoder = new TextEncoder();
-      const stream = new ReadableStream({
-        async start(controller) {
-          try {
-            controller.enqueue(
-              encoder.encode(
-                `event: metadata\ndata: ${JSON.stringify({
-                  standaloneQuery: message,
-                  products: [],
-                  sessionId: activeSessionId,
-                })}\n\n`
-              )
-            );
-            controller.enqueue(
-              encoder.encode(`event: delta\ndata: ${JSON.stringify({ text: offTopicRefusal })}\n\n`)
-            );
-            if (userId && activeSessionId) {
-              await persistAssistantTurn(
-                activeSessionId,
-                offTopicRefusal,
-                [],
-                cappedHistory.length === 0,
-                message
-              );
-            }
-            controller.enqueue(
-              encoder.encode(
-                `event: done\ndata: ${JSON.stringify({ sessionId: activeSessionId })}\n\n`
-              )
-            );
-            controller.close();
-          } catch (streamError) {
-            console.error("Off-topic stream error:", streamError);
-            controller.close();
-          }
-        },
+      if (userId && activeSessionId) {
+        await persistAssistantTurn(
+          activeSessionId,
+          offTopicRefusal,
+          [],
+          cappedHistory.length === 0,
+          message
+        );
+      }
+      return sseTextResponse(offTopicRefusal, {
+        sessionId: activeSessionId,
+        standaloneQuery: message,
       });
+    }
 
-      return new Response(stream, {
-        headers: {
-          "Content-Type": "text/event-stream; charset=utf-8",
-          "Cache-Control": "no-cache, no-transform",
-          Connection: "keep-alive",
-        },
+    const smallTalk = getSmallTalkReply(message);
+    if (smallTalk) {
+      if (userId && activeSessionId) {
+        await persistAssistantTurn(
+          activeSessionId,
+          smallTalk,
+          [],
+          cappedHistory.length === 0,
+          message
+        );
+      }
+      return sseTextResponse(smallTalk, {
+        sessionId: activeSessionId,
+        standaloneQuery: message,
+      });
+    }
+
+    const orderIntent = detectUserOrderIntent(message);
+    if (orderIntent) {
+      const orderReply = await buildUserOrderReply(userId, orderIntent);
+      if (userId && activeSessionId) {
+        await persistAssistantTurn(
+          activeSessionId,
+          orderReply,
+          [],
+          cappedHistory.length === 0,
+          message
+        );
+      }
+      return sseTextResponse(orderReply, {
+        sessionId: activeSessionId,
+        standaloneQuery: message,
       });
     }
 
@@ -201,6 +243,32 @@ export async function POST(request: Request) {
       standaloneQuery = await rewriteFollowupQuery(message, safeHistory);
     } catch (rewriteError) {
       console.warn("Query rewrite failed, using original message:", rewriteError);
+    }
+
+    const normalizedRewrite = standaloneQuery.trim().toUpperCase();
+    if (normalizedRewrite === "SMALL_TALK") {
+      const reply =
+        getSmallTalkReply(message) ||
+        "Hello! I'm the Bhai ka Store shopping assistant. Ask me about products, prices, stock, or your orders — in any language.";
+      if (userId && activeSessionId) {
+        await persistAssistantTurn(activeSessionId, reply, [], cappedHistory.length === 0, message);
+      }
+      return sseTextResponse(reply, { sessionId: activeSessionId, standaloneQuery: message });
+    }
+    if (normalizedRewrite === "OFF_TOPIC") {
+      if (userId && activeSessionId) {
+        await persistAssistantTurn(
+          activeSessionId,
+          OFF_TOPIC_REFUSAL,
+          [],
+          cappedHistory.length === 0,
+          message
+        );
+      }
+      return sseTextResponse(OFF_TOPIC_REFUSAL, {
+        sessionId: activeSessionId,
+        standaloneQuery: message,
+      });
     }
 
     let queryEmbedding: number[];

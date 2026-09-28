@@ -4,6 +4,7 @@ import {
   type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent,
+  type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
   useRef,
@@ -18,6 +19,7 @@ import {
   Loader2,
   LogIn,
   MessageSquarePlus,
+  Minimize2,
   RefreshCw,
   Send,
   Sparkles,
@@ -28,7 +30,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 
 import type { ChatbotProduct } from "@/lib/chatbot/types";
@@ -120,10 +122,10 @@ export type StoreAiOpenDetail = {
 };
 
 const QUICK_PROMPTS_STORE = [
+  "How many orders do I have?",
+  "What's my latest order status?",
   "What watches do you have in stock?",
   "Show me products under $40",
-  "Do you have black color items?",
-  "Which products come in Free Size?",
 ];
 
 const QUICK_PROMPTS_ADMIN = [
@@ -177,7 +179,7 @@ function getAssistantConfig(variant: AssistantVariant): AssistantConfig {
     title: "Store Assistant",
     fabLabel: "Ask Store AI",
     emptyTitle: "Ask the store",
-    emptySubtitle: "Prices, sizes, stock, and recommendations from live inventory.",
+    emptySubtitle: "Prices, sizes, stock, recommendations, and your order status.",
     loadingHint: "Searching catalog…",
     placeholder: "Ask about products… (Enter to send)",
     footerNote: "Ai Can Do mistakes, so please check the product details before buying.",
@@ -222,6 +224,53 @@ function useIsDesktop() {
   return isDesktop;
 }
 
+const FAB_EDGE = 16;
+const FAB_DRAG_THRESHOLD = 6;
+
+type FabPoint = { x: number; y: number };
+
+function fabBounds(width: number, height: number) {
+  const viewW = document.documentElement.clientWidth;
+  const viewH = document.documentElement.clientHeight;
+  const maxX = Math.max(0, viewW - width);
+  const maxY = Math.max(0, viewH - height);
+  const left = Math.min(FAB_EDGE, maxX);
+  const top = Math.min(FAB_EDGE, maxY);
+  const right = Math.max(left, maxX - FAB_EDGE);
+  const bottom = Math.max(top, maxY - FAB_EDGE);
+  return { left, top, right, bottom };
+}
+
+/** Keep the button fully inside the viewport while dragging. */
+function clampFabPosition(x: number, y: number, width: number, height: number): FabPoint {
+  const { left, top, right, bottom } = fabBounds(width, height);
+  return {
+    x: Math.min(Math.max(left, x), right),
+    y: Math.min(Math.max(top, y), bottom),
+  };
+}
+
+/** Snap to the nearest top/bottom × left/right corner, like the Next.js badge. */
+function snapFabToNearestCorner(x: number, y: number, width: number, height: number): FabPoint {
+  const { left, top, right, bottom } = fabBounds(width, height);
+  const corners: FabPoint[] = [
+    { x: left, y: top },
+    { x: right, y: top },
+    { x: left, y: bottom },
+    { x: right, y: bottom },
+  ];
+  let best = corners[0];
+  let bestDist = Number.POSITIVE_INFINITY;
+  for (const corner of corners) {
+    const dist = (corner.x - x) ** 2 + (corner.y - y) ** 2;
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = corner;
+    }
+  }
+  return best;
+}
+
 export function ProductChatDrawer({ variant = "store" }: { variant?: AssistantVariant } = {}) {
   const config = getAssistantConfig(variant);
   const isAdmin = variant === "admin";
@@ -229,10 +278,11 @@ export function ProductChatDrawer({ variant = "store" }: { variant?: AssistantVa
   const isLoggedIn = isAdmin || (authStatus === "authenticated" && Boolean(authSession?.user?.id));
   const isDesktop = useIsDesktop();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const routeKey = `${pathname}?${searchParams.toString()}`;
 
   const [isOpen, setIsOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [historyDesktopBreakpoint, setHistoryDesktopBreakpoint] = useState(isDesktop);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -247,17 +297,117 @@ export function ProductChatDrawer({ variant = "store" }: { variant?: AssistantVa
   const [productHint, setProductHint] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fabRef = useRef<HTMLButtonElement>(null);
+  const fabPosRef = useRef<FabPoint | null>(null);
+  const suppressFabClickRef = useRef(false);
+  const fabDragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+    moved: boolean;
+  } | null>(null);
+  const [fabPos, setFabPos] = useState<FabPoint | null>(null);
+  const [isFabDragging, setIsFabDragging] = useState(false);
+
+  useEffect(() => {
+    fabPosRef.current = fabPos;
+  }, [fabPos]);
+
+  useEffect(() => {
+    const onResize = () => {
+      const prev = fabPosRef.current;
+      const el = fabRef.current;
+      if (!prev || !el) return;
+      const next = snapFabToNearestCorner(prev.x, prev.y, el.offsetWidth, el.offsetHeight);
+      if (next.x !== prev.x || next.y !== prev.y) setFabPos(next);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const onFabPointerDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    suppressFabClickRef.current = false;
+    const el = fabRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    fabDragRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      originX: rect.left,
+      originY: rect.top,
+      moved: false,
+    };
+    try {
+      el.setPointerCapture(e.pointerId);
+    } catch {
+      // Ignore when pointer capture isn't available (e.g. synthetic events).
+    }
+  };
+
+  const onFabPointerMove = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    const drag = fabDragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    const dx = e.clientX - drag.startX;
+    const dy = e.clientY - drag.startY;
+    if (!drag.moved && Math.hypot(dx, dy) < FAB_DRAG_THRESHOLD) return;
+    drag.moved = true;
+    const el = fabRef.current;
+    if (!el) return;
+    setIsFabDragging(true);
+    setFabPos(
+      clampFabPosition(drag.originX + dx, drag.originY + dy, el.offsetWidth, el.offsetHeight)
+    );
+  };
+
+  const onFabPointerUp = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    const drag = fabDragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    if (drag.moved) suppressFabClickRef.current = true;
+    fabDragRef.current = null;
+    const el = fabRef.current;
+    if (el?.hasPointerCapture?.(e.pointerId)) {
+      try {
+        el.releasePointerCapture(e.pointerId);
+      } catch {
+        // Ignore.
+      }
+    }
+    if (drag.moved && el) {
+      const released = clampFabPosition(
+        drag.originX + (e.clientX - drag.startX),
+        drag.originY + (e.clientY - drag.startY),
+        el.offsetWidth,
+        el.offsetHeight
+      );
+      const snapped = snapFabToNearestCorner(
+        released.x,
+        released.y,
+        el.offsetWidth,
+        el.offsetHeight
+      );
+      // Keep the free-drag position first, re-enable transition, then snap next frame
+      // so the corner move animates (like the Next.js badge).
+      setFabPos(released);
+      setIsFabDragging(false);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setFabPos(snapped);
+        });
+      });
+      return;
+    }
+    setIsFabDragging(false);
+  };
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     toastTimerRef.current = setTimeout(() => setToast(null), 3000);
   }, []);
-
-  if (historyDesktopBreakpoint !== isDesktop) {
-    setHistoryDesktopBreakpoint(isDesktop);
-    setShowHistory(isDesktop);
-  }
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -267,6 +417,60 @@ export function ProductChatDrawer({ variant = "store" }: { variant?: AssistantVa
   const messageIdRef = useRef(0);
   /** Tracks the previous authStatus to detect the exact unauthenticated→authenticated transition */
   const prevAuthStatusRef = useRef(authStatus);
+
+  const appendProductActionMessages = useCallback(
+    (action: {
+      type: "add_to_cart" | "add_to_cart_failed" | "view_details" | "view_cart" | "login";
+      product: ChatbotProduct;
+      quantity?: number;
+      result?: string;
+    }) => {
+      const qty = action.quantity ?? 1;
+      const name = action.product.name;
+      const userText =
+        action.type === "add_to_cart" || action.type === "add_to_cart_failed"
+          ? `Add ${qty}× "${name}" to cart`
+          : action.type === "view_details"
+            ? `View details for "${name}"`
+            : action.type === "view_cart"
+              ? "View my cart"
+              : `Log in to continue with "${name}"`;
+
+      const assistantText =
+        action.result ||
+        (action.type === "add_to_cart"
+          ? `Done — added ${qty}× "${name}" to your cart.`
+          : action.type === "add_to_cart_failed"
+            ? `Couldn't add "${name}" to your cart.`
+            : action.type === "view_details"
+              ? `Opening product details for "${name}".`
+              : action.type === "view_cart"
+                ? "Opening your cart."
+                : "Opening sign-in so you can continue.");
+
+      stickToBottomRef.current = true;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `action-user-${++messageIdRef.current}`,
+          role: "user",
+          content: userText,
+        },
+        {
+          id: `action-assistant-${++messageIdRef.current}`,
+          role: "assistant",
+          content: assistantText,
+        },
+      ]);
+
+      if (action.type === "add_to_cart") {
+        showToast(`✓ Added ${qty}× "${name}" to your cart!`);
+      } else if (action.type === "add_to_cart_failed") {
+        showToast(`Cart error: ${action.result || "Failed"}`);
+      }
+    },
+    [showToast]
+  );
 
   const fetchSessions = useCallback(async () => {
     if (!isLoggedIn) {
@@ -381,27 +585,41 @@ export function ProductChatDrawer({ variant = "store" }: { variant?: AssistantVa
     setIsOpen(false);
   }, []);
 
+  // Close drawer on route / query change; keep conversation messages intact
+  const [prevRouteKey, setPrevRouteKey] = useState(routeKey);
+  if (routeKey !== prevRouteKey) {
+    setPrevRouteKey(routeKey);
+    if (isOpen) {
+      setIsLoading(false);
+      setPendingDeleteId(null);
+      setIsOpen(false);
+    }
+  }
+
+  useEffect(() => {
+    if (isOpen) return;
+    if (!abortRef.current) return;
+    abortRef.current.abort();
+    abortRef.current = null;
+  }, [isOpen]);
+
   useEffect(() => {
     if (!isOpen) return;
-    document.body.style.overflow = "hidden";
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (pendingDeleteId) {
         setPendingDeleteId(null);
         return;
       }
-      if (showHistory && !isDesktop) {
+      if (showHistory) {
         setShowHistory(false);
         return;
       }
       closeDrawer();
     };
     document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.body.style.overflow = "";
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [isOpen, showHistory, isDesktop, pendingDeleteId, closeDrawer]);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, showHistory, pendingDeleteId, closeDrawer]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -736,15 +954,15 @@ export function ProductChatDrawer({ variant = "store" }: { variant?: AssistantVa
   };
 
   const historyPanel = (
-    <div className="flex h-full w-full flex-col bg-[#f4f7fb]">
-      <div className="flex items-center justify-between gap-2 border-b border-neutral-border/70 px-3 py-3">
+    <div className="flex h-full w-full flex-col bg-[#f8fafc]">
+      <div className="flex items-center justify-between gap-2 border-b border-neutral-border/70 px-3 py-2.5">
         <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-900">
           <History className="h-3.5 w-3.5 text-brand-500" />
-          History
+          Chat history
         </div>
         <button
           type="button"
-          className="rounded-lg p-1 text-neutral-muted hover:bg-white hover:text-neutral-900 md:hidden"
+          className="rounded-lg p-1 text-neutral-muted hover:bg-white hover:text-neutral-900"
           onClick={() => setShowHistory(false)}
           aria-label="Close history"
         >
@@ -755,8 +973,11 @@ export function ProductChatDrawer({ variant = "store" }: { variant?: AssistantVa
       <div className="p-2.5">
         <button
           type="button"
-          onClick={handleNewChat}
-          className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-brand-500 px-3 py-2.5 text-xs font-semibold text-white shadow-sm shadow-brand-500/20 hover:bg-brand-600 transition"
+          onClick={() => {
+            handleNewChat();
+            setShowHistory(false);
+          }}
+          className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-brand-500 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-600 transition"
         >
           <MessageSquarePlus className="h-3.5 w-3.5" />
           New Chat
@@ -772,6 +993,7 @@ export function ProductChatDrawer({ variant = "store" }: { variant?: AssistantVa
             </p>
             <Link
               href="/login"
+              onClick={closeDrawer}
               className="mt-2.5 inline-flex items-center gap-1 rounded-lg bg-neutral-900 px-2.5 py-1.5 text-[11px] font-medium text-white"
             >
               Sign in
@@ -821,7 +1043,10 @@ export function ProductChatDrawer({ variant = "store" }: { variant?: AssistantVa
                 ) : (
                   <button
                     type="button"
-                    onClick={() => handleLoadSession(s.id)}
+                    onClick={() => {
+                      void handleLoadSession(s.id);
+                      setShowHistory(false);
+                    }}
                     className={cn(
                       "group flex w-full items-start gap-2 rounded-xl px-2.5 py-2 text-left transition",
                       activeSessionId === s.id
@@ -855,7 +1080,7 @@ export function ProductChatDrawer({ variant = "store" }: { variant?: AssistantVa
                           setPendingDeleteId(s.id);
                         }
                       }}
-                      className="mt-0.5 rounded-md p-1 text-neutral-muted opacity-0 group-hover:opacity-100 hover:bg-status-error-bg hover:text-status-error-fg transition"
+                      className="mt-0.5 rounded-md p-1 text-neutral-muted opacity-0 transition group-hover:opacity-100 hover:bg-status-error-bg hover:text-status-error-fg"
                       aria-label="Delete chat"
                     >
                       <Trash2 className="h-3 w-3" />
@@ -870,338 +1095,356 @@ export function ProductChatDrawer({ variant = "store" }: { variant?: AssistantVa
     </div>
   );
 
+  const fabStyle =
+    fabPos != null
+      ? {
+          position: "fixed" as const,
+          left: fabPos.x,
+          top: fabPos.y,
+          right: "auto",
+          bottom: "auto",
+          transition: isFabDragging
+            ? "none"
+            : "left 280ms cubic-bezier(0.2, 0.8, 0.2, 1), top 280ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+        }
+      : undefined;
+
   return (
-    <>
-      {/* Toast notification for cart actions */}
+    <div className="pointer-events-none fixed inset-0 z-50 font-sans">
       {toast && (
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-28 right-6 z-[60] flex items-center gap-2.5 rounded-xl border border-gray-700 bg-gray-900 px-4 py-2.5 text-xs text-white shadow-xl sm:text-sm"
+          className="pointer-events-auto absolute bottom-28 right-5 z-[60] flex max-w-[min(92vw,320px)] items-center gap-2.5 rounded-xl border border-gray-700 bg-gray-900 px-4 py-2.5 text-xs text-white shadow-xl sm:right-6 sm:text-sm"
         >
-          <span className="h-2 w-2 animate-ping rounded-full bg-emerald-400" />
+          <span className="h-2 w-2 shrink-0 animate-ping rounded-full bg-emerald-400" />
           <span>{toast}</span>
         </div>
       )}
-      <button
-        type="button"
-        id="open-product-chat"
-        onClick={() => setIsOpen(true)}
-        className={cn(
-          "fixed bottom-4 right-4 z-40 flex items-center gap-2 rounded-full bg-brand-500 text-white shadow-lg shadow-brand-500/30 transition hover:bg-brand-600 hover:scale-[1.02] active:scale-95 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 sm:bottom-6 sm:right-6 sm:gap-2.5 sm:pl-3.5 sm:pr-4 sm:py-3",
-          "h-12 w-12 justify-center sm:h-auto sm:w-auto sm:justify-start",
-          isOpen && "pointer-events-none scale-0 opacity-0"
-        )}
-        aria-label={config.dialogLabel}
-      >
-        <Sparkles className="h-5 w-5 text-amber-300 sm:h-[18px] sm:w-[18px]" />
-        <span className="hidden text-sm font-semibold tracking-wide sm:inline">
-          {config.fabLabel}
-        </span>
-      </button>
+
+      {!isOpen && (
+        <button
+          ref={fabRef}
+          type="button"
+          id="open-product-chat"
+          style={fabStyle}
+          onClick={() => {
+            if (suppressFabClickRef.current) {
+              suppressFabClickRef.current = false;
+              return;
+            }
+            setIsOpen(true);
+          }}
+          onPointerDown={onFabPointerDown}
+          onPointerMove={onFabPointerMove}
+          onPointerUp={onFabPointerUp}
+          onPointerCancel={onFabPointerUp}
+          aria-label={config.dialogLabel}
+          aria-expanded={false}
+          className={cn(
+            "pointer-events-auto flex h-12 cursor-grab touch-none select-none items-center justify-center gap-2.5 rounded-full bg-brand-500 px-3.5 text-white shadow-lg shadow-brand-500/30 transition-[color,background-color,box-shadow,transform] hover:-translate-y-0.5 hover:bg-brand-600 hover:shadow-xl active:scale-95 focus:outline-none focus:ring-4 focus:ring-brand-300 sm:h-auto sm:py-3 sm:pl-3.5 sm:pr-4",
+            fabPos == null ? "absolute bottom-4 right-4 sm:bottom-6 sm:right-6" : "absolute",
+            isFabDragging && "cursor-grabbing hover:translate-y-0"
+          )}
+        >
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-75" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white" />
+          </span>
+          <Sparkles className="h-5 w-5 text-amber-200" />
+          <span className="hidden text-sm font-semibold tracking-wide sm:inline">
+            {config.fabLabel}
+          </span>
+        </button>
+      )}
 
       {isOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-stretch justify-end overscroll-none"
+          className="pointer-events-auto absolute bottom-4 right-4 flex h-[min(640px,78vh)] w-[min(92vw,400px)] flex-col overflow-hidden rounded-2xl border border-neutral-border/80 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-200 sm:bottom-6 sm:right-6 sm:w-[420px]"
           role="dialog"
           aria-modal="true"
           aria-label={config.dialogLabel}
         >
-          <button
-            type="button"
-            className="absolute inset-0 bg-neutral-900/50 backdrop-blur-[2px]"
-            aria-label="Close assistant backdrop"
-            onClick={closeDrawer}
-          />
-
-          <aside
-            className={cn(
-              "relative flex h-full w-full flex-col overflow-hidden bg-white shadow-2xl",
-              "sm:max-w-[420px] md:max-w-[680px] md:flex-row",
-              "max-sm:rounded-none sm:rounded-l-2xl",
-              "animate-fade-in-up"
-            )}
-          >
-            <div
-              className={cn(
-                "hidden shrink-0 border-r border-neutral-border/70 transition-[width] duration-200 md:block",
-                showHistory ? "md:w-[220px]" : "md:w-0 md:border-r-0 md:overflow-hidden"
-              )}
+          <header className="flex shrink-0 items-center gap-2 bg-gradient-to-r from-brand-600 to-brand-500 px-3 py-3 text-white sm:px-3.5">
+            <button
+              type="button"
+              onClick={() => setShowHistory((v) => !v)}
+              className="rounded-lg p-1.5 text-white/85 hover:bg-white/15 hover:text-white"
+              aria-label={showHistory ? "Hide history" : "Show history"}
+              title="Chat history"
             >
-              <div className="h-full w-[220px]">{historyPanel}</div>
+              <History className="h-4 w-4" />
+            </button>
+
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/25 bg-white/15">
+              <Bot className="h-5 w-5" />
             </div>
 
-            {showHistory && !isDesktop && (
-              <div className="absolute inset-0 z-20 flex md:hidden">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <h3 className="truncate text-sm font-bold">{config.title}</h3>
+                <span className="inline-flex items-center rounded bg-emerald-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                  Online
+                </span>
+              </div>
+              <p className="truncate text-[11px] text-brand-100">
+                {statusHint
+                  ? statusHint
+                  : isLoading
+                    ? config.loadingHint
+                    : isLoggedIn
+                      ? "History saved"
+                      : "Guest · not saved"}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleNewChat}
+              className="rounded-lg p-1.5 text-white/85 hover:bg-white/15 hover:text-white"
+              aria-label="New chat"
+              title="New chat"
+            >
+              <MessageSquarePlus className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={closeDrawer}
+              className="rounded-lg p-1.5 text-white/85 hover:bg-white/15 hover:text-white"
+              aria-label="Minimize chat"
+              title="Minimize"
+            >
+              <Minimize2 className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={closeDrawer}
+              className="rounded-lg p-1.5 text-white/85 hover:bg-white/15 hover:text-white"
+              aria-label="Close"
+              title="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </header>
+
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            {showHistory && (
+              <div className="absolute inset-0 z-20 flex">
                 <button
                   type="button"
-                  className="absolute inset-0 bg-neutral-900/30"
+                  className="absolute inset-0 bg-neutral-900/25"
                   aria-label="Dismiss history"
                   onClick={() => setShowHistory(false)}
                 />
-                <div className="relative z-10 h-full w-[min(86vw,280px)] shadow-xl animate-fade-in-up">
+                <div className="relative z-10 h-full w-[min(100%,280px)] overflow-hidden border-r border-neutral-border/70 bg-[#f8fafc] shadow-xl animate-in slide-in-from-left-2 duration-200">
                   {historyPanel}
                 </div>
               </div>
             )}
 
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-              <header className="flex items-center gap-2 border-b border-neutral-border/70 px-3 py-2.5 sm:px-4 sm:py-3">
+            {displayProductHint && (
+              <div className="flex items-center justify-between gap-2 border-b border-brand-100 bg-brand-50/70 px-3 py-2">
+                <p className="min-w-0 truncate text-[11px] text-brand-700">
+                  Asking about <span className="font-semibold">{displayProductHint}</span>
+                </p>
                 <button
                   type="button"
-                  onClick={() => setShowHistory((v) => !v)}
-                  className="rounded-lg p-2 text-neutral-muted hover:bg-neutral-bg hover:text-neutral-900"
-                  aria-label={showHistory ? "Hide history" : "Show history"}
+                  onClick={() => setProductHint(null)}
+                  className="shrink-0 rounded p-0.5 text-brand-600 hover:bg-brand-100"
+                  aria-label="Dismiss product context"
                 >
-                  <History className="h-4 w-4" />
+                  <X className="h-3.5 w-3.5" />
                 </button>
+              </div>
+            )}
 
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-500 text-white sm:h-9 sm:w-9">
-                  <Bot className="h-4 w-4" />
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <h3 className="truncate text-sm font-semibold text-neutral-900">
-                    {config.title}
-                  </h3>
-                  <p className="truncate text-[10px] text-neutral-muted sm:text-[11px]">
-                    {statusHint
-                      ? statusHint
-                      : isLoading
-                        ? config.loadingHint
-                        : isLoggedIn
-                          ? "History saved"
-                          : "Guest · not saved"}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleNewChat}
-                  className="rounded-lg p-2 text-neutral-muted hover:bg-neutral-bg hover:text-neutral-900 md:hidden"
-                  aria-label="New chat"
-                  title="New chat"
-                >
-                  <MessageSquarePlus className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={closeDrawer}
-                  className="rounded-lg p-2 text-neutral-muted hover:bg-neutral-bg hover:text-neutral-900"
-                  aria-label="Close"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </header>
-
-              {displayProductHint && (
-                <div className="flex items-center justify-between gap-2 border-b border-brand-100 bg-brand-50/70 px-3 py-2 sm:px-4">
-                  <p className="min-w-0 truncate text-[11px] text-brand-700">
-                    Asking about <span className="font-semibold">{displayProductHint}</span>
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setProductHint(null)}
-                    className="shrink-0 rounded p-0.5 text-brand-600 hover:bg-brand-100"
-                    aria-label="Dismiss product context"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
+            <div
+              ref={scrollContainerRef}
+              onScroll={onScrollMessages}
+              className="relative min-h-0 flex-1 overflow-y-auto bg-gray-50/60 px-3 py-3"
+            >
+              {isLoadingSession && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/75">
+                  <Loader2 className="h-5 w-5 animate-spin text-brand-500" />
                 </div>
               )}
 
-              <div
-                ref={scrollContainerRef}
-                onScroll={onScrollMessages}
-                className="relative min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-4 sm:py-4"
-              >
-                {isLoadingSession && (
-                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/75">
-                    <Loader2 className="h-5 w-5 animate-spin text-brand-500" />
-                  </div>
-                )}
-
-                {messages.length === 0 ? (
-                  <div className="mx-auto flex h-full max-w-md flex-col justify-center gap-4 py-2">
-                    <div className="text-center">
-                      <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
-                        <Sparkles className="h-5 w-5" />
-                      </div>
-                      <h4 className="text-base font-semibold text-neutral-900">
-                        {config.emptyTitle}
-                      </h4>
-                      <p className="mx-auto mt-1 max-w-[260px] text-[11px] leading-relaxed text-neutral-muted sm:text-xs">
-                        {config.emptySubtitle}
-                      </p>
+              {messages.length === 0 ? (
+                <div className="mx-auto flex h-full max-w-md flex-col justify-center gap-4 py-2">
+                  <div className="text-center">
+                    <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
+                      <Sparkles className="h-5 w-5" />
                     </div>
-
-                    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                      {config.quickPrompts.map((prompt) => (
-                        <button
-                          key={prompt}
-                          type="button"
-                          disabled={isLoading}
-                          onClick={() => handleSendMessage(prompt)}
-                          className="rounded-xl border border-neutral-border/70 bg-white px-3 py-2.5 text-left text-[11px] font-medium leading-snug text-neutral-text transition hover:border-brand-500/40 hover:bg-brand-50/40 disabled:opacity-50 sm:text-xs"
-                        >
-                          {prompt}
-                        </button>
-                      ))}
-                    </div>
+                    <h4 className="text-base font-semibold text-neutral-900">
+                      {config.emptyTitle}
+                    </h4>
+                    <p className="mx-auto mt-1 max-w-[260px] text-[11px] leading-relaxed text-neutral-muted sm:text-xs">
+                      {config.emptySubtitle}
+                    </p>
                   </div>
-                ) : (
-                  <div className="space-y-3.5">
-                    {messages.map((msg) => {
-                      const isUser = msg.role === "user";
-                      return (
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {config.quickPrompts.map((prompt) => (
+                      <button
+                        key={prompt}
+                        type="button"
+                        disabled={isLoading}
+                        onClick={() => handleSendMessage(prompt)}
+                        className="rounded-xl border border-neutral-border/70 bg-white px-3 py-2.5 text-left text-[11px] font-medium leading-snug text-neutral-text transition hover:border-brand-500/40 hover:bg-brand-50/40 disabled:opacity-50 sm:text-xs"
+                      >
+                        {prompt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3.5">
+                  {messages.map((msg) => {
+                    const isUser = msg.role === "user";
+                    return (
+                      <div
+                        key={msg.id}
+                        className={cn(
+                          "flex flex-col gap-1.5",
+                          isUser ? "items-end" : "items-start"
+                        )}
+                      >
                         <div
-                          key={msg.id}
                           className={cn(
-                            "flex flex-col gap-1.5",
-                            isUser ? "items-end" : "items-start"
+                            "flex max-w-[92%] items-end gap-2",
+                            isUser ? "flex-row-reverse" : "flex-row"
                           )}
                         >
                           <div
                             className={cn(
-                              "flex max-w-[min(100%,28rem)] items-end gap-2",
-                              isUser ? "flex-row-reverse" : "flex-row"
+                              "flex h-6 w-6 shrink-0 items-center justify-center rounded-full",
+                              isUser ? "bg-neutral-900 text-white" : "bg-brand-500 text-white"
                             )}
                           >
-                            <div
-                              className={cn(
-                                "flex h-6 w-6 shrink-0 items-center justify-center rounded-full",
-                                isUser ? "bg-neutral-900 text-white" : "bg-brand-500 text-white"
-                              )}
-                            >
-                              {isUser ? <User className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
-                            </div>
-                            <div
-                              className={cn(
-                                "rounded-2xl px-3 py-2 text-[12px] leading-relaxed sm:text-sm",
-                                isUser
-                                  ? "rounded-br-md bg-brand-500 text-white whitespace-pre-wrap"
-                                  : msg.failed
-                                    ? "rounded-bl-md border border-rose-200 bg-rose-50 text-rose-800"
-                                    : "rounded-bl-md border border-neutral-border/60 bg-white text-neutral-text"
-                              )}
-                            >
-                              {!msg.content ? (
-                                <span className="inline-flex items-center gap-1.5 text-neutral-muted">
-                                  <span className="flex gap-0.5">
-                                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-brand-500 [animation-delay:0ms]" />
-                                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-brand-500 [animation-delay:150ms]" />
-                                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-brand-500 [animation-delay:300ms]" />
-                                  </span>
-                                  {config.loadingHint}
-                                </span>
-                              ) : isUser || msg.failed ? (
-                                <span className="whitespace-pre-wrap">
-                                  {msg.failed ? sanitizeChatContent(msg.content) : msg.content}
-                                </span>
-                              ) : (
-                                <ChatMarkdown content={msg.content} />
-                              )}
-                            </div>
+                            {isUser ? <User className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
                           </div>
-
-                          {!isUser && msg.failed && (
-                            <button
-                              type="button"
-                              onClick={() => handleRetry(msg.id)}
-                              disabled={isLoading}
-                              className="ml-8 inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-brand-600 hover:bg-brand-50 disabled:opacity-50"
-                            >
-                              <RefreshCw className="h-3 w-3" />
-                              Retry
-                            </button>
-                          )}
-
-                          {!isUser &&
-                            config.showProductMatches &&
-                            msg.products &&
-                            msg.products.length > 0 && (
-                              <div className="w-full mt-1.5 pl-8">
-                                <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-muted mb-1.5">
-                                  <Tag className="h-3 w-3" />
-                                  Matches ({msg.products.length})
-                                </p>
-                                <ProductCarousel
-                                  products={msg.products.map(mapToChatbotProduct)}
-                                  onAddToCartSuccess={(name, qty) =>
-                                    showToast(`✓ Added ${qty}× "${name}" to your cart!`)
-                                  }
-                                  onAddToCartError={(err) => showToast(`Cart error: ${err}`)}
-                                />
-                              </div>
+                          <div
+                            className={cn(
+                              "rounded-2xl px-3 py-2 text-[12px] leading-relaxed sm:text-sm",
+                              isUser
+                                ? "rounded-br-md bg-brand-500 text-white whitespace-pre-wrap"
+                                : msg.failed
+                                  ? "rounded-bl-md border border-rose-200 bg-rose-50 text-rose-800"
+                                  : "rounded-bl-md border border-neutral-border/60 bg-white text-neutral-text"
                             )}
+                          >
+                            {!msg.content ? (
+                              <span className="inline-flex items-center gap-1.5 text-neutral-muted">
+                                <span className="flex gap-0.5">
+                                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-brand-500 [animation-delay:0ms]" />
+                                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-brand-500 [animation-delay:150ms]" />
+                                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-brand-500 [animation-delay:300ms]" />
+                                </span>
+                                {config.loadingHint}
+                              </span>
+                            ) : isUser || msg.failed ? (
+                              <span className="whitespace-pre-wrap">
+                                {msg.failed ? sanitizeChatContent(msg.content) : msg.content}
+                              </span>
+                            ) : (
+                              <ChatMarkdown content={msg.content} onNavigate={closeDrawer} />
+                            )}
+                          </div>
                         </div>
-                      );
-                    })}
-                    <div ref={messagesEndRef} />
-                  </div>
-                )}
-                {messages.length === 0 && <div ref={messagesEndRef} />}
 
-                {showScrollDown && (
+                        {!isUser && msg.failed && (
+                          <button
+                            type="button"
+                            onClick={() => handleRetry(msg.id)}
+                            disabled={isLoading}
+                            className="ml-8 inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-brand-600 hover:bg-brand-50 disabled:opacity-50"
+                          >
+                            <RefreshCw className="h-3 w-3" />
+                            Retry
+                          </button>
+                        )}
+
+                        {!isUser &&
+                          config.showProductMatches &&
+                          msg.products &&
+                          msg.products.length > 0 && (
+                            <div className="mt-1.5 w-full pl-8">
+                              <p className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-muted">
+                                <Tag className="h-3 w-3" />
+                                Matches ({msg.products.length})
+                              </p>
+                              <ProductCarousel
+                                products={msg.products.map(mapToChatbotProduct)}
+                                onAction={appendProductActionMessages}
+                              />
+                            </div>
+                          )}
+                      </div>
+                    );
+                  })}
+                  <div ref={messagesEndRef} />
+                </div>
+              )}
+              {messages.length === 0 && <div ref={messagesEndRef} />}
+
+              {showScrollDown && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    stickToBottomRef.current = true;
+                    scrollToBottom(true);
+                    setShowScrollDown(false);
+                  }}
+                  className="sticky bottom-2 left-1/2 z-10 mx-auto flex -translate-x-1/2 items-center gap-1 rounded-full border border-neutral-border bg-white px-3 py-1.5 text-[11px] font-medium text-neutral-text shadow-md"
+                >
+                  <ArrowDown className="h-3 w-3" />
+                  Latest
+                  <ChevronDown className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+
+            <footer className="shrink-0 border-t border-neutral-border/70 bg-white p-3">
+              <form
+                onSubmit={onSubmit}
+                className="flex items-end gap-2 rounded-2xl border border-neutral-border/80 bg-neutral-bg px-2 py-1.5 focus-within:border-brand-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-brand-500/15"
+              >
+                <textarea
+                  ref={inputRef}
+                  rows={1}
+                  value={input}
+                  onChange={(e) => onInputChange(e.target.value)}
+                  onKeyDown={onInputKeyDown}
+                  placeholder={config.placeholder}
+                  className="max-h-[100px] min-h-[36px] min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-neutral-text placeholder:text-neutral-muted focus:outline-none"
+                />
+                {isLoading ? (
                   <button
                     type="button"
-                    onClick={() => {
-                      stickToBottomRef.current = true;
-                      scrollToBottom(true);
-                      setShowScrollDown(false);
-                    }}
-                    className="sticky bottom-2 left-1/2 z-10 mx-auto flex -translate-x-1/2 items-center gap-1 rounded-full border border-neutral-border bg-white px-3 py-1.5 text-[11px] font-medium text-neutral-text shadow-md"
+                    onClick={handleStop}
+                    className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-neutral-900 text-white hover:bg-neutral-800"
+                    aria-label="Stop generating"
+                    title="Stop"
                   >
-                    <ArrowDown className="h-3 w-3" />
-                    Latest
-                    <ChevronDown className="h-3 w-3" />
+                    <Square className="h-3.5 w-3.5 fill-current" />
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={!input.trim()}
+                    className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-500 text-white hover:bg-brand-600 disabled:opacity-45"
+                    aria-label="Send"
+                  >
+                    <Send className="h-4 w-4" />
                   </button>
                 )}
-              </div>
-
-              <footer className="border-t border-neutral-border/70 bg-white p-3 sm:p-3.5 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-                <form
-                  onSubmit={onSubmit}
-                  className="flex items-end gap-2 rounded-2xl border border-neutral-border/80 bg-neutral-bg px-2 py-1.5 focus-within:border-brand-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-brand-500/15"
-                >
-                  <textarea
-                    ref={inputRef}
-                    rows={1}
-                    value={input}
-                    onChange={(e) => onInputChange(e.target.value)}
-                    onKeyDown={onInputKeyDown}
-                    placeholder={config.placeholder}
-                    className="max-h-[120px] min-h-[36px] min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-neutral-text placeholder:text-neutral-muted focus:outline-none"
-                  />
-                  {isLoading ? (
-                    <button
-                      type="button"
-                      onClick={handleStop}
-                      className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-neutral-900 text-white hover:bg-neutral-800"
-                      aria-label="Stop generating"
-                      title="Stop"
-                    >
-                      <Square className="h-3.5 w-3.5 fill-current" />
-                    </button>
-                  ) : (
-                    <button
-                      type="submit"
-                      disabled={!input.trim()}
-                      className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-500 text-white hover:bg-brand-600 disabled:opacity-45"
-                      aria-label="Send"
-                    >
-                      <Send className="h-4 w-4" />
-                    </button>
-                  )}
-                </form>
-                <p className="mt-1.5 text-center text-[10px] text-neutral-muted">
-                  {config.footerNote}
-                </p>
-              </footer>
-            </div>
-          </aside>
+              </form>
+              <p className="mt-1.5 text-center text-[10px] text-neutral-muted">
+                {config.footerNote}
+              </p>
+            </footer>
+          </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

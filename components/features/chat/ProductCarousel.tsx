@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { type ComponentProps, useRef } from "react";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -8,16 +8,20 @@ import type { ChatbotProduct } from "@/lib/chatbot/types";
 
 import { ProductChatCard } from "./ProductChatCard";
 
+type ProductAction = NonNullable<ComponentProps<typeof ProductChatCard>["onAction"]>;
+
 interface ProductCarouselProps {
   products: ChatbotProduct[];
   onAddToCartSuccess?: (productName: string, quantity: number) => void;
   onAddToCartError?: (error: string) => void;
+  onAction?: ProductAction;
 }
 
 export function ProductCarousel({
   products,
   onAddToCartSuccess,
   onAddToCartError,
+  onAction,
 }: ProductCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -62,6 +66,7 @@ export function ProductCarousel({
               product={product}
               onAddToCartSuccess={onAddToCartSuccess}
               onAddToCartError={onAddToCartError}
+              onAction={onAction}
             />
           </div>
         ))}

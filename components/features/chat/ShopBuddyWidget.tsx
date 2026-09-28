@@ -110,6 +110,62 @@ export function ShopBuddyWidget() {
     }, 3000);
   };
 
+  const appendProductActionMessages = useCallback(
+    (action: {
+      type: "add_to_cart" | "add_to_cart_failed" | "view_details" | "view_cart" | "login";
+      product: ChatbotProduct;
+      quantity?: number;
+      result?: string;
+    }) => {
+      const qty = action.quantity ?? 1;
+      const name = action.product.name;
+      const userText =
+        action.type === "add_to_cart" || action.type === "add_to_cart_failed"
+          ? `Add ${qty}× "${name}" to cart`
+          : action.type === "view_details"
+            ? `View details for "${name}"`
+            : action.type === "view_cart"
+              ? "View my cart"
+              : `Log in to continue with "${name}"`;
+
+      const assistantText =
+        action.result ||
+        (action.type === "add_to_cart"
+          ? `Done — added ${qty}× "${name}" to your cart.`
+          : action.type === "add_to_cart_failed"
+            ? `Couldn't add "${name}" to your cart.`
+            : action.type === "view_details"
+              ? `Opening product details for "${name}".`
+              : action.type === "view_cart"
+                ? "Opening your cart."
+                : "Opening sign-in so you can continue.");
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: nextMessageId("user"),
+          sender: "user",
+          text: userText,
+          timestamp: formatChatTimestamp(),
+        },
+        {
+          id: nextMessageId("bot"),
+          sender: "bot",
+          text: assistantText,
+          timestamp: formatChatTimestamp(),
+          type: "small_talk",
+        },
+      ]);
+
+      if (action.type === "add_to_cart") {
+        showToast(`Added ${qty}× "${name}" to your cart!`);
+      } else if (action.type === "add_to_cart_failed") {
+        showToast(`Cart Error: ${action.result || "Failed"}`);
+      }
+    },
+    []
+  );
+
   const handleClearChat = () => {
     setMessages([DEFAULT_WELCOME_MESSAGE]);
     localStorage.removeItem("shopbuddy_chat_history");
@@ -340,10 +396,7 @@ export function ShopBuddyWidget() {
                   <div className="w-full mt-2">
                     <ProductCarousel
                       products={msg.products}
-                      onAddToCartSuccess={(name, qty) =>
-                        showToast(`Added ${qty}x "${name}" to your cart!`)
-                      }
-                      onAddToCartError={(err) => showToast(`Cart Error: ${err}`)}
+                      onAction={appendProductActionMessages}
                     />
                   </div>
                 )}

@@ -1,4 +1,7 @@
+import { Suspense } from "react";
+
 import { OrdersPageClient } from "@/components/features/orders/OrdersPageClient";
+import { OrdersTableSkeleton } from "@/components/ui/skeletons/OrdersTableSkeleton";
 
 export const metadata = {
   title: "My Orders | Bhai ka Store",
@@ -6,5 +9,9 @@ export const metadata = {
 };
 
 export default function OrdersPage() {
-  return <OrdersPageClient />;
+  return (
+    <Suspense fallback={<OrdersTableSkeleton />}>
+      <OrdersPageClient />
+    </Suspense>
+  );
 }

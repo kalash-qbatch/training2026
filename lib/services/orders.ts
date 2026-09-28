@@ -301,7 +301,8 @@ export async function findOrders(
   page = 1,
   pageSize = 5,
   userId?: string,
-  search?: string
+  search?: string,
+  status?: OrderStatus
 ): Promise<{
   orders: Order[];
   total: number;
@@ -312,6 +313,7 @@ export async function findOrders(
   const where = {
     AND: [
       userId ? { userId } : {},
+      status ? { status } : {},
       ref ? { id: { contains: ref, mode: "insensitive" as const } } : {},
     ],
   };

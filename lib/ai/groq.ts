@@ -36,20 +36,13 @@ export function getGroqClient(): Groq {
 }
 
 /**
- * Rewrites a follow-up query into a standalone search query using Groq.
+ * Rewrites a follow-up (or non-English) query into a standalone English product search query.
  */
 export async function rewriteFollowupQuery(
   userQuery: string,
-  history: { role: "user" | "assistant"; content: string }[]
+  history: { role: "user" | "assistant"; content: string }[] = []
 ): Promise<string> {
-  if (!history || history.length === 0) {
-    return userQuery;
-  }
-
-  const recentHistory = sanitizeHistory(history);
-  if (recentHistory.length === 0) {
-    return userQuery;
-  }
+  const recentHistory = sanitizeHistory(history || []);
 
   try {
     const groq = getGroqClient();
@@ -60,12 +53,15 @@ export async function rewriteFollowupQuery(
       messages: [
         {
           role: "system",
-          content: `You are a search query reformulation assistant for an e-commerce store.
-Your job is to rewrite the customer's follow-up question into a single, self-contained product search query based on conversation history.
+          content: `You are a search query reformulation assistant for an e-commerce store catalog.
+Your job is to rewrite the customer's question into a single, self-contained ENGLISH product search query.
 - Do NOT answer the question.
-- Resolve all pronouns ("it", "they", "those", "the cheap one", "the other color") into concrete product terms mentioned in history.
-- Return ONLY the rewritten query text, with no quotes, punctuation, or preamble.
-- If already self-contained or a new topic, return it unchanged.`,
+- Users may write in any language or romanized Urdu/Hindi/Arabic — translate shopping intent into clear English product terms (e.g. "kala watch dikhao" → "black watch").
+- Resolve pronouns from history into concrete product terms.
+- If the message is ONLY a greeting or small talk (any language), return exactly: SMALL_TALK
+- If clearly unrelated to shopping/products/orders, return exactly: OFF_TOPIC
+- Otherwise return ONLY the rewritten English search query text, with no quotes or preamble.
+- If already a clear English product query, return it unchanged.`,
         },
         ...recentHistory.map((m) => ({
           role: m.role as "user" | "assistant",

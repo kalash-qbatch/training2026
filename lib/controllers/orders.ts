@@ -1,3 +1,5 @@
+import type { OrderStatus as PrismaOrderStatus } from "@prisma/client";
+
 import { auth } from "@/auth";
 import { requireUser } from "@/lib/controllers/http";
 import {
@@ -9,6 +11,26 @@ import {
 } from "@/lib/services/orders";
 import type { PlaceOrderItemInput } from "@/types";
 
+const ORDER_STATUS_FILTERS: Record<string, PrismaOrderStatus> = {
+  pending: "PENDING",
+  PENDING: "PENDING",
+  processing: "PROCESSING",
+  PROCESSING: "PROCESSING",
+  shipped: "SHIPPED",
+  SHIPPED: "SHIPPED",
+  delivered: "DELIVERED",
+  DELIVERED: "DELIVERED",
+  cancelled: "CANCELLED",
+  CANCELLED: "CANCELLED",
+  rejected: "REJECTED",
+  REJECTED: "REJECTED",
+};
+
+function parseStatusFilter(raw: string | null): PrismaOrderStatus | undefined {
+  if (!raw?.trim()) return undefined;
+  return ORDER_STATUS_FILTERS[raw.trim()] ?? ORDER_STATUS_FILTERS[raw.trim().toLowerCase()];
+}
+
 export async function listOrders(request: Request) {
   const { userId, error } = await requireUser();
   if (error || !userId) return error!;
@@ -17,7 +39,8 @@ export async function listOrders(request: Request) {
   const page = Number(searchParams.get("page") || 1);
   const pageSize = Number(searchParams.get("pageSize") || 5);
   const search = searchParams.get("search") || "";
-  const result = await findOrders(page, pageSize, userId, search);
+  const status = parseStatusFilter(searchParams.get("status"));
+  const result = await findOrders(page, pageSize, userId, search, status);
   return { status: 200, body: { success: true, ...result } };
 }
 

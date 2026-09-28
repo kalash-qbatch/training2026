@@ -459,8 +459,8 @@ describe("40 End-to-End Chatbot Conversations – Ask Store AI Engine", () => {
     // Must satisfy ChatbotProductSchema
     const result = ChatbotProductSchema.safeParse(mapped);
     expect(result.success).toBe(true);
-    expect(result.data.in_stock).toBe(true);
-    expect(result.data.currency).toBe("USD");
-    expect(result.data.stock).toBe(15);
+    expect(result.data?.in_stock).toBe(true);
+    expect(result.data?.currency).toBe("USD");
+    expect(result.data?.stock).toBe(15);
   });
 });

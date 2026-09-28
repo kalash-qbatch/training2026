@@ -17,12 +17,20 @@ interface ProductChatCardProps {
   product: ChatbotProduct;
   onAddToCartSuccess?: (productName: string, quantity: number) => void;
   onAddToCartError?: (error: string) => void;
+  /** Fired for user actions in the card (add to cart, view details, etc.) */
+  onAction?: (action: {
+    type: "add_to_cart" | "add_to_cart_failed" | "view_details" | "view_cart" | "login";
+    product: ChatbotProduct;
+    quantity?: number;
+    result?: string;
+  }) => void;
 }
 
 export function ProductChatCard({
   product,
   onAddToCartSuccess,
   onAddToCartError,
+  onAction,
 }: ProductChatCardProps) {
   const [quantity, setQuantity] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
@@ -89,6 +97,13 @@ export function ProductChatCard({
       }
 
       setJustAdded(true);
+      const successMsg = `Added ${quantity}× "${product.name}" to your cart.`;
+      onAction?.({
+        type: "add_to_cart",
+        product,
+        quantity,
+        result: successMsg,
+      });
       if (onAddToCartSuccess) {
         onAddToCartSuccess(product.name, quantity);
       }
@@ -99,6 +114,12 @@ export function ProductChatCard({
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to add to cart. Please try again.";
       setErrorMessage(msg);
+      onAction?.({
+        type: "add_to_cart_failed",
+        product,
+        quantity,
+        result: msg,
+      });
       if (onAddToCartError) {
         onAddToCartError(msg);
       }
@@ -190,7 +211,11 @@ export function ProductChatCard({
               <Link
                 href={`/login?redirect=/products/${product.id}`}
                 onClick={() => {
-                  // Mark the chat drawer as "was open" so it auto-restores after login
+                  onAction?.({
+                    type: "login",
+                    product,
+                    result: "Opening sign-in so you can add this item to your cart.",
+                  });
                   try {
                     sessionStorage.setItem(GUEST_OPEN_KEY, "1");
                   } catch {}
@@ -202,6 +227,13 @@ export function ProductChatCard({
               </Link>
               <Link
                 href={`/products/${product.id}`}
+                onClick={() =>
+                  onAction?.({
+                    type: "view_details",
+                    product,
+                    result: `Opening product details for "${product.name}".`,
+                  })
+                }
                 className="text-[10px] text-gray-500 hover:text-blue-600 transition-colors"
               >
                 View full details
@@ -280,6 +312,14 @@ export function ProductChatCard({
               {justAdded ? (
                 <Link
                   href="/cart"
+                  onClick={() =>
+                    onAction?.({
+                      type: "view_cart",
+                      product,
+                      quantity,
+                      result: "Opening your cart.",
+                    })
+                  }
                   className="text-center text-[11px] font-semibold text-emerald-700 hover:underline pt-0.5"
                 >
                   View Cart &rarr;
@@ -287,6 +327,13 @@ export function ProductChatCard({
               ) : (
                 <Link
                   href={`/products/${product.id}`}
+                  onClick={() =>
+                    onAction?.({
+                      type: "view_details",
+                      product,
+                      result: `Opening product details for "${product.name}".`,
+                    })
+                  }
                   className="text-center text-[11px] text-gray-500 hover:text-blue-600 transition-colors"
                 >
                   View full details
