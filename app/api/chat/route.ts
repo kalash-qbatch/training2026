@@ -192,9 +192,46 @@ export async function POST(request: Request) {
       });
     }
 
-    const standaloneQuery = await rewriteFollowupQuery(message, cappedHistory);
-    const queryEmbedding = await createEmbedding(standaloneQuery);
-    const retrievedProducts = await searchSimilarProducts(queryEmbedding, 5, 0.25, standaloneQuery);
+    const safeHistory = cappedHistory.filter(
+      (m) => typeof m.content === "string" && m.content.trim().length > 0
+    );
+
+    let standaloneQuery = message;
+    try {
+      standaloneQuery = await rewriteFollowupQuery(message, safeHistory);
+    } catch (rewriteError) {
+      console.warn("Query rewrite failed, using original message:", rewriteError);
+    }
+
+    let queryEmbedding: number[];
+    try {
+      queryEmbedding = await createEmbedding(standaloneQuery);
+    } catch (embedError) {
+      console.error("Embedding generation failed:", embedError);
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Product search is temporarily unavailable (embedding failed). Please try again in a moment.",
+        },
+        { status: 500 }
+      );
+    }
+
+    let retrievedProducts: RetrievedProduct[] = [];
+    try {
+      retrievedProducts = await searchSimilarProducts(queryEmbedding, 5, 0.25, standaloneQuery);
+    } catch (searchError) {
+      console.error("Product vector search failed:", searchError);
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Could not search the product catalog right now. Please try again in a moment.",
+        },
+        { status: 500 }
+      );
+    }
+
     const contextText = buildRagPromptContext(retrievedProducts);
 
     const systemInstruction = `${SYSTEM_RAG_PROMPT}
@@ -203,7 +240,20 @@ export async function POST(request: Request) {
 ${contextText}
 =================================`;
 
-    const completionStream = await streamChatWithGroq(systemInstruction, cappedHistory, message);
+    let completionStream;
+    try {
+      completionStream = await streamChatWithGroq(systemInstruction, safeHistory, message);
+    } catch (llmError) {
+      console.error("Groq stream init failed:", llmError);
+      const detail = llmError instanceof Error ? llmError.message : "LLM unavailable";
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Store assistant could not generate a reply (${detail}). Please try again.`,
+        },
+        { status: 500 }
+      );
+    }
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({

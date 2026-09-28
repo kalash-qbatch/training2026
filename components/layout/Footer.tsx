@@ -1,7 +1,9 @@
+const COPYRIGHT_YEAR = new Date().getFullYear();
+
 export function Footer() {
   return (
     <footer className="border-t border-neutral-border py-6 text-center text-xs text-neutral-muted">
-      © {new Date().getFullYear()} E-commerce
+      © {COPYRIGHT_YEAR} E-commerce
     </footer>
   );
 }

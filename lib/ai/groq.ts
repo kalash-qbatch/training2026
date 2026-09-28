@@ -3,8 +3,15 @@ import "dotenv/config";
 import Groq from "groq-sdk";
 
 export const GROQ_CHAT_MODEL = "openai/gpt-oss-120b";
+export const GROQ_CHAT_FALLBACK_MODEL = "llama-3.3-70b-versatile";
 
 let groqClientInstance: Groq | null = null;
+
+function sanitizeHistory(history: { role: "user" | "assistant"; content: string }[]) {
+  return history
+    .filter((m) => typeof m.content === "string" && m.content.trim().length > 0)
+    .slice(-6);
+}
 
 export function getGroqClient(): Groq {
   const apiKey = process.env.GROQ_API_KEY;
@@ -39,9 +46,13 @@ export async function rewriteFollowupQuery(
     return userQuery;
   }
 
+  const recentHistory = sanitizeHistory(history);
+  if (recentHistory.length === 0) {
+    return userQuery;
+  }
+
   try {
     const groq = getGroqClient();
-    const recentHistory = history.slice(-6);
 
     const completion = await groq.chat.completions.create({
       model: "openai/gpt-oss-20b",
@@ -84,7 +95,7 @@ export async function streamChatWithGroq(
   userMessage: string
 ) {
   const groq = getGroqClient();
-  const cappedHistory = history.slice(-6);
+  const cappedHistory = sanitizeHistory(history);
 
   const messages = [
     { role: "system" as const, content: systemInstruction },
@@ -95,10 +106,23 @@ export async function streamChatWithGroq(
     { role: "user" as const, content: userMessage },
   ];
 
-  return await groq.chat.completions.create({
-    model: GROQ_CHAT_MODEL,
-    temperature: 0.1,
-    stream: true,
-    messages,
-  });
+  try {
+    return await groq.chat.completions.create({
+      model: GROQ_CHAT_MODEL,
+      temperature: 0.1,
+      stream: true,
+      messages,
+    });
+  } catch (primaryError) {
+    console.warn(
+      `[Groq] Primary model ${GROQ_CHAT_MODEL} failed, trying fallback:`,
+      primaryError instanceof Error ? primaryError.message : primaryError
+    );
+    return await groq.chat.completions.create({
+      model: GROQ_CHAT_FALLBACK_MODEL,
+      temperature: 0.1,
+      stream: true,
+      messages,
+    });
+  }
 }

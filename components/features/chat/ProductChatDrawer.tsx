@@ -14,7 +14,6 @@ import {
   ArrowDown,
   Bot,
   ChevronDown,
-  ExternalLink,
   History,
   Loader2,
   LogIn,
@@ -28,15 +27,47 @@ import {
   User,
   X,
 } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 
+import type { ChatbotProduct } from "@/lib/chatbot/types";
 import type { RetrievedProduct } from "@/lib/services/rag";
 import { cn } from "@/lib/utils";
 
 import { ChatMarkdown } from "./ChatMarkdown";
+import { ProductCarousel } from "./ProductCarousel";
+
+/** Map a RAG RetrievedProduct to the ChatbotProduct shape expected by ProductChatCard */
+function mapToChatbotProduct(p: RetrievedProduct): ChatbotProduct {
+  const matchingSpec =
+    p.specifications.find(
+      (s) =>
+        (!p.color || s.color.toLowerCase() === p.color.toLowerCase()) &&
+        (!p.size || !s.size || s.size.toLowerCase() === p.size.toLowerCase())
+    ) || p.specifications[0];
+
+  return {
+    id: p.id,
+    name: p.title,
+    price: p.price,
+    currency: "USD",
+    image: p.image ?? "",
+    rating: 4.5,
+    in_stock: p.stock > 0,
+    short_description: [
+      p.color ? `Color: ${p.color}` : "",
+      p.size ? `Size: ${p.size}` : "",
+      p.categoryName ? p.categoryName : "",
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    category: p.categoryName ?? undefined,
+    stock: p.stock,
+    specificationId: matchingSpec?.id,
+    actions: [],
+  };
+}
 
 interface ChatMessage {
   id: string;
@@ -131,6 +162,10 @@ function getAssistantConfig(variant: AssistantVariant): AssistantConfig {
 const MD_QUERY = "(min-width: 768px)";
 export const STORE_AI_OPEN_EVENT = "store-ai:open";
 
+/** sessionStorage keys used to preserve guest chat across the login redirect */
+const GUEST_CHAT_KEY = "store_ai_guest_messages";
+const GUEST_OPEN_KEY = "store_ai_guest_open";
+
 export function openStoreAi(detail: StoreAiOpenDetail = {}) {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(STORE_AI_OPEN_EVENT, { detail }));
@@ -138,15 +173,12 @@ export function openStoreAi(detail: StoreAiOpenDetail = {}) {
 
 function formatRelativeTime(iso: string) {
   const date = new Date(iso);
-  const diffMs = Date.now() - date.getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "Just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return date.toLocaleDateString();
+  return date.toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function useIsDesktop() {
@@ -184,6 +216,14 @@ export function ProductChatDrawer({ variant = "store" }: { variant?: AssistantVa
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [isDeletingSession, setIsDeletingSession] = useState(false);
   const [productHint, setProductHint] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 3000);
+  }, []);
 
   if (historyDesktopBreakpoint !== isDesktop) {
     setHistoryDesktopBreakpoint(isDesktop);
@@ -196,6 +236,8 @@ export function ProductChatDrawer({ variant = "store" }: { variant?: AssistantVa
   const abortRef = useRef<AbortController | null>(null);
   const stickToBottomRef = useRef(true);
   const messageIdRef = useRef(0);
+  /** Tracks the previous authStatus to detect the exact unauthenticated→authenticated transition */
+  const prevAuthStatusRef = useRef(authStatus);
 
   const fetchSessions = useCallback(async () => {
     if (!isLoggedIn) {
@@ -232,6 +274,70 @@ export function ProductChatDrawer({ variant = "store" }: { variant?: AssistantVa
       setTimeout(() => setActiveSessionId(null), 0);
     }
   }, [isLoggedIn]);
+
+  // ── Guest chat persistence ──────────────────────────────────────────────
+  // Continuously save guest messages so they survive a page navigation to /login
+  useEffect(() => {
+    if (isAdmin || isLoggedIn || authStatus === "loading") return;
+    if (messages.length === 0) return;
+    try {
+      sessionStorage.setItem(GUEST_CHAT_KEY, JSON.stringify(messages));
+    } catch {
+      // Storage unavailable (private browsing quota, etc.) — ignore silently
+    }
+  }, [messages, isLoggedIn, isAdmin, authStatus]);
+
+  // Save whether the drawer was open when the guest left
+  useEffect(() => {
+    if (isAdmin || isLoggedIn || authStatus === "loading") return;
+    try {
+      sessionStorage.setItem(GUEST_OPEN_KEY, isOpen ? "1" : "0");
+    } catch {}
+  }, [isOpen, isLoggedIn, isAdmin, authStatus]);
+
+  // ── Post-login restore ──────────────────────────────────────────────────
+  // When authStatus transitions unauthenticated → authenticated, restore guest chat
+  useEffect(() => {
+    const prev = prevAuthStatusRef.current;
+    prevAuthStatusRef.current = authStatus;
+
+    if (isAdmin) return; // admin drawer doesn't need guest restore
+    if (prev === "authenticated" || authStatus !== "authenticated") return;
+
+    // The user just logged in — check for a saved guest chat
+    try {
+      const raw = sessionStorage.getItem(GUEST_CHAT_KEY);
+      const wasOpen = sessionStorage.getItem(GUEST_OPEN_KEY);
+
+      sessionStorage.removeItem(GUEST_CHAT_KEY);
+      sessionStorage.removeItem(GUEST_OPEN_KEY);
+
+      if (raw) {
+        const parsed = JSON.parse(raw) as ChatMessage[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Avoid setting state synchronously in useEffect body
+          setTimeout(() => setMessages(parsed), 0);
+          stickToBottomRef.current = true;
+          // Avoid setting state synchronously in useEffect body
+          setTimeout(() => setIsOpen(true), 0); // auto-open with restored history
+          setTimeout(() => {
+            showToast("✓ Welcome back! Your conversation has been restored.");
+          }, 400);
+          return;
+        }
+      }
+
+      // No saved messages but the drawer was open — just reopen it
+      if (wasOpen === "1") {
+        // Avoid setting state synchronously in useEffect body
+        setTimeout(() => setIsOpen(true), 0);
+      }
+    } catch {
+      // sessionStorage unavailable or JSON parse error — open empty
+      // Avoid setting state synchronously in useEffect body
+      setTimeout(() => setIsOpen(true), 0);
+    }
+  }, [authStatus, isAdmin, showToast]);
 
   const closeDrawer = useCallback(() => {
     abortRef.current?.abort();
@@ -439,8 +545,15 @@ export function ProductChatDrawer({ variant = "store" }: { variant?: AssistantVa
       });
 
       if (!res.ok) {
-        const errorJson = await res.json().catch(() => ({}));
-        throw new Error(errorJson.error || `Server responded with status ${res.status}`);
+        const raw = await res.text().catch(() => "");
+        let errorMessage = `Server responded with status ${res.status}`;
+        try {
+          const errorJson = JSON.parse(raw) as { error?: string };
+          if (errorJson.error) errorMessage = errorJson.error;
+        } catch {
+          if (raw.trim()) errorMessage = raw.slice(0, 240);
+        }
+        throw new Error(errorMessage);
       }
       if (!res.body) throw new Error("No response body received from server");
 
@@ -723,6 +836,17 @@ export function ProductChatDrawer({ variant = "store" }: { variant?: AssistantVa
 
   return (
     <>
+      {/* Toast notification for cart actions */}
+      {toast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-28 right-6 z-[60] flex items-center gap-2.5 rounded-xl border border-gray-700 bg-gray-900 px-4 py-2.5 text-xs text-white shadow-xl sm:text-sm"
+        >
+          <span className="h-2 w-2 animate-ping rounded-full bg-emerald-400" />
+          <span>{toast}</span>
+        </div>
+      )}
       <button
         type="button"
         id="open-product-chat"
@@ -958,77 +1082,18 @@ export function ProductChatDrawer({ variant = "store" }: { variant?: AssistantVa
                             config.showProductMatches &&
                             msg.products &&
                             msg.products.length > 0 && (
-                              <div className="w-full max-w-[min(100%,28rem)] space-y-1.5 pl-8">
-                                <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-muted">
+                              <div className="w-full mt-1.5 pl-8">
+                                <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-muted mb-1.5">
                                   <Tag className="h-3 w-3" />
                                   Matches ({msg.products.length})
                                 </p>
-                                <div className="space-y-1.5">
-                                  {msg.products.map((prod) => (
-                                    <div
-                                      key={prod.id}
-                                      className="flex items-center gap-2.5 rounded-xl border border-neutral-border/60 bg-white p-2"
-                                    >
-                                      {prod.image ? (
-                                        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-neutral-bg">
-                                          <Image
-                                            src={prod.image}
-                                            alt={prod.title}
-                                            fill
-                                            sizes="40px"
-                                            className="object-cover"
-                                          />
-                                        </div>
-                                      ) : (
-                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-neutral-bg text-neutral-muted">
-                                          <Tag className="h-3.5 w-3.5" />
-                                        </div>
-                                      )}
-                                      <div className="min-w-0 flex-1">
-                                        <p className="truncate text-xs font-semibold text-neutral-900">
-                                          {prod.title}
-                                        </p>
-                                        <p className="mt-0.5 text-[11px] text-neutral-muted">
-                                          <span className="font-semibold text-brand-600">
-                                            ${prod.price.toFixed(2)}
-                                          </span>
-                                          {prod.color ? (
-                                            <>
-                                              {" · "}
-                                              <span>{prod.color}</span>
-                                            </>
-                                          ) : null}
-                                          {prod.size ? (
-                                            <>
-                                              {" · "}
-                                              <span>{prod.size}</span>
-                                            </>
-                                          ) : null}
-                                          {" · "}
-                                          <span
-                                            className={
-                                              prod.stock > 0 ? "text-emerald-600" : "text-rose-500"
-                                            }
-                                          >
-                                            {prod.stock > 0
-                                              ? `${prod.stock} in stock`
-                                              : "Out of stock"}
-                                          </span>
-                                        </p>
-                                      </div>
-                                      <Link
-                                        href={`/products/${prod.id}`}
-                                        className="shrink-0 rounded-lg bg-brand-50 px-2 py-1 text-[10px] font-semibold text-brand-600 hover:bg-brand-500 hover:text-white"
-                                        onClick={closeDrawer}
-                                      >
-                                        <span className="inline-flex items-center gap-0.5">
-                                          View
-                                          <ExternalLink className="h-2.5 w-2.5" />
-                                        </span>
-                                      </Link>
-                                    </div>
-                                  ))}
-                                </div>
+                                <ProductCarousel
+                                  products={msg.products.map(mapToChatbotProduct)}
+                                  onAddToCartSuccess={(name, qty) =>
+                                    showToast(`✓ Added ${qty}× "${name}" to your cart!`)
+                                  }
+                                  onAddToCartError={(err) => showToast(`Cart error: ${err}`)}
+                                />
                               </div>
                             )}
                         </div>

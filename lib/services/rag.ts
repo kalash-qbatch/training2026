@@ -15,6 +15,7 @@ export interface RetrievedProduct {
   categoryName: string | null;
   similarity: number;
   specifications: {
+    id: string;
     color: string;
     size: string;
     qty: number;
@@ -656,7 +657,7 @@ async function findProductsByTextTerms(terms: string[]): Promise<RetrievedProduc
       isActive: true,
       category: { select: { name: true } },
       specifications: {
-        select: { color: true, size: true, qty: true, sku: true },
+        select: { id: true, color: true, size: true, qty: true, sku: true },
       },
       images: {
         select: { url: true, color: true },
@@ -790,6 +791,7 @@ export async function searchSimilarProducts(
       ? await prisma.specification.findMany({
           where: { productId: { in: productIds } },
           select: {
+            id: true,
             productId: true,
             color: true,
             size: true,
