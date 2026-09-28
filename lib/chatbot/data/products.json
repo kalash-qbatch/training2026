@@ -1,0 +1,541 @@
+[
+  {
+    "id": "prod-001",
+    "name": "Classic Cotton Crewneck Tee",
+    "category": "Apparel",
+    "brand": "UrbanBasics",
+    "price": 28.0,
+    "currency": "USD",
+    "stock": 45,
+    "rating": 4.8,
+    "description": "Premium 100% combed ring-spun cotton tee engineered for daily breathable comfort.",
+    "image": "/products/tee.jpg",
+    "variants": [
+      { "color": "White", "size": "M", "sku": "UB-TEE-WHT-M", "stock": 25 },
+      { "color": "Black", "size": "L", "sku": "UB-TEE-BLK-L", "stock": 20 }
+    ],
+    "features": ["100% Combed Cotton", "Pre-shrunk", "Reinforced Collar"]
+  },
+  {
+    "id": "prod-002",
+    "name": "Vintage Denim Trucker Jacket",
+    "category": "Apparel",
+    "brand": "HeritageDenim",
+    "price": 89.0,
+    "currency": "USD",
+    "stock": 18,
+    "rating": 4.7,
+    "description": "Slim-fit vintage washed denim jacket with antique brass buttons and welt pockets.",
+    "image": "/products/jacket.jpg",
+    "variants": [
+      { "color": "Indigo Blue", "size": "M", "sku": "HD-JAC-BLU-M", "stock": 8 },
+      { "color": "Indigo Blue", "size": "L", "sku": "HD-JAC-BLU-L", "stock": 10 }
+    ],
+    "features": ["12.5 oz Denim", "Brass Button Closure", "Double Stitching"]
+  },
+  {
+    "id": "prod-003",
+    "name": "Artisan Leather Crossbody Bag",
+    "category": "Bags",
+    "brand": "TerraCraft",
+    "price": 120.0,
+    "currency": "USD",
+    "stock": 12,
+    "rating": 4.9,
+    "description": "Full-grain vegetable-tanned leather crossbody with adjustable strap and brass zip.",
+    "image": "/products/bag.jpg",
+    "variants": [
+      { "color": "Cognac Brown", "size": "One Size", "sku": "TC-BAG-BRN-OS", "stock": 7 },
+      { "color": "Obsidian Black", "size": "One Size", "sku": "TC-BAG-BLK-OS", "stock": 5 }
+    ],
+    "features": ["Full-Grain Leather", "Solid Brass Hardware", "YKK Zippers"]
+  },
+  {
+    "id": "prod-004",
+    "name": "AeroStride Pro Running Sneakers",
+    "category": "Footwear",
+    "brand": "AeroSport",
+    "price": 95.0,
+    "currency": "USD",
+    "stock": 32,
+    "rating": 4.6,
+    "description": "Ultra-lightweight mesh running shoes with responsive foam cushioning and high-grip tread.",
+    "image": "/products/sneakers.jpg",
+    "variants": [
+      { "color": "Fire Red", "size": "9", "sku": "AS-SNK-RED-9", "stock": 12 },
+      { "color": "Fire Red", "size": "10", "sku": "AS-SNK-RED-10", "stock": 14 },
+      { "color": "Stealth Black", "size": "10", "sku": "AS-SNK-BLK-10", "stock": 6 }
+    ],
+    "features": ["Engineered Mesh Upper", "Responsive Foam", "Reflective Accents"]
+  },
+  {
+    "id": "prod-005",
+    "name": "Merino Wool Ribbed Beanie",
+    "category": "Accessories",
+    "brand": "NordicWarmth",
+    "price": 24.0,
+    "currency": "USD",
+    "stock": 60,
+    "rating": 4.8,
+    "description": "100% fine Merino wool knit beanie providing temperature regulation without itchiness.",
+    "image": "/products/beanie.jpg",
+    "variants": [
+      { "color": "Heather Gray", "size": "One Size", "sku": "NW-BN-GRY-OS", "stock": 35 },
+      { "color": "Charcoal", "size": "One Size", "sku": "NW-BN-CHR-OS", "stock": 25 }
+    ],
+    "features": ["100% Merino Wool", "Fold-over Cuff", "Itch-free"]
+  },
+  {
+    "id": "prod-006",
+    "name": "Aviator Polarized Sunglasses UV400",
+    "category": "Accessories",
+    "brand": "Solaris",
+    "price": 55.0,
+    "currency": "USD",
+    "stock": 40,
+    "rating": 4.7,
+    "description": "Timeless metal aviators featuring TAC polarized lenses with 100% UV400 radiation protection.",
+    "image": "/products/sunglasses.jpg",
+    "variants": [
+      { "color": "Gold/Green", "size": "Standard", "sku": "SOL-AV-GLD-STD", "stock": 20 },
+      { "color": "Black/Smoke", "size": "Standard", "sku": "SOL-AV-BLK-STD", "stock": 20 }
+    ],
+    "features": ["TAC Polarized Lenses", "UV400 Glare Protection", "Stainless Steel Frame"]
+  },
+  {
+    "id": "prod-007",
+    "name": "Heavyweight Canvas Everyday Tote",
+    "category": "Bags",
+    "brand": "TerraCraft",
+    "price": 35.0,
+    "currency": "USD",
+    "stock": 50,
+    "rating": 4.5,
+    "description": "16 oz organic cotton canvas tote bag with reinforced handles and interior zip pocket.",
+    "image": "/products/tote.jpg",
+    "variants": [
+      { "color": "Natural Ecru", "size": "One Size", "sku": "TC-TOT-NAT-OS", "stock": 30 },
+      { "color": "Olive Green", "size": "One Size", "sku": "TC-TOT-OLV-OS", "stock": 20 }
+    ],
+    "features": ["16oz Cotton Canvas", "Interior Pocket", "Holds 15-inch Laptop"]
+  },
+  {
+    "id": "prod-008",
+    "name": "Minimalist Sapphire Stainless Watch",
+    "category": "Watches",
+    "brand": "ChronoCraft",
+    "price": 150.0,
+    "currency": "USD",
+    "stock": 15,
+    "rating": 4.9,
+    "description": "Sleek 40mm quartz timepiece with scratch-resistant sapphire crystal and mesh steel band.",
+    "image": "/products/watch.jpg",
+    "variants": [
+      { "color": "Silver/White", "size": "40mm", "sku": "CC-WAT-SLV-40", "stock": 10 },
+      { "color": "Matte Black", "size": "40mm", "sku": "CC-WAT-BLK-40", "stock": 5 }
+    ],
+    "features": ["Sapphire Crystal Glass", "5 ATM Water Resistance", "Japanese Quartz"]
+  },
+  {
+    "id": "prod-009",
+    "name": "EchoPulse Noise-Cancelling Headphones",
+    "category": "Electronics",
+    "brand": "SoundForge",
+    "price": 199.99,
+    "currency": "USD",
+    "stock": 25,
+    "rating": 4.9,
+    "description": "Active noise-cancelling wireless headphones with 40mm drivers and 40-hour battery life.",
+    "image": "/products/headphones.jpg",
+    "variants": [
+      { "color": "Midnight Black", "size": "Over-Ear", "sku": "SF-HP-BLK", "stock": 15 },
+      { "color": "Silver Cloud", "size": "Over-Ear", "sku": "SF-HP-SLV", "stock": 10 }
+    ],
+    "features": ["Active Hybrid ANC", "40hr Battery", "Fast USB-C Charging"]
+  },
+  {
+    "id": "prod-010",
+    "name": "SoundMini Rugged Bluetooth Speaker",
+    "category": "Electronics",
+    "brand": "SoundForge",
+    "price": 49.99,
+    "currency": "USD",
+    "stock": 70,
+    "rating": 4.6,
+    "description": "IPX7 waterproof portable Bluetooth 5.3 speaker with rich 360-degree sound and 12h playtime.",
+    "image": "/products/speaker.jpg",
+    "variants": [
+      { "color": "Teal Blue", "size": "Compact", "sku": "SF-SPK-BLU", "stock": 40 },
+      { "color": "Stealth Black", "size": "Compact", "sku": "SF-SPK-BLK", "stock": 30 }
+    ],
+    "features": ["IPX7 Waterproof", "12hr Playback", "Bluetooth 5.3"]
+  },
+  {
+    "id": "prod-011",
+    "name": "Apex Smart Fitness Watch Series 4",
+    "category": "Watches",
+    "brand": "ApexTech",
+    "price": 129.99,
+    "currency": "USD",
+    "stock": 30,
+    "rating": 4.7,
+    "description": "AMOLED touch display smart watch featuring continuous heart rate, SpO2, sleep tracking, and GPS.",
+    "image": "/products/smartwatch.jpg",
+    "variants": [
+      { "color": "Space Gray", "size": "44mm", "sku": "AT-SW-GRY-44", "stock": 18 },
+      { "color": "Rose Gold", "size": "40mm", "sku": "AT-SW-RGD-40", "stock": 12 }
+    ],
+    "features": ["AMOLED Display", "SpO2 & Heart Rate", "Built-in GPS"]
+  },
+  {
+    "id": "prod-012",
+    "name": "MagPower 10,000mAh Magnetic Power Bank",
+    "category": "Electronics",
+    "brand": "VoltLab",
+    "price": 39.99,
+    "currency": "USD",
+    "stock": 55,
+    "rating": 4.8,
+    "description": "Snap-on magnetic wireless portable charger with 20W PD USB-C fast charging capability.",
+    "image": "/products/powerbank.jpg",
+    "variants": [
+      { "color": "Alpine White", "size": "10000mAh", "sku": "VL-PB-WHT", "stock": 30 },
+      { "color": "Graphite", "size": "10000mAh", "sku": "VL-PB-GRP", "stock": 25 }
+    ],
+    "features": ["15W MagSafe Compatible", "20W PD Output", "Pass-Through Charging"]
+  },
+  {
+    "id": "prod-013",
+    "name": "BaristaPro Double-Walled Travel Tumbler",
+    "category": "Accessories",
+    "brand": "HydroCraft",
+    "price": 26.5,
+    "currency": "USD",
+    "stock": 85,
+    "rating": 4.8,
+    "description": "16 oz vacuum-insulated stainless steel tumbler keeping drinks hot for 8 hours or icy for 24 hours.",
+    "image": "/products/tumbler.jpg",
+    "variants": [
+      { "color": "Matte Sage", "size": "16oz", "sku": "HC-TMB-SAG-16", "stock": 50 },
+      { "color": "Brushed Steel", "size": "16oz", "sku": "HC-TMB-STL-16", "stock": 35 }
+    ],
+    "features": ["Double-wall Vacuum", "Leak-proof Lid", "BPA-Free 18/8 Steel"]
+  },
+  {
+    "id": "prod-014",
+    "name": "Horizon Anti-Theft Commuter Backpack",
+    "category": "Bags",
+    "brand": "TerraCraft",
+    "price": 79.99,
+    "currency": "USD",
+    "stock": 22,
+    "rating": 4.8,
+    "description": "Water-resistant commuter backpack with hidden rear zippers, luggage pass-through, and 16\" laptop sleeve.",
+    "image": "/products/backpack.jpg",
+    "variants": [
+      { "color": "Slate Gray", "size": "20L", "sku": "TC-BP-GRY-20", "stock": 12 },
+      { "color": "Navy Blue", "size": "20L", "sku": "TC-BP-NVY-20", "stock": 10 }
+    ],
+    "features": ["Hidden Anti-Theft Pockets", "Padded Laptop Compartment", "Luggage Strap"]
+  },
+  {
+    "id": "prod-015",
+    "name": "CloudWarm French Terry Pullover Hoodie",
+    "category": "Apparel",
+    "brand": "UrbanBasics",
+    "price": 64.0,
+    "currency": "USD",
+    "stock": 38,
+    "rating": 4.7,
+    "description": "Heavyweight 400 GSM French terry hoodie with double-lined hood and rib knit trim.",
+    "image": "/products/hoodie.jpg",
+    "variants": [
+      { "color": "Washed Olive", "size": "M", "sku": "UB-HD-OLV-M", "stock": 20 },
+      { "color": "Heather Grey", "size": "L", "sku": "UB-HD-GRY-L", "stock": 18 }
+    ],
+    "features": ["400 GSM Heavyweight Terry", "Double Layer Hood", "Kangaroo Pocket"]
+  },
+  {
+    "id": "prod-016",
+    "name": "ChronoRacer Automatic Mechanical Watch",
+    "category": "Watches",
+    "brand": "ChronoCraft",
+    "price": 280.0,
+    "currency": "USD",
+    "stock": 8,
+    "rating": 4.9,
+    "description": "Exquisite automatic mechanical timepiece featuring an exhibition case back and calfskin leather strap.",
+    "image": "/products/mechanical-watch.jpg",
+    "variants": [
+      { "color": "Cognac/Silver", "size": "42mm", "sku": "CC-AUTO-CGN", "stock": 5 },
+      { "color": "Black/Rose Gold", "size": "42mm", "sku": "CC-AUTO-RGD", "stock": 3 }
+    ],
+    "features": ["Self-Winding Mechanical", "Exhibition Caseback", "Italian Leather"]
+  },
+  {
+    "id": "prod-017",
+    "name": "Velocity Carbon Trail Running Shoes",
+    "category": "Footwear",
+    "brand": "AeroSport",
+    "price": 145.0,
+    "currency": "USD",
+    "stock": 0,
+    "rating": 4.7,
+    "description": "High-performance carbon plate trail running shoes for rugged terrain. Currently sold out due to high demand.",
+    "image": "/products/trail-shoes.jpg",
+    "variants": [{ "color": "Neon Lime", "size": "10", "sku": "AS-TRL-LME-10", "stock": 0 }],
+    "features": ["Carbon Fiber Propulsion Plate", "Vibram MegaGrip Outsole", "Gore-Tex Membrane"]
+  },
+  {
+    "id": "prod-018",
+    "name": "PureFit Seamless High-Rise Leggings",
+    "category": "Apparel",
+    "brand": "UrbanBasics",
+    "price": 42.0,
+    "currency": "USD",
+    "stock": 48,
+    "rating": 4.8,
+    "description": "Buttery soft 4-way stretch active leggings with supportive high waistband and no front seam.",
+    "image": "/products/leggings.jpg",
+    "variants": [
+      { "color": "Dusty Rose", "size": "S", "sku": "UB-LEG-ROS-S", "stock": 24 },
+      { "color": "Black", "size": "M", "sku": "UB-LEG-BLK-M", "stock": 24 }
+    ],
+    "features": ["Squat-proof 4-way Stretch", "Moisture Wicking", "Drop-in Phone Pocket"]
+  },
+  {
+    "id": "prod-019",
+    "name": "TrueWireless ANC Earbuds Pro",
+    "category": "Electronics",
+    "brand": "SoundForge",
+    "price": 89.99,
+    "currency": "USD",
+    "stock": 42,
+    "rating": 4.6,
+    "description": "In-ear wireless buds with active cancellation, transparency mode, wireless charging case, and IPX5 resistance.",
+    "image": "/products/earbuds.jpg",
+    "variants": [
+      { "color": "Pearl White", "size": "Universal", "sku": "SF-EB-WHT", "stock": 22 },
+      { "color": "Space Gray", "size": "Universal", "sku": "SF-EB-GRY", "stock": 20 }
+    ],
+    "features": ["Hybrid ANC", "Qi Wireless Charging", "32hr Total Battery"]
+  },
+  {
+    "id": "prod-020",
+    "name": "LuxeSilk Mulberry Sleep Mask",
+    "category": "Accessories",
+    "brand": "NordicWarmth",
+    "price": 19.99,
+    "currency": "USD",
+    "stock": 90,
+    "rating": 4.9,
+    "description": "Grade 6A 22-momme pure mulberry silk eye mask preventing skin friction for deeper sleep.",
+    "image": "/products/silk-mask.jpg",
+    "variants": [
+      { "color": "Champagne", "size": "One Size", "sku": "NW-SLK-CMP", "stock": 50 },
+      { "color": "Navy", "size": "One Size", "sku": "NW-SLK-NVY", "stock": 40 }
+    ],
+    "features": ["100% Grade 6A Mulberry Silk", "Adjustable Elastic Band", "Total Light Blackout"]
+  },
+  {
+    "id": "prod-021",
+    "name": "LumiDesk Smart LED Lamp with Wireless Charger",
+    "category": "Electronics",
+    "brand": "VoltLab",
+    "price": 54.0,
+    "currency": "USD",
+    "stock": 26,
+    "rating": 4.7,
+    "description": "Dimmable eye-care architect desk lamp with 5 color temperatures, auto timer, and fast wireless phone pad.",
+    "image": "/products/desk-lamp.jpg",
+    "variants": [
+      { "color": "Silver Aluminum", "size": "Standard", "sku": "VL-LMP-SLV", "stock": 16 },
+      { "color": "Matte Black", "size": "Standard", "sku": "VL-LMP-BLK", "stock": 10 }
+    ],
+    "features": ["5 Color Temperatures", "Touch Slider Dimming", "10W Wireless Charging Base"]
+  },
+  {
+    "id": "prod-022",
+    "name": "RetroClub Round Acetate Sunglasses",
+    "category": "Accessories",
+    "brand": "Solaris",
+    "price": 48.0,
+    "currency": "USD",
+    "stock": 35,
+    "rating": 4.6,
+    "description": "Handcrafted Italian acetate frames with amber polarized lenses and 5-barrel metal hinges.",
+    "image": "/products/round-sunglasses.jpg",
+    "variants": [
+      { "color": "Tortoise Shell", "size": "Medium", "sku": "SOL-RND-TOR", "stock": 20 },
+      { "color": "Smoky Olive", "size": "Medium", "sku": "SOL-RND-OLV", "stock": 15 }
+    ],
+    "features": ["Cellulose Acetate", "5-Barrel Hinges", "Polarized UV400"]
+  },
+  {
+    "id": "prod-023",
+    "name": "CityWalk Slip-On Canvas Loafers",
+    "category": "Footwear",
+    "brand": "AeroSport",
+    "price": 58.0,
+    "currency": "USD",
+    "stock": 28,
+    "rating": 4.5,
+    "description": "Cushioned memory foam slip-on shoes with vulcanized non-slip rubber soles for effortless walking.",
+    "image": "/products/loafers.jpg",
+    "variants": [
+      { "color": "Navy Blue", "size": "9", "sku": "AS-SLP-NVY-9", "stock": 14 },
+      { "color": "Sand Khaki", "size": "10", "sku": "AS-SLP-KHK-10", "stock": 14 }
+    ],
+    "features": ["Memory Foam Insole", "Elastic Side Gores", "Vulcanized Rubber Sole"]
+  },
+  {
+    "id": "prod-024",
+    "name": "Nordic Knit Cashmere Blend Scarf",
+    "category": "Accessories",
+    "brand": "NordicWarmth",
+    "price": 45.0,
+    "currency": "USD",
+    "stock": 42,
+    "rating": 4.8,
+    "description": "Extra-long ultra-soft cashmere and wool blend winter scarf with fringed edges.",
+    "image": "/products/scarf.jpg",
+    "variants": [
+      { "color": "Oatmeal Melange", "size": "70x180cm", "sku": "NW-SCF-OAT", "stock": 25 },
+      { "color": "Burgundy", "size": "70x180cm", "sku": "NW-SCF-BRG", "stock": 17 }
+    ],
+    "features": ["30% Cashmere, 70% Wool", "70x180cm Oversized", "Tassel Trim"]
+  },
+  {
+    "id": "prod-025",
+    "name": "HydroVault 32oz Insulated Water Bottle",
+    "category": "Accessories",
+    "brand": "HydroCraft",
+    "price": 32.0,
+    "currency": "USD",
+    "stock": 65,
+    "rating": 4.9,
+    "description": "Pro-grade stainless steel bottle with leakproof straw lid and condensation-free powder coat.",
+    "image": "/products/bottle.jpg",
+    "variants": [
+      { "color": "Pacific Blue", "size": "32oz", "sku": "HC-BOT-BLU-32", "stock": 35 },
+      { "color": "Obsidian", "size": "32oz", "sku": "HC-BOT-BLK-32", "stock": 30 }
+    ],
+    "features": ["Keeps Cold 24hrs / Hot 12hrs", "Leakproof Straw Lid", "Dishwasher Safe"]
+  },
+  {
+    "id": "prod-026",
+    "name": "TerraPac Water-Resistant Duffel Bag",
+    "category": "Bags",
+    "brand": "TerraCraft",
+    "price": 68.0,
+    "currency": "USD",
+    "stock": 25,
+    "rating": 4.7,
+    "description": "45L weekend duffel featuring a dedicated ventilated shoe compartment and padded shoulder strap.",
+    "image": "/products/duffel.jpg",
+    "variants": [
+      { "color": "Matte Charcoal", "size": "45L", "sku": "TC-DUF-CHR-45", "stock": 15 },
+      { "color": "Army Green", "size": "45L", "sku": "TC-DUF-GRN-45", "stock": 10 }
+    ],
+    "features": ["Ventilated Shoe Pocket", "45L Weekend Capacity", "Heavy Duty TPU Zippers"]
+  },
+  {
+    "id": "prod-027",
+    "name": "BreezeFlex Linen Button-Down Shirt",
+    "category": "Apparel",
+    "brand": "UrbanBasics",
+    "price": 52.0,
+    "currency": "USD",
+    "stock": 36,
+    "rating": 4.6,
+    "description": "100% Normandy flax linen regular-fit long sleeve shirt, garment-washed for relaxed softness.",
+    "image": "/products/linen-shirt.jpg",
+    "variants": [
+      { "color": "Sky Blue", "size": "M", "sku": "UB-LIN-BLU-M", "stock": 18 },
+      { "color": "Crisp White", "size": "L", "sku": "UB-LIN-WHT-L", "stock": 18 }
+    ],
+    "features": ["100% French Flax Linen", "Mother of Pearl Buttons", "Curved Hem"]
+  },
+  {
+    "id": "prod-028",
+    "name": "NovaCharge 65W GaN Fast Wall Charger",
+    "category": "Electronics",
+    "brand": "VoltLab",
+    "price": 34.99,
+    "currency": "USD",
+    "stock": 50,
+    "rating": 4.9,
+    "description": "Ultra-compact 3-port GaN III wall adapter capable of fast-charging laptops, tablets, and phones simultaneously.",
+    "image": "/products/charger.jpg",
+    "variants": [
+      { "color": "Matte White", "size": "65W", "sku": "VL-GAN-WHT", "stock": 30 },
+      { "color": "Matte Black", "size": "65W", "sku": "VL-GAN-BLK", "stock": 20 }
+    ],
+    "features": ["GaN III Tech", "2x USB-C + 1x USB-A", "Foldable Prongs"]
+  },
+  {
+    "id": "prod-029",
+    "name": "UrbanExplorer Water-Repellent Windbreaker",
+    "category": "Apparel",
+    "brand": "UrbanBasics",
+    "price": 72.0,
+    "currency": "USD",
+    "stock": 24,
+    "rating": 4.6,
+    "description": "Packable lightweight jacket featuring DWR finish, zippered vents, and stowaway storm hood.",
+    "image": "/products/windbreaker.jpg",
+    "variants": [
+      { "color": "Black/Steel", "size": "M", "sku": "UB-WB-BLK-M", "stock": 12 },
+      { "color": "Black/Steel", "size": "L", "sku": "UB-WB-BLK-L", "stock": 12 }
+    ],
+    "features": ["DWR Water Repellent", "Packs into Pocket", "Underarm Ventilation"]
+  },
+  {
+    "id": "prod-030",
+    "name": "Heritage Leather Bifold Slim Wallet",
+    "category": "Accessories",
+    "brand": "TerraCraft",
+    "price": 38.0,
+    "currency": "USD",
+    "stock": 40,
+    "rating": 4.8,
+    "description": "Hand-stitched vegetable-tanned leather wallet with RFID-blocking lining, 6 card slots, and bill compartment.",
+    "image": "/products/wallet.jpg",
+    "variants": [
+      { "color": "Saddle Tan", "size": "Slim", "sku": "TC-WLT-TAN", "stock": 25 },
+      { "color": "Ebony Black", "size": "Slim", "sku": "TC-WLT-BLK", "stock": 15 }
+    ],
+    "features": ["RFID Blocking Layer", "Full-grain Cowhide", "Ultra-slim 8mm Profile"]
+  },
+  {
+    "id": "prod-031",
+    "name": "Apex Diver 200m Automatic Sport Watch",
+    "category": "Watches",
+    "brand": "ChronoCraft",
+    "price": 240.0,
+    "currency": "USD",
+    "stock": 14,
+    "rating": 4.9,
+    "description": "Professional 200m water-resistant diving watch featuring ceramic unidirectional rotating bezel and Super-LumiNova markers.",
+    "image": "/products/diver-watch.jpg",
+    "variants": [
+      { "color": "Ocean Blue", "size": "41mm", "sku": "CC-DIV-BLU", "stock": 8 },
+      { "color": "Emerald Green", "size": "41mm", "sku": "CC-DIV-GRN", "stock": 6 }
+    ],
+    "features": ["200m / 20 Bar Diver ISO", "Ceramic Bezel", "Super-LumiNova BGW9"]
+  },
+  {
+    "id": "prod-032",
+    "name": "PureSound Studio Monitor In-Ear Monitors",
+    "category": "Electronics",
+    "brand": "SoundForge",
+    "price": 110.0,
+    "currency": "USD",
+    "stock": 0,
+    "rating": 4.8,
+    "description": "Quad balanced-armature audiophile in-ear monitors with detachable silver-plated MMCX cable. Currently out of stock.",
+    "image": "/products/iem.jpg",
+    "variants": [{ "color": "Clear Resin", "size": "Custom Fit", "sku": "SF-IEM-CLR", "stock": 0 }],
+    "features": ["4 Balanced Armature Drivers", "Detachable MMCX Cable", "Noise Isolation 26dB"]
+  }
+]
