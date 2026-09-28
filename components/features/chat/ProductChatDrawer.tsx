@@ -38,6 +38,35 @@ import { cn } from "@/lib/utils";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { ProductCarousel } from "./ProductCarousel";
 
+const FALLBACK_CHAT_ERROR = "I'm having trouble right now. Please try again in a moment.";
+
+function looksLikeHtml(text: string): boolean {
+  const t = text.trim().toLowerCase();
+  return t.startsWith("<!doctype") || t.startsWith("<html") || t.includes("__next_error__");
+}
+
+/** Prefer JSON error fields; never surface Next.js HTML error pages in the chat UI. */
+function friendlyApiError(raw: string, status: number): string {
+  const trimmed = raw.trim();
+  if (!trimmed || looksLikeHtml(trimmed)) {
+    return status >= 500 ? FALLBACK_CHAT_ERROR : `Request failed (${status}). Please try again.`;
+  }
+  try {
+    const parsed = JSON.parse(trimmed) as { error?: string; message?: string };
+    if (typeof parsed.error === "string" && parsed.error.trim()) return parsed.error.trim();
+    if (typeof parsed.message === "string" && parsed.message.trim()) return parsed.message.trim();
+  } catch {
+    // not JSON
+  }
+  if (looksLikeHtml(trimmed) || trimmed.length > 280) return FALLBACK_CHAT_ERROR;
+  return trimmed.slice(0, 240);
+}
+
+function sanitizeChatContent(content: string): string {
+  if (!content || looksLikeHtml(content)) return FALLBACK_CHAT_ERROR;
+  return content;
+}
+
 /** Map a RAG RetrievedProduct to the ChatbotProduct shape expected by ProductChatCard */
 function mapToChatbotProduct(p: RetrievedProduct): ChatbotProduct {
   const matchingSpec =
@@ -52,7 +81,7 @@ function mapToChatbotProduct(p: RetrievedProduct): ChatbotProduct {
     name: p.title,
     price: p.price,
     currency: "USD",
-    image: p.image ?? "",
+    image: p.image?.trim() || "/placeholder-product.png",
     rating: 4.5,
     in_stock: p.stock > 0,
     short_description: [
@@ -315,8 +344,13 @@ export function ProductChatDrawer({ variant = "store" }: { variant?: AssistantVa
       if (raw) {
         const parsed = JSON.parse(raw) as ChatMessage[];
         if (Array.isArray(parsed) && parsed.length > 0) {
+          const cleaned = parsed.map((m) =>
+            m.role === "assistant" && looksLikeHtml(m.content)
+              ? { ...m, content: FALLBACK_CHAT_ERROR, failed: true }
+              : m
+          );
           // Avoid setting state synchronously in useEffect body
-          setTimeout(() => setMessages(parsed), 0);
+          setTimeout(() => setMessages(cleaned), 0);
           stickToBottomRef.current = true;
           // Avoid setting state synchronously in useEffect body
           setTimeout(() => setIsOpen(true), 0); // auto-open with restored history
@@ -530,7 +564,7 @@ export function ProductChatDrawer({ variant = "store" }: { variant?: AssistantVa
     try {
       const cappedHistory = updatedMessages.slice(-6).map((m) => ({
         role: m.role,
-        content: m.content,
+        content: looksLikeHtml(m.content) ? "[previous reply unavailable]" : m.content,
       }));
 
       const res = await fetch(config.chatUrl, {
@@ -546,14 +580,12 @@ export function ProductChatDrawer({ variant = "store" }: { variant?: AssistantVa
 
       if (!res.ok) {
         const raw = await res.text().catch(() => "");
-        let errorMessage = `Server responded with status ${res.status}`;
-        try {
-          const errorJson = JSON.parse(raw) as { error?: string };
-          if (errorJson.error) errorMessage = errorJson.error;
-        } catch {
-          if (raw.trim()) errorMessage = raw.slice(0, 240);
-        }
-        throw new Error(errorMessage);
+        throw new Error(friendlyApiError(raw, res.status));
+      }
+      const contentType = res.headers.get("content-type") || "";
+      if (!contentType.includes("text/event-stream") && !contentType.includes("application/json")) {
+        const raw = await res.text().catch(() => "");
+        throw new Error(friendlyApiError(raw, res.status || 500));
       }
       if (!res.body) throw new Error("No response body received from server");
 
@@ -624,13 +656,15 @@ export function ProductChatDrawer({ variant = "store" }: { variant?: AssistantVa
             let errorText = dataRaw;
             try {
               const parsedError = JSON.parse(dataRaw);
-              errorText = parsedError.error || "Something went wrong.";
+              errorText = parsedError.error || FALLBACK_CHAT_ERROR;
             } catch {
               // keep raw
             }
             setMessages((prev) =>
               prev.map((msg) =>
-                msg.id === assistantMessageId ? { ...msg, content: errorText, failed: true } : msg
+                msg.id === assistantMessageId
+                  ? { ...msg, content: sanitizeChatContent(errorText), failed: true }
+                  : msg
               )
             );
           }
@@ -660,7 +694,9 @@ export function ProductChatDrawer({ variant = "store" }: { variant?: AssistantVa
         const errMsg = err instanceof Error ? err.message : "Failed to connect to the assistant.";
         setMessages((prev) =>
           prev.map((msg) =>
-            msg.id === assistantMessageId ? { ...msg, content: errMsg, failed: true } : msg
+            msg.id === assistantMessageId
+              ? { ...msg, content: sanitizeChatContent(errMsg), failed: true }
+              : msg
           )
         );
       }
@@ -1059,7 +1095,9 @@ export function ProductChatDrawer({ variant = "store" }: { variant?: AssistantVa
                                   {config.loadingHint}
                                 </span>
                               ) : isUser || msg.failed ? (
-                                <span className="whitespace-pre-wrap">{msg.content}</span>
+                                <span className="whitespace-pre-wrap">
+                                  {msg.failed ? sanitizeChatContent(msg.content) : msg.content}
+                                </span>
                               ) : (
                                 <ChatMarkdown content={msg.content} />
                               )}

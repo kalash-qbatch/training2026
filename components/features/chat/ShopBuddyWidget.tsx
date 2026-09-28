@@ -149,7 +149,21 @@ export function ShopBuddyWidget() {
         }),
       });
 
-      const data: ChatbotResponse = await response.json();
+      const raw = await response.text();
+      if (
+        !response.ok ||
+        raw.trim().toLowerCase().startsWith("<!doctype") ||
+        raw.includes("__next_error__")
+      ) {
+        throw new Error("I'm having trouble right now. Please try again in a moment.");
+      }
+
+      let data: ChatbotResponse;
+      try {
+        data = JSON.parse(raw) as ChatbotResponse;
+      } catch {
+        throw new Error("I'm having trouble right now. Please try again in a moment.");
+      }
 
       const botMessage: Message = {
         id: nextMessageId("bot"),
