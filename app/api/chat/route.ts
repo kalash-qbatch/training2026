@@ -10,6 +10,8 @@ import { buildUserOrderReply, detectUserOrderIntent } from "@/lib/ai/user-orders
 import { prisma } from "@/lib/db";
 import {
   buildRagPromptContext,
+  isGlobalPriceBrowse,
+  parseProductSearchIntent,
   type RetrievedProduct,
   searchSimilarProducts,
   SYSTEM_RAG_PROMPT,
@@ -271,24 +273,45 @@ export async function POST(request: Request) {
       });
     }
 
-    let queryEmbedding: number[];
+    const searchIntentFromUser = parseProductSearchIntent(message);
+    const searchIntentFromRewrite = parseProductSearchIntent(standaloneQuery);
+    // Prefer the original message when it is a clear price/catalog browse — rewrites
+    // sometimes drop "lowest/cheapest" and would empty the catalog again.
+    const searchQuery =
+      isGlobalPriceBrowse(searchIntentFromUser) && !isGlobalPriceBrowse(searchIntentFromRewrite)
+        ? message
+        : standaloneQuery;
+    const searchIntent = parseProductSearchIntent(searchQuery);
+    const priceBrowse = isGlobalPriceBrowse(searchIntent);
+
+    let queryEmbedding: number[] = [];
+    let embeddingFailed = false;
     try {
-      queryEmbedding = await createEmbedding(standaloneQuery);
+      queryEmbedding = await createEmbedding(searchQuery);
     } catch (embedError) {
+      embeddingFailed = true;
       console.error("Embedding generation failed:", embedError);
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Product search is temporarily unavailable (embedding failed). Please try again in a moment.",
-        },
-        { status: 500 }
-      );
+      if (!priceBrowse) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Product search is temporarily unavailable (embedding failed). Please try again in a moment.",
+          },
+          { status: 500 }
+        );
+      }
+      queryEmbedding = new Array(384).fill(0);
     }
 
     let retrievedProducts: RetrievedProduct[] = [];
     try {
-      retrievedProducts = await searchSimilarProducts(queryEmbedding, 5, 0.25, standaloneQuery);
+      retrievedProducts = await searchSimilarProducts(
+        queryEmbedding,
+        5,
+        embeddingFailed ? 0 : 0.25,
+        searchQuery
+      );
     } catch (searchError) {
       console.error("Product vector search failed:", searchError);
       return NextResponse.json(

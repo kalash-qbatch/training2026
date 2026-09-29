@@ -61,7 +61,11 @@ Your job is to rewrite the customer's question into a single, self-contained ENG
 - If the message is ONLY a greeting or small talk (any language), return exactly: SMALL_TALK
 - If clearly unrelated to shopping/products/orders, return exactly: OFF_TOPIC
 - Otherwise return ONLY the rewritten English search query text, with no quotes or preamble.
-- If already a clear English product query, return it unchanged.`,
+- If already a clear English product query, return it unchanged.
+- ALWAYS keep price intent words when present: cheapest, lowest price, most expensive, high range, high-end, low-end, premium, luxury, budget, under $N, sort by price.
+- Map natural phrases: "high range products" → "most expensive products"; "low range" / "budget" → "cheapest products".
+- Example: "show me the lowest price product" → "lowest price products in the store"
+- Example: "i want to know the high range of products" → "most expensive products"`,
         },
         ...recentHistory.map((m) => ({
           role: m.role as "user" | "assistant",

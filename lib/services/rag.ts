@@ -31,6 +31,8 @@ export type ProductSearchIntent = {
   productTerms: string[];
   maxPrice: number | null;
   sortBy: "relevance" | "price_asc" | "price_desc";
+  /** True when user wants a store-wide browse (cheapest / all products / catalog). */
+  catalogBrowse: boolean;
 };
 
 const PRODUCT_TERM_ALIASES: Array<{ match: RegExp; term: string }> = [
@@ -234,6 +236,19 @@ const INTENT_STOP_WORDS = new Set([
   "not",
   "dont",
   "don't",
+  "range",
+  "end",
+  "tier",
+  "priced",
+  "pricey",
+  "costly",
+  "costliest",
+  "luxury",
+  "know",
+  "high",
+  "low",
+  "upper",
+  "top",
 ]);
 
 function normalizeText(value: string): string {
@@ -252,8 +267,26 @@ export function hasSpecificSearchIntent(intent: ProductSearchIntent): boolean {
     intent.productTerms.length > 0 ||
     intent.colors.length > 0 ||
     intent.sizes.length > 0 ||
-    intent.maxPrice != null
+    intent.maxPrice != null ||
+    intent.sortBy !== "relevance" ||
+    intent.catalogBrowse
   );
+}
+
+/** Keep only known category terms — drops typos like "tghe" that kill catalog results. */
+export function knownCatalogProductTerms(terms: string[]): string[] {
+  return terms.filter(
+    (t) =>
+      Boolean(TERM_SYNONYMS[t]) ||
+      PRODUCT_TERM_ALIASES.some((a) => a.term === t) ||
+      Object.values(TERM_SYNONYMS).some((syns) => syns.includes(t))
+  );
+}
+
+export function isGlobalPriceBrowse(intent: ProductSearchIntent): boolean {
+  if (intent.colors.length > 0 || intent.sizes.length > 0) return false;
+  if (intent.sortBy === "relevance" && !intent.catalogBrowse) return false;
+  return knownCatalogProductTerms(intent.productTerms).length === 0;
 }
 
 export function parseProductSearchIntent(query: string): ProductSearchIntent {
@@ -308,16 +341,40 @@ export function parseProductSearchIntent(query: string): ProductSearchIntent {
   const underMatch = query.match(/(?:under|below|less than|<=?)\s*\$?\s*(\d+(?:\.\d+)?)/i);
   if (underMatch) maxPrice = Number(underMatch[1]);
 
+  // Natural language price bands (high-range / low-end / premium / budget, etc.)
+  const PRICE_ASC_RE =
+    /\b(cheapest|cheap(er)?|lowest(\s+priced?)?|low[\s-]?price|low[\s-]?end|low[\s-]?range|lower[\s-]?range|budget|affordable|inexpensive|economical|least\s+expensive|min(imum)?\s+price|lowest\s+price|price\s*(is\s+)?(low|lowest|cheapest)|sort(ed)?\s+by\s+price\s*(asc|low)?|entry[\s-]?level)\b/i;
+  const PRICE_DESC_RE =
+    /\b(most\s+expensive|expensive|highest(\s+priced?)?|high[\s-]?price|high[\s-]?end|high[\s-]?range|higher[\s-]?range|upper[\s-]?range|upper[\s-]?end|top[\s-]?end|top[\s-]?tier|top[\s-]?(priced|price)|premium|luxury|costliest|pricey|costly|max(imum)?\s+price|highest\s+price|price\s*(is\s+)?(high|highest|expensive)|sort(ed)?\s+by\s+price\s*(desc|high)?|deluxe)\b/i;
+
   let sortBy: ProductSearchIntent["sortBy"] = "relevance";
-  if (/\b(cheapest|lowest|low[\s-]?price|budget|affordable|inexpensive)\b/i.test(query)) {
+  if (PRICE_ASC_RE.test(query)) {
     sortBy = "price_asc";
-  } else if (/\b(expensive|highest|premium|costliest|most\s+expensive)\b/i.test(query)) {
+  } else if (PRICE_DESC_RE.test(query)) {
     sortBy = "price_desc";
   } else if (maxPrice != null) {
     sortBy = "price_asc";
   }
 
-  return { colors, sizes, productTerms, maxPrice, sortBy };
+  const catalogBrowse =
+    sortBy !== "relevance" ||
+    maxPrice != null ||
+    /\b(all\s+products|what\s+do\s+you\s+(sell|have)|show\s+(me\s+)?(all\s+)?products|what'?s?\s+in\s+(the\s+)?(store|catalog)|browse\s+(the\s+)?(store|catalog)|catalog|price\s+range|price\s+list)\b/i.test(
+      query
+    );
+
+  // Drop noise terms (e.g. "tghe", "range") so price/catalog browse is not filtered to zero hits.
+  const cleanedTerms =
+    sortBy !== "relevance" || catalogBrowse ? knownCatalogProductTerms(productTerms) : productTerms;
+
+  return {
+    colors,
+    sizes,
+    productTerms: cleanedTerms,
+    maxPrice,
+    sortBy,
+    catalogBrowse,
+  };
 }
 
 function matchingVariantSpecs(
@@ -691,6 +748,68 @@ async function findProductsByTextTerms(terms: string[]): Promise<RetrievedProduc
   });
 }
 
+/** Store-wide browse by price (cheapest / most expensive / under $X) without needing embeddings. */
+async function findProductsByPriceBrowse(
+  sortBy: "price_asc" | "price_desc" | "relevance",
+  limit: number,
+  maxPrice?: number | null
+): Promise<RetrievedProduct[]> {
+  const order =
+    sortBy === "price_desc" ? ({ price: "desc" } as const) : ({ price: "asc" } as const);
+
+  const rows = await prisma.product.findMany({
+    where: {
+      isActive: true,
+      ...(maxPrice != null ? { price: { lte: maxPrice } } : {}),
+    },
+    orderBy: order,
+    take: Math.max(limit * 2, 10),
+    select: {
+      id: true,
+      title: true,
+      price: true,
+      color: true,
+      size: true,
+      stock: true,
+      image: true,
+      isActive: true,
+      category: { select: { name: true } },
+      specifications: {
+        select: { id: true, color: true, size: true, qty: true, sku: true },
+      },
+      images: {
+        select: { url: true, color: true },
+        orderBy: { sortOrder: "asc" },
+      },
+    },
+  });
+
+  return rows.map((p, index) => {
+    const galleryImages = (p.images || []).map((img) => ({
+      url: img.url,
+      color: img.color || "",
+    }));
+    return withResolvedImage(
+      {
+        id: p.id,
+        title: p.title,
+        price: Number(p.price),
+        color: p.color,
+        size: p.size,
+        stock: p.stock,
+        image: p.image,
+        isActive: p.isActive,
+        categoryName: p.category?.name ?? null,
+        // Higher score for earlier (cheaper/expensive) rows so merge prefers them
+        similarity: Math.max(0.5, 0.95 - index * 0.02),
+        specifications: p.specifications,
+        galleryImages,
+      },
+      p.color
+    );
+  });
+}
+
 function mergeProductCandidates(
   vectorHits: RetrievedProduct[],
   textHits: RetrievedProduct[]
@@ -724,6 +843,8 @@ function mergeProductCandidates(
 
 /**
  * Searches for products using pgvector, then applies query-intent filters.
+ * Price / catalog browse queries hit Postgres directly so they work even when
+ * embeddings are missing or the query has no product-type keyword.
  */
 export async function searchSimilarProducts(
   embedding: number[],
@@ -736,6 +857,18 @@ export async function searchSimilarProducts(
   // Vague prompts ("hi", "recommend something") must not surface random catalog hits.
   if (intent && !hasSpecificSearchIntent(intent)) {
     return [];
+  }
+
+  // "lowest price product", "cheapest item", "most expensive" — browse by price in DB.
+  if (intent && isGlobalPriceBrowse(intent)) {
+    const browsed = await findProductsByPriceBrowse(
+      intent.sortBy === "relevance" ? "price_asc" : intent.sortBy,
+      limit,
+      intent.maxPrice
+    );
+    if (browsed.length === 0) return [];
+    const hydrated = await hydrateGalleryImages(browsed);
+    return stripGalleryForClient(hydrated).slice(0, limit);
   }
 
   const vecStr = `[${embedding.join(",")}]`;
@@ -827,6 +960,19 @@ export async function searchSimilarProducts(
     products = mergeProductCandidates(products, textHits);
   }
 
+  // "cheapest watch" with no embeddings: still return price-sorted text hits.
+  if (products.length === 0 && intent && intent.sortBy !== "relevance") {
+    if (intent.productTerms.length > 0) {
+      const textHits = await findProductsByTextTerms(intent.productTerms);
+      products = filterProductsByIntent(textHits, intent);
+    } else {
+      products = await findProductsByPriceBrowse(intent.sortBy, limit, intent.maxPrice);
+    }
+    if (products.length === 0) return [];
+    const hydrated = await hydrateGalleryImages(products);
+    return stripGalleryForClient(hydrated).slice(0, limit);
+  }
+
   products = await hydrateGalleryImages(products);
 
   if (products.length === 0) {
@@ -835,6 +981,12 @@ export async function searchSimilarProducts(
 
   if (intent) {
     products = filterProductsByIntent(products, intent);
+  }
+
+  // Price sort with category still empty after filters → price-browse that category via text.
+  if (products.length === 0 && intent?.productTerms.length && intent.sortBy !== "relevance") {
+    const textHits = await findProductsByTextTerms(intent.productTerms);
+    products = filterProductsByIntent(await hydrateGalleryImages(textHits), intent);
   }
 
   products = products.map((p) => withResolvedImage(p, p.color));
@@ -894,7 +1046,7 @@ GROUNDING:
 3. Prefer the best overall match for the asked product type (clear title/category). If the exact color/size is missing on the best match, say so and still recommend that product when appropriate — do not push poorly named / likely mismatched listings over a clear match.
 4. Only recommend products that match the user's asked product type. Never list unrelated categories.
 5. If the user asked for a specific color or size and it exists on a strong match, use that variant's stock. Do not invent colors.
-6. When the user asks for cheapest / most expensive / under a price, respect that order and only list matching items.
+6. When the user asks for cheapest / lowest / low-range / budget OR most expensive / high-range / high-end / premium / luxury, the retrieved list is already sorted for that — recommend those products clearly with prices. Never say the catalog is empty if products are listed in the context. Call them "higher-priced" or "more affordable" naturally — do not invent a brand tier that is not in the data.
 7. When listing products, use a short bullet list (not markdown tables). For each item include title, price as $XX.XX, the matching color/size if known, and stock for that variant.
 8. You may link products as: [View Product](/products/{ID})
 9. Keep answers concise and professional. Never continue with off-topic content after a store answer.`;
